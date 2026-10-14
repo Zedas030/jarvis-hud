@@ -1,0 +1,32 @@
+.env
+state.json
+__pycache__/
+*.pyc
+raw-*.log
+
+# skills installer writes a symlink farm per agent; keep .agents (real content)
+# plus .claude (what Claude Code reads) and drop the rest
+.hermes/
+.kiro/
+
+# personal memory
+vault/Erinnerungen/
+vault/Gespraeche/
+.jarvis-mcp.json
+.garmin_tokens/
+.venv/
+
+# local TTS voice models
+models/
+.venv-tts/
+
+# generated per run / personal — never in the repo
+.jarvis-mcp*.json
+logs/
+vault/Papierkorb/
+hoerprobe_*.wav
+.env.*
+!.env.example
+
+# personal configuration — only the example goes into the repo
+config/home.json

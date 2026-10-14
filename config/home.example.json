@@ -1,0 +1,35 @@
+{
+  "_comment": "Kopieren nach config/home.json und die Entity-IDs aus Home Assistant eintragen (Entwicklerwerkzeuge → Zustände). Felder ohne passendes Gerät leer lassen.",
+  "storage_name": "Batteriespeicher",
+  "solar_power": [
+    "sensor.solar_power"
+  ],
+  "generation_today": [
+    "sensor.solar_energy_today"
+  ],
+  "storage_soc": "sensor.battery_state_of_charge",
+  "battery_soc_pattern": "sensor\\.\\w+_bat(\\d+)_soc",
+  "charge_power": "sensor.battery_charging_power",
+  "output_power": "sensor.battery_output_power",
+  "rooms": [
+    [
+      "climate.living_room",
+      "Wohnzimmer"
+    ],
+    [
+      "climate.bedroom",
+      "Schlafzimmer"
+    ]
+  ],
+  "air_pm25": "sensor.air_purifier_pm25",
+  "router": {
+    "online": "binary_sensor.router_connection",
+    "down": "sensor.router_download",
+    "up": "sensor.router_upload",
+    "temp": "sensor.router_cpu_temperature"
+  },
+  "person": "person.user",
+  "battery_ignore": [
+    "sensor.phone_battery_level"
+  ]
+}

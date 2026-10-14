@@ -1,0 +1,8 @@
+# Haupt-Umgebung (.venv) — Server, Spracherkennung, Microsoft- und Piper-Stimme, Garmin.
+# Der Server selbst braucht nur die Python-Standardbibliothek.
+edge-tts>=7.3.1
+faster-whisper==1.2.1
+nvidia-cublas-cu12      # Whisper auf der Grafikkarte (CUDA 12)
+nvidia-cudnn-cu12
+piper-tts==1.8.0
+garminconnect==0.3.17
