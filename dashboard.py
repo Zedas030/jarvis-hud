@@ -244,4 +244,10 @@ def data():
         mail=_cached("mail", 300, _mail),
         nas=_cached("nas", 300, _nas),
         pi=_cached("pi", 120, _pi),
+        pc=_cached("pc", 20, _pc),
     )
+
+
+def _pc():
+    import infra
+    return infra.pc_metrics()

@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy to config/scripts.json. Jarvis may only start these scripts, always with a confirmation card. path: .ps1, .bat, .cmd or .py; args are fixed here (the model cannot add any); timeout in seconds. The names are what you say, so German.",
+  "temp aufräumen": {
+    "path": "C:\\Skripte\\temp-aufraeumen.ps1",
+    "beschreibung": "Löscht Dateien in %TEMP%, die älter als 7 Tage sind",
+    "timeout": 120
+  },
+  "dns leeren": {
+    "path": "C:\\Skripte\\dns-flush.bat",
+    "beschreibung": "Leert den DNS-Cache von Windows",
+    "timeout": 30
+  }
+}

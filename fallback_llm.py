@@ -47,8 +47,8 @@ PRIVATE_OK = {p.strip() for p in os.environ.get("JARVIS_FALLBACK_PRIVATE", "groq
 UNSUPPORTED_GROUPS = {"pc", "ha_full"}
 # Tools that change something. After one of these ran, no second provider takes
 # over (it would repeat the action); after read-only tools a handover is safe.
-ACTING_TOOLS = {"home_control", "calendar_add", "memory_save", "mail_mark_read", "music", "open_website",
-                "reminder_add", "reminder_cancel", "list_add", "list_remove", "routine_save", "routine_delete"}
+import policy  # noqa: E402
+ACTING_TOOLS = policy.acting()
 # Typographic spaces and hyphens some models emit; the voice chain reads them oddly.
 _PLAIN = str.maketrans({" ": " ", " ": " ", " ": " ", "‑": "-", "‐": "-"})
 

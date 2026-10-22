@@ -185,6 +185,10 @@ function renderSystems(d) {
   if (h && !h.error) row(h.router.online ? 'ok' : 'bad', 'Router',
     h.router.online ? '↓ ' + de(h.router.down * 8 / 1000, 1) + ' · ↑ ' + de(h.router.up * 8 / 1000, 1) + ' Mbit/s' : 'offline');
   if (h) row(h.error ? 'bad' : 'ok', 'Home Assistant', h.error ? 'nicht erreichbar' : 'verbunden');
+  var c = d.pc;
+  if (c && !c.error) row((c.pc_gpu_temp > 85 || c.pc_disk > 92) ? 'warn' : 'ok', 'Dieser PC',
+    'CPU ' + de(c.pc_cpu) + ' % · RAM ' + de(c.pc_ram) + ' %' + (c.pc_vram != null ? ' · VRAM ' + de(c.pc_vram) + ' %' : '')
+    + (c.pc_gpu_temp != null ? ' · GPU ' + de(c.pc_gpu_temp) + ' °C' : ''));
   $('#sysList').innerHTML = rows.map(function (r) {
     return '<li class="' + r[0] + '"><i class="dot"></i><span class="nm">' + esc(r[1]) + '</span><em>' + esc(r[2]) + '</em></li>';
   }).join('') || '<p class="hint">lädt …</p>';
@@ -316,6 +320,7 @@ async function loadStatus() {
   safely(function () { if (s.wake) Wake.configure(s.wake); });
   safely(function () {
     window.__quiet = !!s.quiet;
+    if (s.persona) { window.__persona = s.persona; if (!running) $('#toneNow').textContent = s.persona; }
     if (typeof s.night_volume === 'number') window.__nightVolume = s.night_volume;
   });
   safely(function () { if (s.timers) Timers.set(s.timers); });
@@ -427,6 +432,14 @@ function renderBilling(b) {
 })();
 
 /* ── the run ──────────────────────────────── */
+// A typed question may get a long answer: only its first paragraph is read aloud.
+var typedRun = false;
+function speakable(text) {
+  if (!typedRun) return text;
+  var cut = text.search(/\n\s*\n/);
+  return cut >= 0 ? text.slice(0, cut) : text;
+}
+
 async function transmit(message, opts) {
   message = (message || '').trim();
   if (!message) return;
@@ -440,7 +453,8 @@ async function transmit(message, opts) {
   document.body.classList.remove('boot');
   document.body.classList.add('running');
   if (graph) graph.setActivity(1);
-  $('#toneNow').textContent = '—';
+  $('#toneNow').textContent = window.__persona || '—';
+  typedRun = !!opts.typed;
   setVoiceState('THINKING', 'hot');
   bubble('me', message);
   answerBubble = bubble('jarvis', '');
@@ -453,7 +467,7 @@ async function transmit(message, opts) {
     var res = await fetch('/api/run', {
       method: 'POST',
       headers: headers({ 'content-type': 'application/json' }),
-      body: JSON.stringify({ message: message, fresh: /^\/new\b/.test(message) }),
+      body: JSON.stringify({ message: message, fresh: /^\/new\b/.test(message), typed: !!opts.typed }),
       signal: activeCtl.signal
     });
     if (!res.ok) throw new Error('backend HTTP ' + res.status);
@@ -481,7 +495,7 @@ async function transmit(message, opts) {
   $('#sLatency').textContent = Math.round(performance.now() - t0) + 'ms';
   setVoiceState('IDLE', '');
   if (answerText.trim() && opts.speak !== false) {
-    feedSpeech(answerText, true);   // whatever is left after the last full sentence
+    feedSpeech(speakable(answerText), true);   // whatever is left after the last full sentence
     await speechDrained();
   }
   streamSpeak = false;
@@ -521,11 +535,15 @@ function handleEvent(ev) {
       break;
     case 'delta':
       answerText += ev.text;
-      if (streamSpeak) feedSpeech(answerText, false);
+      if (streamSpeak) feedSpeech(speakable(answerText), false);
       renderSpoken(answerBubble, answerText);
       var tone = lastTone(answerText);
       if (tone) $('#toneNow').textContent = tone;
       $('#transcript').scrollTop = $('#transcript').scrollHeight;
+      break;
+    case 'route':
+      $('#routeNow').textContent = ev.model + (ev.groups && ev.groups.length ? ' · ' + ev.groups.join(', ') : '')
+        + (ev.reason ? ' · ' + ev.reason : '');
       break;
     case 'ratelimit':
       $('#sLimit').textContent = (ev.status || '—') + (ev.window ? ' · ' + ev.window.replace('_', ' ') : '');
@@ -650,9 +668,10 @@ function driveOrb(audio, isDone) {
     var an = orbAudioCtx.createAnalyser();
     an.fftSize = 512;
     src.connect(an); an.connect(orbAudioCtx.destination);
+    Wave.speech = an;
     var buf = new Uint8Array(an.fftSize);
     (function tick() {
-      if (isDone()) { JarvisOrb.setLevel(0); return; }
+      if (isDone()) { JarvisOrb.setLevel(0); if (Wave.speech === an) Wave.speech = null; return; }
       an.getByteTimeDomainData(buf);
       var sum = 0;
       for (var i = 0; i < buf.length; i++) { var v = (buf[i] - 128) / 128; sum += v * v; }
@@ -661,6 +680,89 @@ function driveOrb(audio, isDone) {
     })();
   } catch (e) { /* audio still plays through the element */ }
 }
+
+/* Waveform in the right rail: Jarvis' voice while he speaks, otherwise the live microphone.
+   Only real signal — a flat line when nothing is there. */
+var Wave = { speech: null, cv: null };
+(function waveLoop() {
+  var cv = document.getElementById('wave');
+  if (!cv) return;
+  var g = cv.getContext('2d'), buf = new Uint8Array(512);
+  (function draw() {
+    var an = Wave.speech || (typeof Live !== 'undefined' && Live.on && Live.analyser) || null;
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.strokeStyle = Wave.speech ? 'rgba(95,228,255,.95)' : 'rgba(95,228,255,.45)';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    if (an) {
+      var n = Math.min(buf.length, an.fftSize || 512);
+      an.getByteTimeDomainData(buf.subarray(0, n));
+      for (var i = 0; i < n; i++) {
+        var x = i / (n - 1) * cv.width, y = buf[i] / 255 * cv.height;
+        if (i) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+    } else { g.moveTo(0, cv.height / 2); g.lineTo(cv.width, cv.height / 2); }
+    g.stroke();
+    requestAnimationFrame(draw);
+  })();
+})();
+
+/* Notification centre behind the bell: messages, homelab incidents, open proposals. */
+var Notes = {
+  unseen: 0,
+  bump: function () {
+    Notes.unseen++;
+    var b = $('#bellCount'); if (b) { b.hidden = false; b.textContent = Notes.unseen > 9 ? '9+' : Notes.unseen; }
+  },
+  open: async function () {
+    Notes.unseen = 0; $('#bellCount').hidden = true;
+    $('#noteBox').hidden = false;
+    try {
+      var n = await (await fetch('/api/notifications', { headers: headers() })).json();
+      var t = function (s) { return new Date(s * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); };
+      var html = '';
+      if (n.paused_until) html += '<h3>NOT-AUS</h3><ul><li class="bad">Pausiert bis ' + t(n.paused_until) + ' — „weitermachen“ hebt es auf.</li></ul>';
+      if (n.proposals.length) html += '<h3>OFFENE VORSCHLÄGE</h3><ul>' + n.proposals.map(function (p) {
+        return '<li class="prop"><b>' + esc(p.title) + '</b><br>' + esc(p.why) + '</li>'; }).join('') + '</ul>';
+      html += '<h3>MELDUNGEN</h3><ul>' + (n.items.map(function (e) {
+        return '<li><small>' + t(e.at) + ' · ' + esc(e.kind) + '</small>' + esc(e.text) + '</li>'; }).join('')
+        || '<li>Noch keine Meldungen seit dem Start.</li>') + '</ul>';
+      if (n.incidents.length) html += '<h3>HOMELAB</h3><ul>' + n.incidents.map(function (i) {
+        return '<li class="' + (i.state === 'ok' ? 'ok' : 'bad') + '"><small>' + esc(i.at) + '</small>' + esc(i.text) + '</li>'; }).join('') + '</ul>';
+      $('#noteBody').innerHTML = html;
+      $('#noteAge').textContent = 'Profil ' + (n.persona || '—');
+    } catch (e) { $('#noteBody').innerHTML = '<p class="hint">Nicht erreichbar.</p>'; }
+  }
+};
+(function initNotes() {
+  var bell = document.getElementById('btnBell');
+  if (!bell) return;
+  bell.onclick = Notes.open;
+  $('#noteClose').onclick = function () { $('#noteBox').hidden = true; };
+  $('#noteBox').onclick = function (e) { if (e.target.id === 'noteBox') $('#noteBox').hidden = true; };
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('#noteBox').hidden = true; });
+})();
+
+/* Views: ?view=wall (command centre, e.g. a second monitor) or ?view=mini; remembered. */
+(function initViews() {
+  var set = function (v) {
+    document.body.classList.remove('view-wall', 'view-mini');
+    if (v) document.body.classList.add('view-' + v);
+    try { localStorage.setItem('jarvis.view', v || ''); } catch (e) { /* private mode */ }
+    ['Wall', 'Mini'].forEach(function (k) { var b = document.getElementById('btn' + k); if (b) b.classList.toggle('on', v === k.toLowerCase()); });
+  };
+  var q = new URLSearchParams(location.search).get('view'), saved = '';
+  try { saved = localStorage.getItem('jarvis.view') || ''; } catch (e) { /* private mode */ }
+  set(q !== null ? q : saved);
+  var wall = document.getElementById('btnWall'), mini = document.getElementById('btnMini');
+  if (wall) wall.onclick = function () {
+    var on = !document.body.classList.contains('view-wall');
+    set(on ? 'wall' : '');
+    if (on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {});
+    else if (!on && document.fullscreenElement) document.exitFullscreen();
+  };
+  if (mini) mini.onclick = function () { set(document.body.classList.contains('view-mini') ? '' : 'mini'); };
+})();
 
 /* Output volume, 0–1 — set by the slider in the right rail, remembered across reloads. */
 var voiceVolume = (function () {
@@ -1005,7 +1107,7 @@ function connectEvents() {
     if (ev.t === 'wake') return window.__remote ? undefined : Wake.heard();
     if (ev.t === 'timers') return Timers.set(ev.items || []);
     if (ev.t === 'say' && window.__remote) ev = Object.assign({}, ev, { silent: true });   // the PC reads it out
-    if (ev.t === 'say' || ev.t === 'alarm') { Push.queue.push(ev); drainPush(); }
+    if (ev.t === 'say' || ev.t === 'alarm') { Push.queue.push(ev); drainPush(); Notes.bump(); }
   };
 }
 
@@ -1655,9 +1757,9 @@ window.addEventListener('DOMContentLoaded', function () {
     $('#btnStop').disabled = !(running || stopSpeaking || Speech.active);
   }, 200);
 
-  $('#btnSend').onclick = function () { var v = $('#ask').value; $('#ask').value = ''; transmit(v); };
+  $('#btnSend').onclick = function () { var v = $('#ask').value; $('#ask').value = ''; transmit(v, { typed: true }); };
   $('#ask').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { var v = $('#ask').value; $('#ask').value = ''; transmit(v); }
+    if (e.key === 'Enter') { var v = $('#ask').value; $('#ask').value = ''; transmit(v, { typed: true }); }
   });
   $('#btnFit').onclick = function () { graph.fit(); };
   $('#btnLabels').onclick = function () {

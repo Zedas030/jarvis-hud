@@ -254,6 +254,9 @@ def log_turn(user_text, reply_text):
     reply = _strip_tags(reply_text)
     if not (user_text or "").strip() or not reply:
         return
+    import privacy
+    if privacy.is_work(user_text, reply):          # work stays out of the vault
+        user_text, reply = "(Arbeitsthema, nicht protokolliert)", "(nicht protokolliert)"
     DIARY_DIR.mkdir(parents=True, exist_ok=True)
     day = time.strftime("%Y-%m-%d")
     path = DIARY_DIR / f"Gespräch {day}.md"

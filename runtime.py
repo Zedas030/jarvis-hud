@@ -537,12 +537,10 @@ LEAN_EFFORT = os.environ.get("JARVIS_EFFORT", "low").strip()
 MAX_OUTPUT = os.environ.get("JARVIS_MAX_OUTPUT_TOKENS", "1500").strip()
 POOL_SIZE = int(os.environ.get("JARVIS_POOL_SIZE", "3"))
 # built-in Claude Code tools a group brings along (everything else stays off)
-GROUP_BUILTINS = {"web": ["WebSearch"], "pc": ["PowerShell"], "ha_full": ["ToolSearch"]}
+GROUP_BUILTINS = {"web": ["WebSearch"], "research": ["WebSearch"], "pc": ["PowerShell"], "ha_full": ["ToolSearch"]}
 # tools that run without a confirmation card; the rest goes through mcp__jarvis__approve
-NO_CONFIRM = {"web_fetch", "open_website", "memory_search", "memory_read", "memory_save", "calendar_events",
-              "home_states", "home_control", "mail_inbox", "mail_mark_read", "weather", "music", "pi_status", "nas_status",
-              "network_devices", "garmin_health", "reminder_add", "reminder_list", "reminder_cancel",
-              "list_read", "list_add", "list_remove", "routine_list", "routine_save", "routine_delete"}
+import policy  # noqa: E402  — READ and LIMITED_WRITE run without a card; policy.py has the table
+NO_CONFIRM = policy.no_confirm()
 
 _POOL = {}            # key -> (_Proc, spawned_at)
 _POOL_LOCK = threading.Lock()

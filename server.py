@@ -82,7 +82,16 @@ import dashboard   # noqa: E402
 import events      # noqa: E402
 import learning    # noqa: E402
 import pc          # noqa: E402
+import assistant  # noqa: E402
+import audit  # noqa: E402
 import fallback_llm  # noqa: E402
+import memory_tools  # noqa: E402
+import personality  # noqa: E402
+import policy  # noqa: E402
+import homelab_watch  # noqa: E402
+import reflection  # noqa: E402
+import suggestions  # noqa: E402
+import weekly_review  # noqa: E402
 import memory      # noqa: E402
 import router      # noqa: E402
 import runtime     # noqa: E402
@@ -203,9 +212,40 @@ BRIEFING_PROMPT = (commands.LEAN_PERSONA + "\n\nFormuliere aus den Fakten ein ge
                    "keine Nachrichten. Nichts erfinden, was nicht in den Fakten steht.")
 
 
+def notifications():
+    """For the bell in the HUD: recent messages, homelab incidents, open proposals, pause state."""
+    import emergency
+    import homelab_watch
+    import proposals
+    with events._COND:
+        said = [dict(text=e.get("text", ""), kind=e.get("kind") or e["t"], at=e["at"], t=e["t"])
+                for e in events._LOG if e["t"] in ("say", "alarm")][-30:][::-1]
+    paused = commands.load().get("paused_until") or 0
+    return dict(items=said, incidents=homelab_watch.history(15),
+                proposals=[dict(id=p["id"], title=p["title"], why=p["why"]) for p in proposals.pending()],
+                paused_until=paused if paused > time.time() else None, persona=personality.label())
+
+
+def _deny_open_cards():
+    """Emergency stop: every waiting confirmation card is answered with no."""
+    n = 0
+    for entry in list(PENDING.values()):
+        entry["allow"] = False
+        entry["event"].set()
+        n += 1
+    return n
+
+
 def _describe_call(tool, data):
     if not isinstance(data, dict):
         return str(data)[:400]
+    if tool.endswith("proposal_accept"):
+        import proposals
+        p = proposals.get(data.get("id"))
+        return policy.describe(tool, {"begruendung": data.get("begruendung")}) + "\n\n" + (
+            proposals.describe(p) if p else f"Vorschlag {data.get('id')} (nicht gefunden)")
+    if tool.startswith("mcp__jarvis__") and not tool.endswith("calendar_add"):
+        return policy.describe(tool, data)
     if tool.endswith("calendar_add"):
         parts = [f"Neuer Termin: {data.get('title', '?')}",
                  f"{data.get('start', '?')}" + (f" bis {data['end']}" if data.get("end") else ""),
@@ -321,6 +361,7 @@ class Handler(BaseHTTPRequestHandler):
                 wake=wakeword.status(), timers=scheduler.public(), quiet=events.quiet_now(),
                 night_volume=NIGHT_VOLUME,
                 fallback=fallback_llm.status(),
+                persona=personality.label(),
                 session=SESSION["id"], boot=BOOT_ID, remote=self.remote, remote_enabled=REMOTE))
 
         if p == "/api/events":
@@ -339,6 +380,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if p == "/api/dashboard":
             return self._json(dashboard.data())
+
+        if p == "/api/notifications":
+            return self._json(notifications())
 
         if p == "/api/note":
             title = parse_qs(urlparse(self.path).query).get("id", [""])[0].lower()
@@ -531,13 +575,14 @@ class Handler(BaseHTTPRequestHandler):
                       detail=_describe_call(tool, req.get("input")), timeout=PERM_TIMEOUT))
             entry["event"].wait(PERM_TIMEOUT)
             emit(dict(t="confirm_done", id=rid, allow=entry["allow"]))
+            audit.write("card", tool=tool, allow=entry["allow"], args=policy.redact(req.get("input") or {}))
         except OSError:
             entry["allow"] = False
         finally:
             PENDING.pop(rid, None)
         return self._json({"allow": entry["allow"]})
 
-    def _lean(self, message, emit):
+    def _lean(self, message, emit, typed=False):
         """Lean path: local router first, otherwise one small stateless Claude call."""
         t0 = time.time()
         commands.update_state(lambda d: d.__setitem__("last_turn_at", time.time()))
@@ -561,6 +606,7 @@ class Handler(BaseHTTPRequestHandler):
             if route["kind"] == "local":
                 reply = route["reply"]
                 emit(dict(t="note", message=f"lokal erledigt ({route['handler']}) — 0 Tokens"))
+                emit(dict(t="route", model="lokal", groups=[route["handler"]], reason="Router, 0 Tokens"))
                 emit(dict(t="delta", text=reply))
                 emit(dict(t="complete", ms=int((time.time() - t0) * 1000)))
                 try:
@@ -570,6 +616,8 @@ class Handler(BaseHTTPRequestHandler):
                 commands.remember_turn(message, reply)
                 log_usage("local:" + route["handler"], None, [], {}, message=message, reply=reply,
                           ms=int((time.time() - t0) * 1000))
+                if route["handler"] not in ("time", "date", "sun", "weather", "solar", "nas", "pi", "home_state"):
+                    audit.write("local", handler=route["handler"], message=message[:80])
                 return
             cached = answer_cache.get(message, route["groups"])
             if cached:                                   # same question minutes ago: no second call
@@ -582,11 +630,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             system = commands.lean_system(route["groups"])
             prefix = commands.lean_prefix(message, route["groups"])
+            if typed:                                    # typed: longer text, only the first paragraph is spoken
+                prefix = prefix.replace("</kontext>", personality.TYPED_HINT + "\n</kontext>")
         why = ("Claude nicht erreichbar" if runtime.runtime_kind() != "claude" else
                "Claude-Limit erreicht" if fallback_llm.claude_blocked(commands.load().get("usage")) else None)
         if why and fallback_llm.available():
             return self._local_llm(message, prefix, emit, t0, is_briefing, why, route["groups"])
         emit(dict(t="note", message=f"{route['model']} · {', '.join(route['groups']) or 'ohne Werkzeuge'}"))
+        emit(dict(t="route", model=route["model"], groups=route["groups"], reason=route.get("reason", "")))
         hit = memory.top_match(message)
         if hit and not is_briefing:
             emit(dict(t="focus", id=hit))
@@ -662,6 +713,7 @@ class Handler(BaseHTTPRequestHandler):
                     who = ev
                     emit(dict(t="note", message=f"{why} — antwortet {ev['label']} ({ev['model']})"
                                                 + (f" · {', '.join(groups)}" if groups else "")))
+                    emit(dict(t="route", model=f"{ev['label']} {ev['model']}", groups=groups, reason=why))
                     continue
                 if t == "usage":
                     usage = ev
@@ -748,7 +800,7 @@ class Handler(BaseHTTPRequestHandler):
             message = cmd["message"]
 
         if runtime.LEAN:
-            return self._lean(message, emit)
+            return self._lean(message, emit, typed=bool(payload.get("typed")))
 
         last = commands.load().get("last_turn_at") or 0
         if SESSION["id"] and time.time() - last > SESSION_IDLE_MIN * 60:
@@ -895,6 +947,13 @@ def main():
     briefing.start_watchdog()
     scheduler.start()              # timers, alarms, reminders, planned commands
     watchers.start()               # proactive notices (appliances, appointments, storage, NAS)
+    reflection.start()             # learning loop: Lernprotokoll, weekly rules proposal
+    weekly_review.start()          # Garmin once a day, weekly review on Sunday
+    homelab_watch.start()          # outages and unusual values in the homelab
+    suggestions.start()            # a new ability twice a week
+    memory_tools.start()           # daily vault backup (backups/), audit log trimming
+    assistant.start()              # watched topics (web search, at most a few a day)
+    router.EMERGENCY_HOOKS.update(deny=_deny_open_cards, cancel=runtime.cancel_active)
     wakeword.start()               # openWakeWord, if JARVIS_WAKE=oww
     if os.environ.get("JARVIS_CHILD") == "1":    # only a supervised child can be restarted
         threading.Thread(target=_watch_code, daemon=True).start()

@@ -49,6 +49,13 @@ def quiet_now(now=None):
 
 def publish(etype, text="", priority="normal", **extra):
     """etype: say | alarm | wake | timers. Extra fields (kind, items, ...) travel along."""
+    if etype == "say" and priority != "alarm":
+        try:
+            import emergency
+            if emergency.paused():
+                return None                 # emergency stop: Jarvis stays quiet (alarms still ring)
+        except Exception:  # noqa: BLE001
+            pass
     ev = dict(extra, t=etype, text=text, priority=priority, at=time.time())
     if etype == "say" and priority != "alarm" and quiet_now():
         ev["silent"] = True

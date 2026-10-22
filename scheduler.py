@@ -407,8 +407,9 @@ def _due(start):
             continue
         late = i["at"] < start - 60 and now - i["at"] > 120
         if i["kind"] == "action":
-            if late:
-                continue                     # switching lights an hour late helps nobody
+            import emergency
+            if late or emergency.paused():
+                continue                     # switching lights an hour late helps nobody; nor during an emergency stop
             import router
             reply = router.run_local(i.get("text", ""))
             events.publish("say", reply or f"Den geplanten Befehl konnte ich nicht ausführen: {i.get('text')}.",

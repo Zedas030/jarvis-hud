@@ -543,3 +543,28 @@ body.remote .saytip{display:none}
   .rail .panel,.rail.left .panel:first-child,.rail.left .panel.widget.grow,.rail.right .panel.grow{flex:0 0 auto;max-height:none}
   .rail.left .panel:first-child{max-height:260px}
 }
+
+/* ── route line, waveform, bell, notification centre ── */
+.routeline{font-size:9px;letter-spacing:.08em;color:var(--ink-dim);text-align:center;max-width:220px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:4px}
+.wave{width:140px;height:24px;display:block;margin:4px auto 0;opacity:.85}
+.bell{background:var(--panel);border:1px solid var(--line);color:var(--ink-dim);border-radius:8px;
+  padding:4px 9px;font-size:13px;cursor:pointer;position:relative;margin-left:6px}
+.bell:hover{color:var(--cy);border-color:var(--line-hot);box-shadow:var(--glow)}
+.bell b{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;border-radius:8px;background:#ffb84d;
+  color:#04070c;font-size:9px;line-height:16px;text-align:center;font-weight:700}
+.bell b[hidden]{display:none}
+.notebox .panel{width:min(560px,calc(100vw - 32px));max-height:80vh;overflow:auto}
+.notebody h3{font-size:9px;letter-spacing:.2em;color:var(--ink-dim);margin:10px 0 4px;font-weight:400}
+.notebody ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.notebody li{font-size:11px;line-height:1.45;border-left:2px solid var(--line);padding-left:8px}
+.notebody li.bad{border-color:#ff6b6b}.notebody li.ok{border-color:#5fe4a1}.notebody li.prop{border-color:#ffb84d}
+.notebody small{color:var(--ink-dim);margin-right:6px}
+
+/* ── views: command centre (second monitor) and mini ── */
+body.view-wall .askbar,body.view-wall .stagetools #btnPair,body.view-wall .usage,body.view-wall #pLog{display:none}
+body.view-wall .transcript{font-size:15px}
+body.view-wall .chip-lg b{font-size:15px}
+body.view-mini .rail.left,body.view-mini .canvaswrap,body.view-mini .usage,body.view-mini #pLog,
+body.view-mini #pSystem,body.view-mini .pills .chip-lg{display:none}
+body.view-mini .grid{grid-template-columns:1fr 260px}

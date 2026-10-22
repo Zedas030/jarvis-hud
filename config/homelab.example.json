@@ -1,0 +1,21 @@
+{
+  "_comment": "Copy to config/homelab.json. devices: important devices by host (ping) or entity (Home Assistant tracker); critical = report even during quiet hours. Names are spoken, so German ('Der Router'). limits: fixed thresholds that trigger a message.",
+  "devices": [
+    {
+      "name": "Der Router",
+      "host": "192.0.2.1",
+      "critical": true
+    },
+    {
+      "name": "Der Drucker",
+      "entity": "device_tracker.drucker",
+      "critical": false
+    }
+  ],
+  "limits": {
+    "pi_temp": 75,
+    "pi_disk": 90,
+    "pi_load": 4.0,
+    "nas_temp": 60
+  }
+}

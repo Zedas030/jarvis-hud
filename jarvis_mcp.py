@@ -217,9 +217,11 @@ TOOLS += [
         "name": "memory_save",
         "description": ("Remember something lasting about the user. `note`: Profil, Befehle, Vorlieben, Websites, "
                         "Termine, Wissen, Personen/<Name> or Projekte/<Name>. `text`: one short bullet. "
-                        "`replace` (optional): an existing bullet text to replace instead of appending."),
+                        "`replace` (optional): an existing bullet text to replace instead of appending (to correct). "
+                        "`quelle`: 'gesagt' if the user said it explicitly, 'abgeleitet' if you concluded it."),
         "inputSchema": {"type": "object", "properties": {
-            "note": {"type": "string"}, "text": {"type": "string"}, "replace": {"type": "string"}},
+            "note": {"type": "string"}, "text": {"type": "string"}, "replace": {"type": "string"},
+            "quelle": {"type": "string", "enum": ["gesagt", "abgeleitet"]}},
             "required": ["note", "text"]},
     },
 ]
@@ -293,6 +295,209 @@ TOOLS += [
     },
 ]
 
+TOOLS += [
+    {
+        "name": "memory_overview",
+        "description": ("What Jarvis has stored about the user: without `note` a list of notes with counts, with "
+                        "`note` its entries with source (gesagt/abgeleitet) and date."),
+        "inputSchema": {"type": "object", "properties": {"note": {"type": "string"}}},
+    },
+    {
+        "name": "memory_why",
+        "description": "Why a fact is stored: its note, source, date and the matching line of that day's conversation. `text`: words from the fact.",
+        "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]},
+    },
+    {
+        "name": "memory_forget",
+        "description": ("Forget one stored fact (moves it to the trash). `text`: words from the fact, `note` optional. "
+                        "Shows a confirmation card; explain in German first, `begruendung` = that explanation."),
+        "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}, "note": {"type": "string"},
+                                                         "begruendung": {"type": "string"}},
+                        "required": ["text", "begruendung"]},
+    },
+    {
+        "name": "memory_export",
+        "description": "Export the whole memory vault as a zip file in the backups folder; returns the path.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "audit_today",
+        "description": "What Jarvis did today (actions, confirmation cards). `day` optional as YYYY-MM-DD.",
+        "inputSchema": {"type": "object", "properties": {"day": {"type": "string"}}},
+    },
+]
+
+TOOLS += [
+    {
+        "name": "mail_draft",
+        "description": ("Create an email DRAFT in the user's mailbox (Drafts folder) — never sends. `to`, `subject`, "
+                        "`body` (German unless asked otherwise). Shows a confirmation card; explain first, "
+                        "`begruendung` = that explanation."),
+        "inputSchema": {"type": "object", "properties": {"to": {"type": "string"}, "subject": {"type": "string"},
+                                                         "body": {"type": "string"}, "begruendung": {"type": "string"}},
+                        "required": ["to", "subject", "body", "begruendung"]},
+    },
+    {
+        "name": "day_prep",
+        "description": ("Prepare a day: appointments with travel time and leave time, matching notes. `day` as "
+                        "YYYY-MM-DD (default tomorrow)."),
+        "inputSchema": {"type": "object", "properties": {"day": {"type": "string"}}},
+    },
+    {
+        "name": "research_save",
+        "description": ("Save a researched answer as a note: `title`, `summary` (with dates; mark assumptions as such), "
+                        "`sources` (list of 'Title – URL (date)')."),
+        "inputSchema": {"type": "object", "properties": {"title": {"type": "string"}, "summary": {"type": "string"},
+                                                         "sources": {"type": "array", "items": {"type": "string"}}},
+                        "required": ["title", "summary"]},
+    },
+    {
+        "name": "watch_add",
+        "description": "Watch a topic and tell the user when there is news. `topic`, `every_days` (default 7).",
+        "inputSchema": {"type": "object", "properties": {"topic": {"type": "string"}, "every_days": {"type": "integer"}},
+                        "required": ["topic"]},
+    },
+    {
+        "name": "watch_list",
+        "description": "List the watched topics.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "watch_remove",
+        "description": "Stop watching a topic (`topic`: words from it).",
+        "inputSchema": {"type": "object", "properties": {"topic": {"type": "string"}}, "required": ["topic"]},
+    },
+    {
+        "name": "plan_create",
+        "description": ("Plan something over several days: `title`, `steps` = [{text, date 'YYYY-MM-DD'}]. Creates a "
+                        "note Projekte/<title> with a checklist and a reminder per step."),
+        "inputSchema": {"type": "object", "properties": {
+            "title": {"type": "string"},
+            "steps": {"type": "array", "items": {"type": "object", "properties": {
+                "text": {"type": "string"}, "date": {"type": "string"}}, "required": ["text", "date"]}}},
+            "required": ["title", "steps"]},
+    },
+    {
+        "name": "plan_list",
+        "description": "Open steps of all plans.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "plan_check",
+        "description": "Tick off a step of a plan: `title` of the plan, `step` = words from the step.",
+        "inputSchema": {"type": "object", "properties": {"title": {"type": "string"}, "step": {"type": "string"}},
+                        "required": ["title", "step"]},
+    },
+]
+
+TOOLS += [
+    {
+        "name": "pc_status",
+        "description": "This PC: CPU, RAM, GPU and VRAM (with the programs using it), free disk space, uptime, biggest programs.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "net_diagnose",
+        "description": "Diagnose the internet connection step by step (router, internet, DNS, web) with a verdict. Takes ~15 s.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "backup_status",
+        "description": "Status of the Hyper Backup tasks on the Synology NAS (last result, last and next run).",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "home_check",
+        "description": "Home Assistant health: unavailable devices, low batteries, temperature/humidity sensors silent for a day.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "phone_notify",
+        "description": "Send a short push message to the user's phone (Home Assistant app). `text`: the message.",
+        "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]},
+    },
+]
+
+TOOLS += [
+    {
+        "name": "window_arrange",
+        "description": ("Move an app's window: `app` (e.g. spotify, chrome, code, discord), `position`: links, "
+                        "rechts, oben links, oben rechts, unten links, unten rechts, mitte, voll; `monitor` 1, 2, ..."),
+        "inputSchema": {"type": "object", "properties": {"app": {"type": "string"}, "position": {"type": "string"},
+                                                         "monitor": {"type": "integer"}}, "required": ["app", "position"]},
+    },
+    {
+        "name": "file_search",
+        "description": "Find files by name in the user's shared folders (Desktop, Documents, Downloads). Returns paths, size, date.",
+        "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+    },
+    {
+        "name": "file_read",
+        "description": "Read a text, Markdown, CSV, log, code or Word file from the shared folders (path from file_search).",
+        "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+    },
+    {
+        "name": "clipboard_read",
+        "description": "Read the text the user just copied (only when they ask about it).",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "screen_read",
+        "description": ("Read the text on the user's screen via local OCR (only when they ask): the active window, "
+                        "or the whole screen with `ganz`=true. Refused while a password, banking or chat window is visible."),
+        "inputSchema": {"type": "object", "properties": {"ganz": {"type": "boolean"}}},
+    },
+    {
+        "name": "script_list",
+        "description": "List the scripts the user has allowed Jarvis to run.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "script_run",
+        "description": ("Run one allowed script by `name` (from script_list). Shows a confirmation card; explain in "
+                        "German first, `begruendung` = that explanation."),
+        "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "begruendung": {"type": "string"}},
+                        "required": ["name", "begruendung"]},
+    },
+]
+
+TOOLS += [
+    {
+        "name": "health_log",
+        "description": ("Note what Garmin cannot know, for the weekly review: a meal, alcohol, coffee, training. "
+                        "`what`: short German text ('Abendessen', 'zwei Bier'); `at`: 'HH:MM', 'gestern HH:MM' or "
+                        "'YYYY-MM-DD HH:MM' (empty = now). No confirmation needed."),
+        "inputSchema": {"type": "object", "properties": {"what": {"type": "string"}, "at": {"type": "string"}},
+                        "required": ["what"]},
+    },
+    {
+        "name": "proposal_list",
+        "description": "List Jarvis' open proposals (learned rules, suggested routines/reminders/ideas) with ids.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "proposal_accept",
+        "description": ("Carry out an open proposal after the user said yes. Shows a confirmation card. Before "
+                        "calling, explain in German what will happen and why. `begruendung`: that explanation "
+                        "in one or two German sentences (shown on the card)."),
+        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "begruendung": {"type": "string"}},
+                        "required": ["id", "begruendung"]},
+    },
+    {
+        "name": "proposal_decline",
+        "description": "Discard an open proposal by `id` when the user does not want it.",
+        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+    },
+    {
+        "name": "rule_remove",
+        "description": ("Remove a learned rule from the note Vorlieben (section 'Gelernte Regeln'). `text`: words "
+                        "from the rule. Shows a confirmation card; explain in German first. `begruendung` as above."),
+        "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}, "begruendung": {"type": "string"}},
+                        "required": ["text", "begruendung"]},
+    },
+]
+
+
 # Which tools each group brings. The router in the server picks the groups per
 # request and passes them in JARVIS_TOOL_GROUPS, so a question about the weather
 # does not carry the definitions of mail, NAS and calendar tools along.
@@ -300,15 +505,27 @@ GROUPS = {
     "memory": {"memory_search", "memory_read", "memory_save"},
     "web": {"web_fetch", "open_website"},
     "calendar": {"calendar_events", "calendar_add"},
-    "home": {"home_states", "home_control"},
-    "mail": {"mail_inbox", "mail_mark_read"},
+    "home": {"home_states", "home_control", "home_check"},
     "weather": {"weather"},
     "music": {"music"},
-    "systems": {"pi_status", "nas_status", "network_devices"},
-    "health": {"garmin_health"},
+    "systems": {"pi_status", "nas_status", "network_devices", "pc_status", "net_diagnose", "backup_status"},
+    "health": {"garmin_health", "health_log"},
     "timers": {"reminder_add", "reminder_list", "reminder_cancel"},
     "lists": {"list_read", "list_add", "list_remove"},
     "routines": {"routine_list", "routine_save", "routine_delete", "home_states"},
+    "proposals": {"proposal_list", "proposal_accept", "proposal_decline", "rule_remove"},
+    "memory_admin": {"memory_overview", "memory_why", "memory_forget", "memory_export", "memory_save", "memory_search"},
+    "audit": {"audit_today"},
+    "phone": {"phone_notify"},
+    "mail": {"mail_inbox", "mail_mark_read", "mail_draft"},
+    "dayprep": {"day_prep", "calendar_events"},
+    "research": {"web_fetch", "research_save", "watch_add", "watch_list", "watch_remove"},
+    "plans": {"plan_create", "plan_list", "plan_check", "reminder_list"},
+    "windows": {"window_arrange"},
+    "files": {"file_search", "file_read"},
+    "clipboard": {"clipboard_read"},
+    "screen": {"screen_read"},
+    "scripts": {"script_list", "script_run"},
 }
 ACTIVE_GROUPS = [g.strip() for g in os.environ.get("JARVIS_TOOL_GROUPS", "").split(",") if g.strip()]
 # Hard cap per tool result — results are sent again with every later API call of the turn.
@@ -394,6 +611,10 @@ def _memory(name, args):
     text = " ".join((args.get("text") or "").split())
     if not note or not text or ".." in note or not _re.fullmatch(r"[\w äöüÄÖÜß.\-/!]+", note):
         return "Ungültige Notiz oder leerer Text."
+    import privacy
+    if privacy.is_work(note, text):
+        return "Nicht gespeichert: Arbeitsthemen merke ich mir nicht."
+    import memory_tools as mt
     path = memory.MEMORY_DIR / (note + ".md")
     path.parent.mkdir(parents=True, exist_ok=True)
     import time as _t
@@ -402,16 +623,21 @@ def _memory(name, args):
         body = path.read_text(encoding="utf-8")
         old = (args.get("replace") or "").strip()
         if old and old in body:
-            body = body.replace(old, text, 1)
+            line = next((ln for ln in body.splitlines() if old in ln), "")
+            rest = line[line.index(old) + len(old):] if line else ""
+            if mt.TAG.search(rest):                       # correcting: the old tag goes, a fresh one comes
+                body = body.replace(old + rest, text + mt.tag(args.get("quelle")), 1)
+            else:
+                body = body.replace(old, text + mt.tag(args.get("quelle")), 1)
         elif text in body:
             return "Steht schon drin."
         else:
-            body = body.rstrip() + f"\n- {text}\n"
+            body = body.rstrip() + f"\n- {text}{mt.tag(args.get('quelle'))}\n"
         body = _re.sub(r"(?m)^updated: .*$", f"updated: {today}", body, count=1)
     else:
         body = (f"---\ntype: {'person' if note.lower().startswith('personen/') else 'erinnerung'}\n"
                 f"wichtigkeit: mittel\nupdated: {today}\n---\n\n# {note.split('/')[-1]}\n\n"
-                f"Gehört zu [[Profil]].\n\n- {text}\n")
+                f"Gehört zu [[Profil]].\n\n- {text}{mt.tag(args.get('quelle'))}\n")
     path.write_text(body, encoding="utf-8")
     return "Gespeichert."
 
@@ -608,6 +834,30 @@ def _ha(path, body=None):
         return json.loads(r.read() or b"null")
 
 
+VERIFY_S = float(os.environ.get("JARVIS_VERIFY_SECONDS", "2.5"))
+
+
+def _verify(eid, domain, service, wait=None):
+    """Reads the state back after switching: only a confirmed state counts as done."""
+    want = {"turn_on": "on", "turn_off": "off"}.get(service)
+    if domain not in ("light", "switch", "fan") or not want:
+        return f"Erledigt: {domain}.{service} für {eid}."
+    import time as _t
+    end, state = _t.time() + (VERIFY_S if wait is None else wait), "?"
+    while True:
+        try:
+            state = (_ha(f"/api/states/{eid}") or {}).get("state", "?")
+        except Exception:  # noqa: BLE001
+            state = "?"
+        if state == want or _t.time() >= end:
+            break
+        _t.sleep(0.3)
+    if state == want:
+        return f"Erledigt: {eid} ist jetzt {'an' if want == 'on' else 'aus'}."
+    return (f"Gesendet, aber {eid} meldet noch '{state}' statt '{want}' — vielleicht offline oder träge. "
+            "Nicht als erledigt melden.")
+
+
 def _home(name, args):
     if not HA_TOKEN:
         return ("Home Assistant noch nicht verbunden: In .env fehlt HA_TOKEN (langlebiges Zugriffstoken "
@@ -635,7 +885,7 @@ def _home(name, args):
         if not service.replace("_", "").isalnum():
             return "Abgelehnt: ungültiger Dienst."
         _ha(f"/api/services/{domain}/{service}", dict(args.get("data") or {}, entity_id=eid))
-        return f"Erledigt: {domain}.{service} für {eid}."
+        return _verify(eid, domain, service)
     except urllib.error.HTTPError as e:
         return f"Home Assistant meldet Fehler {e.code}" + (" (Token ungültig?)" if e.code == 401 else "")
     except Exception as e:  # noqa: BLE001
@@ -859,6 +1109,175 @@ def _reply(mid, result=None, error=None):
     sys.stdout.flush()
 
 
+def call_tool(name, args):
+    """Runs one tool and returns its text, or None for an unknown tool. No policy here — see handle_call."""
+    text = None
+    if name == "approve":
+        text = json.dumps(_ask(args.get("tool_name", "?"), args.get("input") or {}))
+    elif name == "open_website":
+        text = _open(args.get("url"))
+    elif name in ("calendar_events", "calendar_add"):
+        text = _calendar(name, args)
+    elif name == "music":
+        try:
+            text = _music(args)
+        except Exception as e:  # noqa: BLE001
+            text = f"Musik-Fehler: {e}"
+    elif name == "mail_inbox":
+        text = _mail(args)
+    elif name == "mail_mark_read":
+        text = _mail_mark(args)
+    elif name == "weather":
+        try:
+            text = _weather(args)
+        except Exception as e:  # noqa: BLE001
+            text = f"Wetterdienst nicht erreichbar: {e}"
+    elif name in ("nas_status", "garmin_health"):
+        try:
+            text = _nas_status() if name == "nas_status" else _garmin(args)
+        except Exception as e:  # noqa: BLE001
+            text = f"Fehler: {e}"
+    elif name in ("home_states", "home_control"):
+        text = _home(name, args)
+    elif name in ("network_devices", "pi_status"):
+        try:
+            text = _network_devices() if name == "network_devices" else _pi_status()
+        except Exception as e:  # noqa: BLE001
+            text = f"Fehler: {e}"
+    elif name == "web_fetch":
+        text = _web_fetch(args.get("url"))
+    elif name in ("reminder_add", "reminder_list", "reminder_cancel"):
+        text = _internal(name, args)
+    elif name in ("list_read", "list_add", "list_remove"):
+        try:
+            import lists
+            text = lists.tool(name, args)
+        except Exception as e:  # noqa: BLE001
+            text = f"Listen-Fehler: {e}"
+    elif name in ("routine_list", "routine_save", "routine_delete"):
+        try:
+            import routines
+            text = routines.tool(name, args)
+        except Exception as e:  # noqa: BLE001
+            text = f"Routinen-Fehler: {e}"
+    elif name in ("memory_overview", "memory_why", "memory_forget", "memory_export"):
+        try:
+            import memory_tools as mt
+            if name == "memory_overview":
+                text = mt.overview(args.get("note") or "")
+            elif name == "memory_why":
+                text = mt.why(args.get("text"))
+            elif name == "memory_forget":
+                text = mt.forget(args.get("text"), args.get("note") or "")
+            else:
+                text = f"Exportiert: {mt.export()}"
+        except Exception as e:  # noqa: BLE001
+            text = f"Gedächtnis-Fehler: {e}"
+    elif name in ("window_arrange", "file_search", "file_read", "clipboard_read", "screen_read",
+                  "script_list", "script_run"):
+        try:
+            import desktop
+            text = {"window_arrange": lambda: desktop.arrange(args.get("app") or "", args.get("position") or "",
+                                                              args.get("monitor") or 1),
+                    "file_search": lambda: desktop.search(args.get("query")),
+                    "file_read": lambda: desktop.read(args.get("path")),
+                    "clipboard_read": desktop.clipboard,
+                    "screen_read": lambda: desktop.screen_text(bool(args.get("ganz"))),
+                    "script_list": desktop.script_list,
+                    "script_run": lambda: desktop.script_run(args.get("name"))}[name]()
+        except Exception as e:  # noqa: BLE001
+            text = f"Windows-Fehler: {e}"
+    elif name in ("mail_draft", "day_prep", "research_save", "watch_add", "watch_list", "watch_remove",
+                  "plan_create", "plan_list", "plan_check"):
+        try:
+            import assistant as a
+            text = {"mail_draft": lambda: a.mail_draft(args.get("to"), args.get("subject"), args.get("body")),
+                    "day_prep": lambda: a.day_prep(args.get("day") or None),
+                    "research_save": lambda: a.research_save(args.get("title"), args.get("summary"), args.get("sources")),
+                    "watch_add": lambda: a.watch_add(args.get("topic"), args.get("every_days") or 7),
+                    "watch_list": a.watch_list,
+                    "watch_remove": lambda: a.watch_remove(args.get("topic") or ""),
+                    "plan_create": lambda: a.plan_create(args.get("title"), args.get("steps") or [], internal=_internal),
+                    "plan_list": a.plan_list,
+                    "plan_check": lambda: a.plan_check(args.get("title"), args.get("step"))}[name]()
+        except Exception as e:  # noqa: BLE001
+            text = f"Fehler: {e}"
+    elif name in ("pc_status", "net_diagnose", "backup_status", "home_check", "phone_notify"):
+        try:
+            import infra
+            text = (infra.phone_notify(args.get("text")) if name == "phone_notify"
+                    else getattr(infra, name)())
+        except Exception as e:  # noqa: BLE001
+            text = f"Fehler: {e}"
+    elif name == "audit_today":
+        import audit
+        text = audit.today_summary(args.get("day") or None)
+    elif name == "health_log":
+        try:
+            import weekly_review
+            text = weekly_review.log_entry(args.get("what"), args.get("at") or "")
+        except Exception as e:  # noqa: BLE001
+            text = f"Notiz-Fehler: {e}"
+    elif name in ("proposal_list", "proposal_accept", "proposal_decline", "rule_remove"):
+        try:
+            import proposals
+            if name == "proposal_list":
+                text = "\n".join(f"{p['id']}: {p['title']} — {p['why']}\n  {proposals.describe(p)}"
+                                 for p in proposals.pending()) or "Keine offenen Vorschläge."
+            elif name == "proposal_accept":
+                text = proposals.accept(args.get("id"), internal=_internal)
+            elif name == "proposal_decline":
+                text = proposals.decline(args.get("id"))
+            else:
+                import reflection
+                text = reflection.remove_rule(args.get("text"))
+        except Exception as e:  # noqa: BLE001
+            text = f"Vorschlags-Fehler: {e}"
+    elif name in ("memory_search", "memory_read", "memory_save"):
+        try:
+            text = _memory(name, args)
+        except Exception as e:  # noqa: BLE001
+            text = f"Gedächtnis-Fehler: {e}"
+    else:
+        return None
+    return text
+
+
+# Set once untrusted content (mail, web, files, screen) was read in this process —
+# one process per request in lean mode, so it covers exactly one request.
+TAINTED = {"on": False, "by": ""}
+
+
+def handle_call(name, args):
+    """Policy, audit and size cap around call_tool (policy.py has the rules)."""
+    import audit
+    import policy
+    if name == "approve":
+        return call_tool(name, args)
+    cls = policy.action_class(name)
+    refused = policy.blocked_reason(name, args)
+    if refused:
+        audit.tool(name, args, refused, cls)
+        return refused
+    if TAINTED["on"] and cls == policy.LIMITED_WRITE:
+        hint = (f"Vorher wurden fremde Inhalte gelesen ({TAINTED['by']}). Deshalb frage ich, bevor ich etwas ändere.")
+        verdict = _ask(f"mcp__jarvis__{name}", dict(args, _hinweis=hint))
+        if verdict.get("behavior") != "allow":
+            audit.write("card", tool=name, allow=False, reason="taint")
+            return "Nicht ausgeführt: nach dem Lesen fremder Inhalte nicht bestätigt."
+    text = call_tool(name, args)
+    if text is None:
+        return None
+    audit.tool(name, args, text, cls)
+    if name in policy.UNTRUSTED:
+        TAINTED.update(on=True, by=name)
+    if len(text) > MAX_RESULT:
+        text = text[:MAX_RESULT] + f" … [gekürzt, {len(text)} Zeichen]"
+    if name in policy.UNTRUSTED:
+        text = policy.wrap_untrusted(name, text)
+    return text
+
+
 def main():
     for line in sys.stdin:
         line = line.strip()
@@ -880,64 +1299,10 @@ def main():
         elif method == "tools/call":
             params = msg.get("params") or {}
             name, args = params.get("name"), params.get("arguments") or {}
-            if name == "approve":
-                text = json.dumps(_ask(args.get("tool_name", "?"), args.get("input") or {}))
-            elif name == "open_website":
-                text = _open(args.get("url"))
-            elif name in ("calendar_events", "calendar_add"):
-                text = _calendar(name, args)
-            elif name == "music":
-                try:
-                    text = _music(args)
-                except Exception as e:  # noqa: BLE001
-                    text = f"Musik-Fehler: {e}"
-            elif name == "mail_inbox":
-                text = _mail(args)
-            elif name == "mail_mark_read":
-                text = _mail_mark(args)
-            elif name == "weather":
-                try:
-                    text = _weather(args)
-                except Exception as e:  # noqa: BLE001
-                    text = f"Wetterdienst nicht erreichbar: {e}"
-            elif name in ("nas_status", "garmin_health"):
-                try:
-                    text = _nas_status() if name == "nas_status" else _garmin(args)
-                except Exception as e:  # noqa: BLE001
-                    text = f"Fehler: {e}"
-            elif name in ("home_states", "home_control"):
-                text = _home(name, args)
-            elif name in ("network_devices", "pi_status"):
-                try:
-                    text = _network_devices() if name == "network_devices" else _pi_status()
-                except Exception as e:  # noqa: BLE001
-                    text = f"Fehler: {e}"
-            elif name == "web_fetch":
-                text = _web_fetch(args.get("url"))
-            elif name in ("reminder_add", "reminder_list", "reminder_cancel"):
-                text = _internal(name, args)
-            elif name in ("list_read", "list_add", "list_remove"):
-                try:
-                    import lists
-                    text = lists.tool(name, args)
-                except Exception as e:  # noqa: BLE001
-                    text = f"Listen-Fehler: {e}"
-            elif name in ("routine_list", "routine_save", "routine_delete"):
-                try:
-                    import routines
-                    text = routines.tool(name, args)
-                except Exception as e:  # noqa: BLE001
-                    text = f"Routinen-Fehler: {e}"
-            elif name in ("memory_search", "memory_read", "memory_save"):
-                try:
-                    text = _memory(name, args)
-                except Exception as e:  # noqa: BLE001
-                    text = f"Gedächtnis-Fehler: {e}"
-            else:
+            text = handle_call(name, args)
+            if text is None:
                 _reply(mid, error=f"unknown tool {name}")
                 continue
-            if name != "approve" and len(text) > MAX_RESULT:
-                text = text[:MAX_RESULT] + f" … [gekürzt, {len(text)} Zeichen]"
             _reply(mid, {"content": [{"type": "text", "text": text}]})
         elif method == "ping":
             _reply(mid, {})

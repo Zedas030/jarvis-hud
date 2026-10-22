@@ -30,6 +30,8 @@ The language model is the **Claude Code CLI** on a subscription, so there is no 
 - [Usage](#usage)
 - [Speech output: provider chain](#speech-output-provider-chain)
 - [Fallback mode: stand-in chain](#fallback-mode-stand-in-chain)
+- [Control, personality and everyday](#control-personality-and-everyday)
+- [Learning modules](#learning-modules)
 - [Efficiency: router and lean mode](#efficiency-router-and-lean-mode)
 - [Memory](#memory)
 - [On the go: iPhone and iPad](#on-the-go-iphone-and-ipad)
@@ -52,6 +54,10 @@ The language model is the **Claude Code CLI** on a subscription, so there is no 
 | 📉 **Gets cheaper over time** | Remembers phrasings Claude had to resolve once ("reading lamp off") and handles them itself afterwards. Identical questions within 5 minutes come from a cache. A "usage report" says how much ran locally. |
 | 🗣️ **Pronunciation** | NAS, Pi, kWh & co. are spoken correctly; add your own words by voice ("pronounce Tuya as Tuja"). |
 | 🛒 **Lists and routines** | Shopping and to-do list by voice (Home Assistant or a vault note). Routines like "good night": one phrase, several actions, created by voice. |
+| 🛡️ **Controlled and honest** | Rules enforced in code, not in the prompt; protection against instructions hidden in mails and web pages; audit log; emergency stop; traceable source of every memory; honest feedback when switching. |
+| 🎭 **Personality** | Standard, professional, technical, casual by voice; typed questions in detail, spoken ones short. |
+| 🪟 **Windows** | Arrange windows, workspaces, files and clipboard, screen text via local OCR, allow-listed scripts. |
+| 🎓 **Learns** | Rates its own conversations, proposes fixed rules on Sundays, a weekly review with patterns from sleep, steps, stress and golf, reports homelab outages only when relevant, suggests a new ability twice a week. No work topics, changes only by card. |
 | 🛟 **Fallback mode** | If Claude is down or the limit is reached, a free chain takes over: Groq → Gemini → Ollama, with the same tools and confirmation cards. |
 | 🧠 **Real memory** | Notes by topic, automatic conversation log, remembers and forgets on its own (expiry dates, trash). |
 | ⚡ **Local intent router** | Lights, sockets, music, time, weather, energy and system status without an LLM, answered in milliseconds. |
@@ -272,6 +278,89 @@ GEMINI_API_KEY=...
 
 ---
 
+## Control, personality and everyday
+
+Six expansion packages, each with its own tests. The rules behind them are in [SECURITY.md](SECURITY.md), the structure in [ARCHITECTURE.md](ARCHITECTURE.md). Spoken commands are German; translations in brackets.
+
+**Trust and safety**
+- Every tool has a fixed class in code (`policy.py`): read, small change, card required, blocked. Locks, alarm systems and cameras are never switched.
+- Mails, web pages, calendar entries, files, clipboard and screen text are **untrusted data**: wrapped as such, and afterwards every change in the same request needs a card.
+- *„Was hast du heute gemacht?“* (what did you do today?) reads the audit log (`logs/audit.jsonl`).
+- *„Jarvis, stopp alles“* / *„Not-Aus“* (emergency stop): open cards are denied, Claude is stopped, messages and planned commands pause for two hours; alarms still ring. *„Weitermachen“* resumes.
+- Memory: every new entry carries its source and date (*gesagt* = said, *abgeleitet* = inferred). Plus "what do you know about me?", "why did you save that?", "correct …", "forget …" (with a card, goes to the trash) and "export my memory". A daily backup goes to `backups/`.
+- After switching, Jarvis reads the state back and says honestly when a device did not react.
+
+**Personality**
+- *„Profi-Modus“* (professional), *„sei mal locker“* (casual), *„technischer Modus für zwei Stunden“* (technical, for two hours), *„zurück zum Normalen“* (back to standard), *„welcher Modus?“* — local, 0 tokens. Own profiles in `config/profiles.json`.
+- In every profile: no jokes about outages or bad news, uncertainty is said openly.
+- **Typed** questions get detailed, structured answers; only the first paragraph is read aloud.
+
+**Windows and screen**
+- *„Spotify nach rechts“*, *„Browser links und Code rechts auf Monitor 2“* — local. A workspace is a routine with steps like „Öffne Discord“ (open Discord) and „Discord nach rechts“.
+- Search and read files only in Desktop, Documents and Downloads (`JARVIS_FILE_ROOTS`): text, code and Word, no work files.
+- Clipboard and screen only on request; the screen text is recognised by the Windows OCR on the PC, the image never leaves it. Refused while a password manager, banking or messenger window is visible.
+- Scripts only from `config/scripts.json`, always with a card.
+
+**Infrastructure and smart home**
+- PC status: CPU, RAM, GPU, VRAM (with the programs behind it), disks. Network diagnosis: router, internet, DNS, web — with a verdict where the problem is.
+- Hyper Backup status from the Synology (the Jarvis DSM user needs the rights to see the tasks).
+- "Are all sensors online?": unavailable devices, low batteries, silent sensors.
+- The homelab observer also watches GPU temperature and the system disk, checks backups daily, keeps an incident history and pushes critical events to the phone (`JARVIS_PHONE_NOTIFY`).
+
+**Organisation and research**
+- Mail **drafts** in the mailbox's Drafts folder, with a card — nothing is ever sent.
+- "What do I need to know for tomorrow?": appointments with travel and leave time and matching notes; work appointments only counted.
+- Research mode with dated sources, contradictions named, assumptions marked; saved under `Recherchen/`.
+- Watched topics: up to 5, at most 2 checks a day, Jarvis only speaks up when something is new.
+- Plans over several days: `Projekte/<title>` with a checklist and a reminder per step.
+
+**HUD**
+- Shows who answered last and why (e.g. *Haiku · home · simple* or *lokal · Router, 0 Tokens*).
+- A waveform of the real microphone or voice signal — no fake animation.
+- 🔔 opens the notification centre: messages, homelab incidents, open proposals, emergency stop.
+- **⛶ Zentrale**: full-screen command centre without input (second monitor, `?view=wall`); **▭ Mini**: conversation and voice only (`?view=mini`).
+- A row for this PC under "Systeme".
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `JARVIS_PAUSE_HOURS` | `2` | Length of the emergency stop |
+| `JARVIS_AUDIT_DAYS`, `JARVIS_BACKUP_KEEP` | `90`, `14` | Keep audit log and vault backups |
+| `JARVIS_VERIFY_SECONDS` | `2.5` | How long Jarvis waits for the new device state |
+| `JARVIS_FILE_ROOTS` | Desktop, Documents, Downloads | Shared folders, comma-separated |
+| `JARVIS_SCREEN_BLOCK` | empty | More window titles that block screen reading |
+| `JARVIS_PHONE_NOTIFY`, `JARVIS_PHONE_PUSH` | empty, `critical` | HA notify service for the phone; what is pushed (`critical`, `all`, `off`) |
+| `JARVIS_WATCH_MAX`, `JARVIS_WATCH_PER_DAY` | `5`, `2` | Watched topics and checks per day |
+| `JARVIS_PLAN_REMIND` | `09:00` | Time of plan reminders |
+
+---
+
+## Learning modules
+
+Four background modules, each in its own file. For all of them:
+- **No work topics:** anything that looks like work is not logged, evaluated or saved (`privacy.py`, own terms in `JARVIS_WORK_TERMS`) — this also covers the conversation log and `memory_save`.
+- **Changes only with a card:** background jobs never change anything themselves. They store a proposal (`proposals.py`); in the next conversation Jarvis explains it in German, and only the confirmation card (`proposal_accept`) carries it out.
+
+| Module | File | What it does | When |
+|---|---|---|---|
+| **Learning loop** | `reflection.py` | After each conversation rates what went well and what was corrected, in the note **Lernprotokoll**. Condenses the week into rules; confirmed rules live in **Vorlieben** under "Gelernte Regeln" and apply to every turn. "Streich die Regel …" removes one. | 30 min after the last exchange; rules Sundays from 19:00 |
+| **Weekly review** | `weekly_review.py` | Fetches sleep, steps, stress, Body Battery and golf rounds from Garmin daily; Sunday review with last-week comparison and patterns computed in code (with day counts). Meal times, alcohol and coffee are noted when you say them. Note **Gesundheit/Wochenrückblick YYYY-KWnn**. | fetch from 9:00; review Sundays from 18:00 |
+| **Homelab observer** | `homelab_watch.py` | Home Assistant, Pi (services, containers, temperature, SD card, load), NAS and important devices from `config/homelab.json`. Outages only after two checks, one message per incident plus recovery, only critical ones at night, fixed limits and — after a learning week — outliers from the normal range. 0 tokens. | every 5 minutes |
+| **Suggestions** | `suggestions.py` | Suggests one new ability that fits the habits of the last two weeks, with a reason. Routines and reminders are set up after the card; anything needing code is only noted. List with status in the note **Vorschläge**. | Tuesday and Friday 18:30 |
+
+Background jobs use Claude Haiku (`JARVIS_BACKGROUND_MODEL`) as their own short call without tools, outside the conversation lock; when Claude is at its limit only Groq or Ollama (never Gemini). Usage is logged as `background:…`, about 30–60k tokens a week.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `JARVIS_WORK_TERMS` | empty | Your own work terms (employer, colleagues, customers, projects), comma-separated |
+| `JARVIS_REFLECT`, `JARVIS_REVIEW`, `JARVIS_HOMELAB`, `JARVIS_SUGGEST` | `1` | Module on/off |
+| `JARVIS_REFLECT_IDLE_MIN`, `JARVIS_REFLECT_WEEK_HOUR`, `JARVIS_MAX_RULES` | `30`, `19`, `20` | Learning loop |
+| `JARVIS_REVIEW_HOUR`, `JARVIS_LATE_MEAL`, `JARVIS_PATTERN_DAYS` | `18`, `21:00`, `42` | Weekly review |
+| `JARVIS_HOMELAB_SECONDS`, `JARVIS_HOMELAB_CONFIRM`, `JARVIS_HOMELAB_MAX_PER_DAY` | `300`, `2`, `2` | Observer; devices and limits in `config/homelab.json` |
+| `JARVIS_SUGGEST_DAYS`, `JARVIS_SUGGEST_TIME` | `1,4`, `18:30` | Suggestions (Monday = 0) |
+| `JARVIS_BACKGROUND_MODEL`, `JARVIS_PROPOSAL_DAYS` | `haiku`, `7` | Model of the background jobs, expiry of open proposals |
+
+---
+
 ## Efficiency: router and lean mode
 
 A default Claude Code call sends ~35,000 tokens of baseline with every request:
@@ -360,6 +449,7 @@ The PC stays the brain. iPhone and iPad connect over [Tailscale](https://tailsca
 - **Protected devices:** the router never switches off the router, PC, server or fridge by itself. Home Assistant only switches `light`, `switch`, `fan`, `media_player` and `scene`.
 - **Questions never switch:** "Is … on?" is read, never executed.
 - **No self-modification:** at runtime there are no tools for editing code.
+- **Action classes, untrusted content, audit log, emergency stop:** see [SECURITY.md](SECURITY.md).
 - **Data stays local:** `.env`, `config/home.json`, `vault/`, `logs/`, `state.json` and models are in `.gitignore`. Speech recognition and the GPU voice run offline.
 
 ---
@@ -372,6 +462,9 @@ The PC stays the brain. iPhone and iPad connect over [Tailscale](https://tailsca
 ├─ briefing.py · dashboard.py · icloud_calendar.py · billing.py · jarvis_profile.py
 ├─ scheduler.py · lists.py · routines.py · events.py · watchers.py · wakeword.py · fallback_llm.py
 ├─ learning.py · answer_cache.py · commute.py · parcels.py · pc.py · pronounce.py · devices.py
+├─ reflection.py · weekly_review.py · homelab_watch.py · suggestions.py · proposals.py · privacy.py · background.py
+├─ policy.py · audit.py · emergency.py · memory_tools.py · personality.py · desktop.py · infra.py · assistant.py
+├─ CLAUDE.md · ARCHITECTURE.md · SECURITY.md
 ├─ ui/                 index.html · app.js · graph.js · styles.css · pair.html
 ├─ scripts/            measure_tokens.py · lean_probe.py · mail_to_trash.py · router_report.py · install-autostart.ps1
 ├─ tests/              test_router.py · test_tts_chain.py · test_fallback.py · test_remote.py   (no house, Claude, network or sound needed)
@@ -436,6 +529,10 @@ set JARVIS_PORT=8721& set JARVIS_STATE=%TEMP%\state_test.json& .venv\Scripts\pyt
 - [x] Autostart and restart after a crash
 - [x] Access from iPhone and iPad (Tailscale, device pairing)
 - [x] Automated tests for the voice chain
+- [x] Learning loop, weekly review, homelab observer, suggestion module
+- [x] Action classes, audit log, emergency stop, memory control, protection against injected instructions
+- [x] Personality profiles, windows/files/screen, PC and network diagnosis, mail drafts, research, plans, notification centre
+- [ ] Reading PDFs (needs an extra package)
 - [ ] Central control: screen, room microphones, speaker recognition
 - [ ] Focus sessions with distraction hints
 - [ ] Screen and camera context on request

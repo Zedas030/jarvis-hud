@@ -35,6 +35,7 @@
       <span><i class="dot ok"></i><b id="pBrain">Claude CLI</b></span>
       <span><i class="dot warn"></i><b id="pVoice">browser</b></span>
     </div>
+    <button class="bell" id="btnBell" title="Meldungen, Ausfälle, offene Vorschläge">🔔<b id="bellCount" hidden>0</b></button>
   </div>
 </header>
 
@@ -84,6 +85,8 @@
       <button class="tool" id="btnLabels" title="Toggle labels">Aa</button>
       <button class="tool" id="btnDim" title="Toggle contrast">◐</button>
       <button class="tool" id="btnPair" title="iPhone, iPad koppeln oder entfernen">📱 Geräte</button>
+      <button class="tool" id="btnWall" title="Kommandozentrale: Vollbild, ohne Eingabe — z. B. für den Zweitmonitor">⛶ Zentrale</button>
+      <button class="tool" id="btnMini" title="Minimaler Modus: nur Stimme und Gespräch">▭ Mini</button>
       <span class="stagecount" id="stageCount"></span>
     </div>
 
@@ -122,12 +125,14 @@
       </div>
       <div class="voicestate"><i class="dot" id="voiceDot"></i><span id="voiceState">IDLE</span></div>
       <div class="vu"><i class="vufill" id="vuFill"></i></div>
+      <canvas class="wave" id="wave" width="240" height="40" title="Wellenform: Mikrofon oder Jarvis' Stimme (echte Daten)"></canvas>
       <label class="volbox" title="Lautstärke von JARVIS"><span>volume</span>
         <input type="range" id="volume" min="0" max="100" step="1" value="60">
         <b id="volumeVal">60</b></label>
       <div class="tonebox"><span>delivery</span><b id="toneNow">—</b></div>
       <div class="saytip">say <b>“Jarvis…”</b></div>
       <div class="clibadge" id="cliBadge">CLAUDE CLI</div>
+      <div class="routeline" id="routeNow" title="Wer hat zuletzt geantwortet und warum">—</div>
     </section>
 
     <section class="panel widget" id="pSystem">
@@ -173,6 +178,14 @@
     <div class="pairhint" id="pairHint"></div>
     <div class="pairbtns"><button id="pairNew">Neuen Code</button><button id="pairClose">Schließen</button></div>
     <ul class="pairlist" id="pairList"></ul>
+  </section>
+</div>
+
+<div class="pairbox notebox" id="noteBox" hidden>
+  <section class="panel">
+    <h2>Meldungen <em id="noteAge"></em></h2>
+    <div class="notebody" id="noteBody"><p class="hint">lädt …</p></div>
+    <div class="pairbtns"><button id="noteClose">Schließen</button></div>
   </section>
 </div>
 

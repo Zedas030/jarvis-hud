@@ -53,8 +53,11 @@ GROUP_RULES = [
              r"solar|akku|speicher|strom|watt|sensor|luft|feucht|echo|fire ?tv|fernseher|tv\b)"),
     ("mail", r"\b(mail|e-mail|postfach|posteingang|newsletter|nachricht von|geschrieben|gelesen)"),
     ("calendar", r"\b(termin|kalender|eintragen|trag\w* .*ein|erinner|verabredung|meeting|wann (ist|habe))"),
-    ("systems", r"\b(pi\b|raspi|raspberry|nas\b|synology|netzwerk|wlan|router|fritz|gerät|server|pi-hole|pihole|ip\b)"),
-    ("health", r"\b(schlaf|geschlafen|schritte|puls|garmin|body ?battery|stress|fitness|training|lauf)"),
+    ("systems", r"\b(pi\b|raspi|raspberry|nas\b|synology|netzwerk|wlan|router|fritz|gerät|server|pi-hole|pihole|ip\b|"
+                r"internet|dns|backup|grafikkarte|gpu|vram|cpu|prozessor|arbeitsspeicher|ram\b|festplatte|"
+                r"speicherplatz|laufwerk|ausgefallen|ausfall)"),
+    ("health", r"\b(schlaf|geschlafen|schritte|puls|garmin|body ?battery|stress|fitness|training|lauf|"
+               r"gegessen|abendessen|alkohol|bier\b|wein\b|rückblick|wochenrückblick)"),
     ("music", r"\b(musik|spotify|song|lied|playlist|album|abspielen)"),
     ("weather", r"\b(wetter|vorhersage|sonne|sonnig|sonnen|uv\b|uv-|regen|regnet|schirm|schnee|schneit|gewitter|"
                 r"sturm|wind\b|windig|nebel|frost|glatt|temperatur(?! im)|grad draußen|wie warm|wie kalt|"
@@ -66,7 +69,28 @@ GROUP_RULES = [
     ("timers", r"\b(timer|wecker|weck|erinner|schlummer|alarm|countdown)"),
     ("lists", r"\b(einkauf|to-?do|aufgabenliste|erledigungsliste)"),
     ("routines", r"\b(routine|wenn ich .{1,40} sage|sobald ich .{1,40} sage|immer wenn ich)"),
+    ("proposals", r"\b(vorschl|regel|übernimm|übernehmen|lernprotokoll|gelernt)"),
+    ("memory_admin", r"\b(vergiss|vergessen|lösch|warum hast du|weshalb hast du|was weißt du über mich|"
+                     r"was hast du (über mich )?gespeichert|gespeichert|korrigier|stimmt nicht mehr|exportier|backup)"),
+    ("windows", r"\b(fenster|nebeneinander|anordnen|arbeitsbereich|monitor \d|linke seite|rechte seite)"),
+    ("files", r"\b(datei|dateien|dokument|dokumente|ordner|word-?datei|textdatei|downloads)"),
+    ("clipboard", r"\b(zwischenablage|kopiert|clipboard)"),
+    ("screen", r"\b(bildschirm|screen|was siehst du|fehlermeldung|dieses fenster|auf meinem monitor|was steht da)"),
+    ("scripts", r"\b(skript|script)"),
+    ("mail", r"\b(entwurf|mail an|schreib .{0,40}(mail|nachricht)|antwort an)"),
+    ("dayprep", r"\b(was muss ich (für|fuer) .{0,20}wissen|bereite? .{0,20}(vor|termin)|vorbereitung|"
+                r"wie sieht (mein|der) (tag|morgen)|was steht (morgen|übermorgen|heute) an)"),
+    ("research", r"\b(recherchier|gründlich|quellen|fakten ?check|sag bescheid,? wenn|beobacht|"
+                 r"halt mich auf dem laufenden|was gibt es neues)"),
+    ("plans", r"\b(plan(e|en)? .{0,30}(über|bis|für die)|über (mehrere|zwei|drei|\d+) (tage|wochen)|"
+              r"mein(en)? plan|schritt .{0,20}erledigt|abhaken|projektplan)"),
+    ("phone", r"\b(aufs handy|ans handy|aufs telefon|push(-nachricht)?|schick mir .{0,30}handy)"),
+    ("audit", r"\b(was hast du (heute|gestern)? ?(alles )?(gemacht|getan|geschaltet)|protokoll deiner|audit|"
+              r"was hast du ausgeführt)"),
 ]
+# A short yes/no while a proposal is open: bring the proposal tools along.
+PROPOSAL_REPLY = re.compile(r"^\W*(ja|jo|klar|gerne?|ok(ay)?|mach( das)?|einverstanden|passt|nein|nee|lieber nicht|"
+                            r"nicht nötig|später)\b", re.I)
 SMART_HINTS = re.compile(
     r"\b(erklär|warum|wieso|analys|vergleich|plan|schreib|formulier|zusammenfass|recherch|überleg|hilf mir|"
     r"code|programm|berechne|strategie|optimier|bewert|was meinst du|ausführlich|genau)", re.I)
@@ -80,6 +104,11 @@ def llm_route(message, ha_full=False):
             groups.append(name)
     if ha_full:
         groups.append("ha_full")
+    groups = list(dict.fromkeys(groups))       # one group can match several patterns
+    if "proposals" not in groups and PROPOSAL_REPLY.search(n):
+        import proposals
+        if proposals.pending():
+            groups.append("proposals")
     smart = (bool(SMART_HINTS.search(message)) or len(message) > 220
              or any(g in groups for g in ("web", "pc", "ha_full")) or len(groups) > 3)
     return {"kind": "llm", "groups": groups, "model": MODEL_SMART if smart else MODEL_SIMPLE,
@@ -406,6 +435,8 @@ def _home(n):
         data = {"brightness_pct": max(1, min(100, int(pct.group(1))))} if pct and d["dom"] == "light" else None
         svc = "turn_on" if d["dom"] == "scene" else service
         res = jarvis_mcp._home("home_control", {"entity_id": d["eid"], "service": svc, "data": data or {}})
+        if res.startswith("Gesendet"):              # sent, but the state did not follow: say so
+            return f"{d['name']} reagiert nicht, {_sir()}: der Befehl ging raus, aber der Zustand ist unverändert."
         if not res.startswith("Erledigt"):
             return None
         done.append(d["name"])
@@ -472,7 +503,25 @@ def _report(n):
     return learning.spoken_report(7)
 
 
-LOCAL_HANDLERS = [_routine, _timers, _lists, _pronounce, _report, _pc, _commute, _parcels, _home_state, _home,
+def _emergency(n):
+    import emergency
+    return emergency.handle(n, deny_cards=EMERGENCY_HOOKS.get("deny"), cancel=EMERGENCY_HOOKS.get("cancel"))
+
+
+EMERGENCY_HOOKS = {}     # the server sets deny (open cards) and cancel (running Claude process)
+
+
+def _personality(n):
+    import personality
+    return personality.handle(n)
+
+
+def _desktop(n):
+    import desktop
+    return desktop.handle(n)
+
+
+LOCAL_HANDLERS = [_emergency, _personality, _desktop, _routine, _timers, _lists, _pronounce, _report, _pc, _commute, _parcels, _home_state, _home,
                   _music, _time, _date, _sun, _weather, _solar, _nas, _pi]
 
 

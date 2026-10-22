@@ -35,3 +35,9 @@ config/learned.json
 config/aussprache.json
 config/apps.json
 config/devices.json
+config/homelab.json
+
+# vault backups and exports (memory_tools.py)
+backups/
+config/profiles.json
+config/scripts.json

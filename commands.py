@@ -246,15 +246,17 @@ Du änderst nie deinen eigenen Code; größere Umbauten macht der User in Claude
 LEAN_MEMORY = """Gedächtnis: memory_search (Notizen und frühere Gespräche), memory_read (eine Notiz ganz).
 Erfährst du etwas Dauerhaftes über den User (Personen, Vorlieben, Pläne, Anweisungen, ausdrückliches "merk dir"),
 speichere es still mit memory_save (Notiz: Profil, Befehle, Vorlieben, Websites, Termine, Wissen, Personen/Name,
-Projekte/Name) und erwähne es höchstens mit "Notiert". Nicht speichern: Smalltalk, einmalige Fragen, Wetter."""
+Projekte/Name; quelle 'gesagt' oder 'abgeleitet') und erwähne es höchstens mit "Notiert". Nicht speichern: Smalltalk,
+einmalige Fragen, Wetter. Abgeleitetes ist eine Annahme, keine Tatsache."""
 
 LEAN_GROUP_RULES = {
     "home": "Haus: home_states (mit search filtern!) liest Geräte und Sensoren, home_control schaltet Licht, "
-            "Steckdosen, Ventilatoren, Medien, Szenen. entity_id erst nachschlagen, nicht raten. Router, PC, Pi "
+            "Steckdosen, Ventilatoren, Medien, Szenen. home_check prüft, ob alle Geräte online sind. entity_id erst nachschlagen, nicht raten. Router, PC, Pi "
             "und Kühlschrank nur ausschalten, wenn der User es ausdrücklich bestätigt.",
     "ha_full": "Home-Assistant-Server (mcp__homeassistant__*): Verlauf, Logs, Automationen. Lesen frei; Änderungen "
                "erst im Gespräch ankündigen.",
-    "mail": "E-Mail: mail_inbox liest das Postfach (IMAP, nur lesen). Kurz zusammenfassen, Werbung weglassen, nie ganze Mails, "
+    "mail": "E-Mail: mail_draft legt einen Entwurf im Postfach an (Karte; vorher Empfänger, Betreff und Kern nennen; "
+            "gesendet wird nie). mail_inbox liest das Postfach (IMAP, nur lesen). Kurz zusammenfassen, Werbung weglassen, nie ganze Mails, "
             "Links oder Codes vorlesen. mail_mark_read markiert als gelesen (search = Absender/Betreff, all = alle "
             "ungelesenen; unread = wieder ungelesen), ohne Rückfrage.",
     "weather": "Wetter: weather (days bis 14, place für andere Orte, hourly für die nächsten Stunden) liefert Himmel, "
@@ -262,8 +264,11 @@ LEAN_GROUP_RULES = {
     "calendar": "Kalender: calendar_events liest, calendar_add trägt ein (der User bestätigt per Karte; vorher kurz "
                 "Titel und Uhrzeit klären).",
     "systems": "Systeme: pi_status, nas_status, network_devices lesen frei. Befehle auf dem Pi nur per "
-               "ssh auf den Pi (Adresse in der Notiz 'Netzwerk') mit Bestätigung. Warne bei Platten nicht 'normal' oder Volume über 85 Prozent.",
-    "health": "Gesundheit: garmin_health liest Schlaf, Schritte, Ruhepuls, Stress, Body Battery.",
+               "ssh auf den Pi (Adresse in der Notiz 'Netzwerk') mit Bestätigung. Warne bei Platten nicht 'normal' oder Volume über 85 Prozent. pc_status: dieser PC (CPU, RAM, "
+               "GPU, VRAM, Platten); net_diagnose: Internet-Probleme eingrenzen; backup_status: Hyper Backup auf dem NAS.",
+    "health": "Gesundheit: garmin_health liest Schlaf, Schritte, Ruhepuls, Stress, Body Battery. health_log notiert, "
+              "was Garmin nicht kennt (Essenszeit, Alkohol, Kaffee) für den Wochenrückblick; der liegt als Notiz "
+              "'Wochenrückblick <Jahr>-KW<nn>' (memory_read).",
     "music": "Musik: music steuert Spotify (play_pause, next, previous, volume_up/down, search mit query).",
     "web": "Web: web_fetch holt Seiten gekürzt, WebSearch sucht. Zuerst die bewährten Quellen aus der Notiz "
            "'Websites' (memory_read). open_website öffnet Seiten im eingestellten Browser.",
@@ -274,6 +279,28 @@ LEAN_GROUP_RULES = {
               "Zeitpunkt hierhin, nicht in den Kalender, außer der User will einen Termin.",
     "lists": "Listen: list_read, list_add, list_remove mit list 'einkauf' (Einkaufsliste) oder 'todo' (To-do-Liste). "
              "Einträge kurz, ohne Artikel.",
+    "memory_admin": "Gedächtnis verwalten: memory_overview (was gespeichert ist), memory_why (warum, mit Herkunft), "
+                    "korrigieren = memory_save mit replace, memory_forget (Karte; vorher erklären), memory_export (Zip).",
+    "windows": "Fenster: window_arrange schiebt ein Programmfenster (links, rechts, Ecken, mitte, voll, monitor). "
+               "Arbeitsbereiche sind Routinen mit Schritten wie {do: 'Öffne Discord'}, {do: 'Discord nach rechts'}.",
+    "files": "Dateien: file_search findet Dateien in Desktop, Dokumente, Downloads; file_read liest Text, Code, Word. "
+             "Fass zusammen statt vorzulesen.",
+    "clipboard": "Zwischenablage: clipboard_read liest den kopierten Text, nur wenn der User danach fragt.",
+    "screen": "Bildschirm: screen_read liest den Text im aktiven Fenster (ganz=true: ganzer Bildschirm) lokal per OCR. "
+              "Erkläre Fehlermeldungen konkret; OCR verwechselt manchmal 0 und O.",
+    "scripts": "Skripte: script_list zeigt freigegebene Skripte, script_run startet eines (Karte; vorher erklären).",
+    "dayprep": "Tagesvorbereitung: day_prep liefert Termine mit Fahrzeit, Losfahrzeit und passenden Notizen. "
+               "Fasse es gesprochen zusammen: was, wann, wann los, woran denken.",
+    "research": "Recherche: Suche mit WebSearch, lies Quellen mit web_fetch. Nenne Quellen mit Datum, sag, wo sie sich "
+                "widersprechen, und kennzeichne Vermutungen. Ausführliche Ergebnisse mit research_save speichern. "
+                "watch_add beobachtet ein Thema (nicht Arbeit), watch_list, watch_remove.",
+    "plans": "Pläne über mehrere Tage: zerlege das Vorhaben in kleine Schritte mit Datum (realistisch verteilt) und "
+             "lege sie mit plan_create an; plan_list zeigt Offenes, plan_check hakt ab.",
+    "phone": "Handy: phone_notify schickt eine kurze Nachricht aufs Handy (Home-Assistant-App).",
+    "audit": "Protokoll: audit_today sagt, was du heute ausgeführt hast. Nur aufzählen, was dort steht.",
+    "proposals": "Vorschläge: proposal_list zeigt deine offenen Vorschläge. Sagt der User ja: erst auf Deutsch "
+                 "erklären, was passiert und warum, dann proposal_accept (Karte). Nein: proposal_decline. "
+                 "'Streich die Regel …': erklären, dann rule_remove (Karte).",
     "routines": "Routinen: routine_save legt fest, was auf einen Satz hin passiert (läuft danach ohne dich); "
                 "routine_list, routine_delete. Schritte möglichst als do/tell mit einfachen deutschen Befehlen; "
                 "nenne dem User danach kurz Auslöser und Schritte.",
@@ -292,7 +319,8 @@ def lean_core():
         if not path.exists():
             continue
         _, body = memory._parse_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
-        bullets = [ln.strip() for ln in body.splitlines() if ln.strip().startswith("- ")]
+        import memory_tools
+        bullets = ["- " + memory_tools.for_prompt(ln.strip()[2:]) for ln in body.splitlines() if ln.strip().startswith("- ")]
         text = "\n".join(bullets)[:max(0, budget)]
         budget -= len(text)
         if text:
@@ -308,7 +336,16 @@ def lean_core():
 def lean_system(groups):
     """Stable per tool-group set: identical text = prompt-cache hit."""
     name = profile.persona_line()
-    out = [LEAN_PERSONA + ("\n" + name if name else ""), LEAN_MEMORY]
+    import privacy
+    import reflection
+    import policy
+    import personality
+    out = [personality.persona(LEAN_PERSONA) + ("\n" + name if name else ""), LEAN_MEMORY,
+           privacy.CARD_RULE + " " + privacy.WORK_RULE,
+           policy.RULES]
+    rules = reflection.rules_block()
+    if rules:
+        out.append(rules)
     for g in groups:
         if g in LEAN_GROUP_RULES:
             out.append(LEAN_GROUP_RULES[g])
@@ -340,6 +377,10 @@ def lean_prefix(message, groups=()):
     net = briefing.network_block()
     if net:
         out.append(net[:500])
+    import proposals
+    waiting = proposals.block()
+    if waiting:
+        out.append(waiting[:900])
     recall = memory.context_for(message, limit=2)
     if recall:
         out.append(recall.replace("## Relevant memory from the JARVIS vault", "Passende Notizen:")[:900])
