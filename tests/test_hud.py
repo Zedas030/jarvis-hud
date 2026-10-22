@@ -25,7 +25,7 @@ class Notifications(unittest.TestCase):
         pid = proposals.add("idea", "Schlaf-Ampel", "Sie fragen oft nach dem Schlaf.", source="suggestions")
         emergency.pause(hours=1)
         n = server.notifications()
-        self.assertEqual(set(n), {"items", "incidents", "proposals", "paused_until", "persona"})
+        self.assertEqual(set(n), {"items", "incidents", "proposals", "paused_until", "persona", "tasks"})
         self.assertEqual(n["items"][0]["text"], "Die Waschmaschine ist fertig.")
         self.assertEqual(n["items"][0]["kind"], "appliance")
         self.assertIn(pid, [p["id"] for p in n["proposals"]])

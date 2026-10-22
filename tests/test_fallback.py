@@ -168,6 +168,21 @@ class Chain(unittest.TestCase):
         _, reply = self.run_chain()
         self.assertEqual(reply.strip(), "6 Wochen, CPU-Temp")
 
+    def test_profile_never_reaches_gemini(self):
+        system = ("Du bist JARVIS.\nDer User heißt Max.\n\nWas du über den User weißt:\nProfil:\n- Mail: max@example.org"
+                  "\n\nWeitere Notizen (memory_read): Wissen\n\nJede Nachricht beginnt mit einem <kontext>-Block.")
+        prefix = "<kontext>\nJetzt: x\n\nPassende Notizen:\n- Max mag Golf\n</kontext>"
+        SCRIPT["groq"] = [(429, {}, {"retry-after": "60"})]
+        SCRIPT["gemini"] = [text("ok")]
+        list(fallback_llm.run(system, prefix, "Wie wird das Wetter?", ["weather"]))
+        gemini = [b for n, b in SEEN if n == "gemini"][0]
+        sent = json.dumps(gemini["messages"], ensure_ascii=False)
+        self.assertNotIn("Max", sent)
+        self.assertNotIn("max@example.org", sent)
+        self.assertIn("<kontext>-Block", sent)
+        groq = [b for n, b in SEEN if n == "groq"][0]
+        self.assertIn("max@example.org", json.dumps(groq["messages"], ensure_ascii=False))
+
     def test_gemini_safe_schemas(self):
         for spec in fallback_llm.tool_specs(["systems", "home"]):
             params = spec["function"].get("parameters")

@@ -41,3 +41,4 @@ config/homelab.json
 backups/
 config/profiles.json
 config/scripts.json
+config/learned.history.jsonl

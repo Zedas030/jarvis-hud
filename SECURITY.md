@@ -36,9 +36,20 @@ LIMITED_WRITE call in the same request needs a card ("taint"). One MCP process p
 - Work topics are not logged, evaluated, saved, planned or watched (`privacy.py`, `JARVIS_WORK_TERMS`).
 - Screen reading only on request, local Windows OCR; refused while a password manager, banking or
   messenger window is visible. The image never leaves the PC.
+- Screen description (`vision.py`) only on request with a card for every picture; same window block; the
+  picture goes to Claude in a call without any tools and is deleted afterwards. No mouse or keyboard control.
 - Files only below `JARVIS_FILE_ROOTS`; path traversal is resolved and refused.
 - The Gemini free tier may train on prompts, so it never sees mail, calendar, health or briefing turns.
 - Background jobs that read conversations or health data use Claude or Groq/Ollama only.
+
+## Learning without self-modification
+
+- Router rules learned from Claude are drafts. They become active only after checks (devices exist and are
+  switchable, no clash with routine triggers) and a confirmation card; every version is kept in
+  `config/learned.history.jsonl` and can be undone (card). Checks only read — they never switch anything.
+- A memory entry that contradicts an existing one is never overwritten; Jarvis asks the user.
+- Check tasks (`tasks.py`) only read; findings come with a recovery plan in words, nothing is repaired automatically.
+- The resource manager only unloads or pauses Jarvis' own components when they are idle; it never touches other programs.
 
 ## Emergency stop
 

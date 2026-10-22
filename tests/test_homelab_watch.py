@@ -34,8 +34,9 @@ def finding(key="pi", ok=False, severity="critical"):
 class Watch(unittest.TestCase):
     def setUp(self):
         commands.update_state(lambda d: d.pop("homelab", None))
-        if hw.BASELINE.exists():
-            hw.BASELINE.unlink()
+        for p in (hw.BASELINE, hw.HISTORY):
+            if p.exists():
+                p.unlink()
 
     def test_outage_needs_two_checks_and_recovery_once(self):
         t = 1_000_000

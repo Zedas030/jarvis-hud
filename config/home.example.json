@@ -1,5 +1,5 @@
 {
-  "_comment": "Kopieren nach config/home.json und die Entity-IDs aus Home Assistant eintragen (Entwicklerwerkzeuge → Zustände). Felder ohne passendes Gerät leer lassen.",
+  "_comment": "Copy to config/home.json and enter the entity IDs from Home Assistant (Developer tools → States). Leave fields empty that have no matching device.",
   "storage_name": "Batteriespeicher",
   "solar_power": [
     "sensor.solar_power"

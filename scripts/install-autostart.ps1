@@ -1,4 +1,4 @@
-# Start Jarvis automatically at sign-in (Windows Task Scheduler).
+﻿# Start Jarvis automatically at sign-in (Windows Task Scheduler).
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1            # install
 #   powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -Remove    # remove

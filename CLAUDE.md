@@ -19,11 +19,15 @@ port and state file (see README, "Entwicklung und Diagnose"); `JARVIS_RUNTIME=mo
 
 - Python 3.12, standard library first. New dependencies only with the user's OK.
 - Code, comments and docs in English; everything Jarvis **says**, router patterns and prompts in German.
-- One module per feature, plain functions, module-level config from environment variables with defaults.
+- One module per feature in `jarvis/<group>/` (core, safety, tools, memory, voice, llm, watch), plain functions,
+  module-level config from environment variables with defaults. Imports stay flat (`import memory`) — `paths.py`
+  adds the group folders to `sys.path`; a new entry point must `import paths` first. Paths to config, logs, vault
+  and ui come from the repository root (`Path(__file__).resolve().parents[2]`), never from the module's folder.
+  A new module goes into the fitting group; module names must stay unique across groups.
 - Every test file imports `tests/isolate.py` first — it moves state, vault, logs and config into a
   temp folder. A new data file needs an env var and an entry there.
 - Comments explain why, not what. Match the surrounding density.
-- Commit messages in German, author `User <user@users.noreply.github.com>` via `git -c`; no Claude co-author line.
+- Commit messages in German, author from the local git config (`Zedas030`, GitHub noreply address); no Claude co-author line.
 
 ## Rules that must not break
 

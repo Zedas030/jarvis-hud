@@ -30,5 +30,7 @@ os.environ.update(JARVIS_STATE=str(TMP / "state.json"), JARVIS_VAULT=str(TMP / "
                   JARVIS_PROFILES=str(TMP / "profiles.json"), JARVIS_WORKSPACES=str(TMP / "workspaces.json"),
                   JARVIS_SCRIPTS=str(TMP / "scripts.json"), JARVIS_FILE_ROOTS=str(TMP / "files"),
                   JARVIS_PERM_URL="http://127.0.0.1:9/api/permission/request",
-                  JARVIS_HOMELAB_HISTORY=str(TMP / "homelab_events.jsonl"), JARVIS_PHONE_NOTIFY="")
+                  JARVIS_HOMELAB_HISTORY=str(TMP / "homelab_events.jsonl"), JARVIS_PHONE_NOTIFY="", JARVIS_TASKS=str(TMP / "tasks.json"), JARVIS_METRICS_DAILY=str(TMP / "metrics_daily.json"),
+                  JARVIS_DOC_INDEX=str(TMP / "docindex.sqlite"), JARVIS_DOC_ROOTS="")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+import paths  # noqa: E402,F401 — the jarvis/<group> folders

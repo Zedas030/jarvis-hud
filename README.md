@@ -30,6 +30,7 @@ The language model is the **Claude Code CLI** on a subscription, so there is no 
 - [Usage](#usage)
 - [Speech output: provider chain](#speech-output-provider-chain)
 - [Fallback mode: stand-in chain](#fallback-mode-stand-in-chain)
+- [Resources, context, tasks and memory](#resources-context-tasks-and-memory)
 - [Control, personality and everyday](#control-personality-and-everyday)
 - [Learning modules](#learning-modules)
 - [Efficiency: router and lean mode](#efficiency-router-and-lean-mode)
@@ -278,6 +279,39 @@ GEMINI_API_KEY=...
 
 ---
 
+## Resources, context, tasks and memory
+
+More layers on the existing architecture. All run without an LLM unless noted, and each can be switched off.
+
+| Module | File | What it does | Say |
+|---|---|---|---|
+| **Resource manager** | `resources.py` | Measures VRAM, RAM, Ollama, the GPU voice and Whisper from real data and keeps a reserve free (`JARVIS_VRAM_RESERVE_MB`). Under pressure it gives memory back, only when idle: unload Ollama, then pause the GPU voice (Piper speaks), then move Whisper to the CPU — and takes it back later. Never interrupts a conversation. | "How full is the GPU?" · HUD row "GPU-Budget" |
+| **Skill factory** | `skill_factory.py` | Learned wordings are **drafts**; from the 2nd repetition they become a proposal, activated only after checks (device exists and is switchable, no clash with routines) and a confirmation card. Every version is kept and can be undone. | „Was hast du gelernt?“, „Nimm die Regel … zurück“ |
+| **Context engine** | `context.py` | Asks time, calendar, weather, timers, due plan steps, warnings, PC and home in parallel with time limits and a cache; stale or missing sources are marked. Every LLM request gets a short "situation". | „Wie sieht mein Tag aus?“ (local) |
+| **Task engine** | `tasks.py` | Checks in steps (NAS, Pi, network, PC, smart home, everything), each with time limit, retry and its own result check; cancel any time; report with a recovery plan. Never repairs anything itself. | „Prüf mein NAS“, „Systemcheck“ |
+| **Memory intelligence** | `memory_intel.py` | Duplicates are not saved; a contradiction (another home town, another date) is **never** overwritten — Jarvis asks. Names of people, projects and devices become graph links. Source "vermutet" (assumption) and an expiry date per entry. | „Prüf mein Gedächtnis“ |
+| **Monitoring** | `monitoring.py` | Storage forecast for NAS, system disk and Pi SD card with data basis and confidence; recurring outages named; the same notice from several sources merged; at most 6 spoken notices per hour. | „Wann ist das NAS voll?“ |
+| **Document search** | `docsearch.py` | Local full-text index (SQLite FTS5) of the shared folders and `JARVIS_DOC_ROOTS`, with file and position (page for PDF, via `pypdf`). | "What does the manual say about …?" |
+| **Vision** | `vision.py` | Describes the screen with Claude when local text recognition is not enough (layout, where a button is). Only on request, a **card for every picture**, blocked for password, banking and chat windows; the picture goes to Claude without any tools and is deleted afterwards. Off without Claude. | "Where is the setting in this window?" |
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `JARVIS_RESOURCES`, `JARVIS_VRAM_RESERVE_MB`, `JARVIS_VRAM_HYSTERESIS_MB` | `1`, `1500`, `1000` | Resource manager, free reserve, margin before taking back |
+| `JARVIS_TTS_VRAM_MB`, `JARVIS_WHISPER_VRAM_MB` | `4000`, `1800` | Needs of the GPU voice and Whisper (settings, not measurements) |
+| `JARVIS_OLLAMA_IDLE_S`, `JARVIS_OLLAMA_SMALL_MODEL` | `180`, empty | Unload Ollama when idle; smaller model when memory is short |
+| `JARVIS_SKILL_MIN_SEEN` | `2` | Repetitions before a draft is proposed |
+| `JARVIS_CONTEXT_TIMEOUT` | `4` | Time limit per context source in seconds |
+| `JARVIS_TASK_STEP_TIMEOUT`, `JARVIS_TASK_MAX_RUNNING` | `45`, `2` | Time limit per check step, parallel checks |
+| `JARVIS_FORECAST_WINDOW`, `JARVIS_FORECAST_WARN_DAYS` | `30`, `60` | Forecast window, warning threshold in days |
+| `JARVIS_DEDUP_SECONDS`, `JARVIS_SAY_PER_HOUR` | `1800`, `6` | Merge identical notices, spoken notices per hour |
+| `JARVIS_HOME_IGNORE` | inverters, internet-access switches | Entities the smart-home check skips (regex) |
+| `JARVIS_DOCSEARCH`, `JARVIS_DOC_ROOTS`, `JARVIS_DOC_MAX_FILES`, `JARVIS_DOC_MAX_MB` | `1`, empty, `5000`, `20` | Document search, extra folders, limits |
+| `JARVIS_VISION`, `JARVIS_VISION_MODEL`, `JARVIS_VISION_MAX_WIDTH` | `1`, `sonnet`, `1600` | Screen description on/off, model, max picture width |
+
+The stand-in providers that may train on prompts (Gemini free tier) no longer see the user profile, name or memory notes at all.
+
+---
+
 ## Control, personality and everyday
 
 Six expansion packages, each with its own tests. The rules behind them are in [SECURITY.md](SECURITY.md), the structure in [ARCHITECTURE.md](ARCHITECTURE.md). Spoken commands are German; translations in brackets.
@@ -457,21 +491,26 @@ The PC stays the brain. iPhone and iPad connect over [Tailscale](https://tailsca
 ## Project structure
 
 ```
-├─ server.py · router.py · runtime.py · commands.py
-├─ jarvis_mcp.py · memory.py · voice.py · tts_chain.py · local_tts_server.py
-├─ briefing.py · dashboard.py · icloud_calendar.py · billing.py · jarvis_profile.py
-├─ scheduler.py · lists.py · routines.py · events.py · watchers.py · wakeword.py · fallback_llm.py
-├─ learning.py · answer_cache.py · commute.py · parcels.py · pc.py · pronounce.py · devices.py
-├─ reflection.py · weekly_review.py · homelab_watch.py · suggestions.py · proposals.py · privacy.py · background.py
-├─ policy.py · audit.py · emergency.py · memory_tools.py · personality.py · desktop.py · infra.py · assistant.py
-├─ CLAUDE.md · ARCHITECTURE.md · SECURITY.md
+├─ server.py           entry point (supervisor + HTTP server), loads paths.py
+├─ paths.py            makes the folders under jarvis/ importable (short import names stay)
+├─ jarvis/
+│  ├─ core/            router · runtime · commands · events · scheduler · background · jarvis_profile ·
+│  │                   personality · context · tasks
+│  ├─ safety/          policy · privacy · audit · emergency · proposals
+│  ├─ tools/           jarvis_mcp (tool server) · desktop · infra · assistant · pc · lists · routines ·
+│  │                   devices · dashboard · commute · parcels · icloud_calendar · billing
+│  ├─ memory/          memory · memory_tools · memory_intel · learning · skill_factory · answer_cache ·
+│  │                   reflection · docsearch
+│  ├─ voice/           voice · tts_chain · local_tts_server · wakeword · pronounce · vision
+│  ├─ llm/             fallback_llm · resources
+│  └─ watch/           watchers · homelab_watch · monitoring · briefing · weekly_review · suggestions
 ├─ ui/                 index.html · app.js · graph.js · styles.css · pair.html
-├─ scripts/            measure_tokens.py · lean_probe.py · mail_to_trash.py · router_report.py · install-autostart.ps1
-├─ tests/              test_router.py · test_tts_chain.py · test_fallback.py · test_remote.py   (no house, Claude, network or sound needed)
-├─ config/             home.example.json · routines.example.json   (home.json, routines.json stay local)
-├─ .env.example        configuration template
-├─ requirements.txt    main environment
-├─ requirements-tts.txt  GPU voice
+├─ scripts/            measure_tokens.py · lean_probe.py · mail_to_trash.py · router_report.py ·
+│                      install-autostart.ps1 · ocr_screen.ps1
+├─ tests/              one test module per area, isolate.py first (no house, Claude, network or sound needed)
+├─ config/             *.example.json (your own files stay local)
+├─ CLAUDE.md · ARCHITECTURE.md · SECURITY.md
+├─ requirements.txt · requirements-tts.txt
 └─ start-jarvis.bat
 ```
 
@@ -532,7 +571,9 @@ set JARVIS_PORT=8721& set JARVIS_STATE=%TEMP%\state_test.json& .venv\Scripts\pyt
 - [x] Learning loop, weekly review, homelab observer, suggestion module
 - [x] Action classes, audit log, emergency stop, memory control, protection against injected instructions
 - [x] Personality profiles, windows/files/screen, PC and network diagnosis, mail drafts, research, plans, notification centre
-- [ ] Reading PDFs (needs an extra package)
+- [x] Resource manager, skill factory with approval, context and task engines, memory intelligence, forecasts
+- [x] Document search incl. PDF, screen description on request with a card per picture
+- [ ] Mouse and keyboard control (deliberately not built; only as a separate, strictly controlled extension)
 - [ ] Central control: screen, room microphones, speaker recognition
 - [ ] Focus sessions with distraction hints
 - [ ] Screen and camera context on request

@@ -2,7 +2,9 @@
 # Called by desktop.py (Jarvis, "Was steht auf meinem Bildschirm?"). The image is a
 # temporary file that is deleted at the end; nothing leaves this PC.
 # -ImagePath reads an existing image instead (used by the tests).
-param([int]$Left = -1, [int]$Top = 0, [int]$Width = 0, [int]$Height = 0, [string]$ImagePath = "")
+# -SaveTo only saves the screenshot (scaled to -MaxWidth) for vision.py and skips the OCR.
+param([int]$Left = -1, [int]$Top = 0, [int]$Width = 0, [int]$Height = 0, [string]$ImagePath = "",
+      [string]$SaveTo = "", [int]$MaxWidth = 1600)
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
@@ -21,7 +23,21 @@ $g = [System.Drawing.Graphics]::FromImage($bmp)
 try {
     $g.CopyFromScreen($Left, $Top, 0, 0, $bmp.Size)
     $bmp.Save($tmp, [System.Drawing.Imaging.ImageFormat]::Png)
-} finally { $g.Dispose(); $bmp.Dispose() }
+} finally { $g.Dispose() }
+if ($SaveTo) {
+    $scale = [Math]::Min(1.0, $MaxWidth / [double]$Width)
+    $w = [int]($Width * $scale); $h = [int]($Height * $scale)
+    $small = New-Object System.Drawing.Bitmap $w, $h
+    $g2 = [System.Drawing.Graphics]::FromImage($small)
+    try {
+        $g2.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $g2.DrawImage($bmp, 0, 0, $w, $h)
+        $small.Save($SaveTo, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally { $g2.Dispose(); $small.Dispose(); $bmp.Dispose(); Remove-Item $tmp -ErrorAction SilentlyContinue }
+    "saved"
+    exit 0
+}
+$bmp.Dispose()
 }
 
 try {

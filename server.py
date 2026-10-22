@@ -20,6 +20,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
 ROOT = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+import paths  # noqa: E402,F401 — the jarvis/<group> folders
 UI = ROOT / "ui"
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
@@ -83,10 +85,12 @@ import events      # noqa: E402
 import learning    # noqa: E402
 import pc          # noqa: E402
 import assistant  # noqa: E402
+import docsearch  # noqa: E402
 import audit  # noqa: E402
 import fallback_llm  # noqa: E402
 import memory_tools  # noqa: E402
 import personality  # noqa: E402
+import resources  # noqa: E402
 import policy  # noqa: E402
 import homelab_watch  # noqa: E402
 import reflection  # noqa: E402
@@ -221,7 +225,11 @@ def notifications():
         said = [dict(text=e.get("text", ""), kind=e.get("kind") or e["t"], at=e["at"], t=e["t"])
                 for e in events._LOG if e["t"] in ("say", "alarm")][-30:][::-1]
     paused = commands.load().get("paused_until") or 0
+    import tasks
     return dict(items=said, incidents=homelab_watch.history(15),
+                tasks=[dict(id=t["id"], title=t["title"], status=t["status"], report=t.get("report", ""),
+                            done=sum(1 for s in t["steps"] if s["status"] not in ("pending", "running")),
+                            total=len(t["steps"])) for t in tasks.get()[-6:][::-1]],
                 proposals=[dict(id=p["id"], title=p["title"], why=p["why"]) for p in proposals.pending()],
                 paused_until=paused if paused > time.time() else None, persona=personality.label())
 
@@ -672,7 +680,7 @@ class Handler(BaseHTTPRequestHandler):
                         answer_cache.put(message, route["groups"], text, [n for n, _ in tools])
                         learned = learning.observe(message, tools)
                         if learned:
-                            emit(dict(t="note", message=f"gelernt: „{learned}“ geht künftig ohne LLM"))
+                            emit(dict(t="note", message=f"Entwurf gelernt: „{learned}“ — wartet auf Ihre Freigabe"))
                 emit(ev)
         except (BrokenPipeError, ConnectionResetError):
             pass
@@ -748,7 +756,7 @@ class Handler(BaseHTTPRequestHandler):
                 pass
             learned = learning.observe(message, tools)
             if learned:
-                emit(dict(t="note", message=f"gelernt: „{learned}“ geht künftig ohne LLM"))
+                emit(dict(t="note", message=f"Entwurf gelernt: „{learned}“ — wartet auf Ihre Freigabe"))
         commands.remember_turn(message if not is_briefing else "(Tagesbriefing)", text)
         if memory.build_graph(force=True)["total"] != before:
             emit(dict(t="graph"))
@@ -953,6 +961,8 @@ def main():
     suggestions.start()            # a new ability twice a week
     memory_tools.start()           # daily vault backup (backups/), audit log trimming
     assistant.start()              # watched topics (web search, at most a few a day)
+    resources.start()              # VRAM budget: GPU voice, Whisper, Ollama
+    docsearch.start()              # local full-text index of the shared folders (hourly, incremental)
     router.EMERGENCY_HOOKS.update(deny=_deny_open_cards, cancel=runtime.cancel_active)
     wakeword.start()               # openWakeWord, if JARVIS_WAKE=oww
     if os.environ.get("JARVIS_CHILD") == "1":    # only a supervised child can be restarted

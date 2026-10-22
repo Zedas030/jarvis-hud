@@ -13,6 +13,7 @@ import unittest
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="jarvis-tts-test-"))
 os.environ.update(JARVIS_STATE=str(TMP / "state.json"), TTS_CHAIN="a,b,c", TTS_ANNOUNCE_SWITCH="1")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+import paths  # noqa: E402,F401
 
 import commands    # noqa: E402
 import tts_chain   # noqa: E402

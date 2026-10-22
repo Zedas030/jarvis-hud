@@ -378,11 +378,14 @@ class PcControl(Base):
 class Learning(Base):
     def test_learns_a_switch_and_does_it_alone_next_time(self):
         self.llm("Mach die Leselampe aus")              # unknown name: the LLM has to find it
-        learned = learning.observe("Mach die Leselampe aus",
-                                   [("mcp__jarvis__home_states", {"search": "lese"}),
-                                    ("mcp__jarvis__home_control", {"entity_id": "light.kueche",
-                                                                   "service": "turn_off"})])
+        calls = [("mcp__jarvis__home_states", {"search": "lese"}),
+                 ("mcp__jarvis__home_control", {"entity_id": "light.kueche", "service": "turn_off"})]
+        learned = learning.observe("Mach die Leselampe aus", calls)
         self.assertEqual(learned, "leselampe")
+        self.llm("Mach die Leselampe aus")              # only a draft: still the LLM
+        import skill_factory
+        skill_factory._ha_entities = lambda: {"light.kueche"}
+        self.assertIn("Aktiv", skill_factory.activate("leselampe"))   # what the card's yes does
         self.local("Mach die Leselampe aus", "home")
         self.assertEqual(CALLS, [("light.kueche", "turn_off", {})])
         self.local("Leselampe an")
@@ -399,6 +402,9 @@ class Learning(Base):
     def test_learned_protected_device_still_protected(self):
         learning.observe("Mach den Kasten aus", [("home_control", {"entity_id": "switch.router",
                                                                   "service": "turn_off"})])
+        import skill_factory
+        skill_factory._ha_entities = lambda: {"switch.router"}
+        skill_factory.activate("kasten")
         self.llm("Mach den Kasten aus")
         self.assertEqual(CALLS, [])
 
@@ -525,7 +531,7 @@ class Parcels(Base):
         super().setUp()
         now = time.time()
         self.items = [
-            dict(sender="DHL", subject="Ihr Paket kommt heute", status="heute", when=now - 3600, id="1"),
+            dict(sender="DHL", subject="Ihr Paket kommt heute", status="heute", when=now, id="1"),   # now: always today, even just after midnight
             dict(sender="Amazon", subject="Versandt: Kabel", status="unterwegs", when=now - 86400, id="2"),
             dict(sender="Hermes", subject="Zugestellt", status="zugestellt", when=now - 5 * 86400, id="3"),
         ]

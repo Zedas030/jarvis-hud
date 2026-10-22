@@ -6,3 +6,4 @@ nvidia-cublas-cu12      # Whisper on the GPU (CUDA 12)
 nvidia-cudnn-cu12
 piper-tts==1.8.0
 garminconnect==0.3.17
+pypdf>=5,<7             # PDFs in the local document search (optional)

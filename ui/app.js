@@ -185,6 +185,9 @@ function renderSystems(d) {
   if (h && !h.error) row(h.router.online ? 'ok' : 'bad', 'Router',
     h.router.online ? '↓ ' + de(h.router.down * 8 / 1000, 1) + ' · ↑ ' + de(h.router.up * 8 / 1000, 1) + ' Mbit/s' : 'offline');
   if (h) row(h.error ? 'bad' : 'ok', 'Home Assistant', h.error ? 'nicht erreichbar' : 'verbunden');
+  var rs = d.resources;
+  if (rs && rs.ok !== null) row(rs.ok ? (rs.shed && rs.shed.length ? 'warn' : 'ok') : 'warn', 'GPU-Budget',
+    rs.text + (rs.shed && rs.shed.length ? ' · abgegeben: ' + rs.shed.join(', ') : ''));
   var c = d.pc;
   if (c && !c.error) row((c.pc_gpu_temp > 85 || c.pc_disk > 92) ? 'warn' : 'ok', 'Dieser PC',
     'CPU ' + de(c.pc_cpu) + ' % · RAM ' + de(c.pc_ram) + ' %' + (c.pc_vram != null ? ' · VRAM ' + de(c.pc_vram) + ' %' : '')
@@ -724,6 +727,10 @@ var Notes = {
       if (n.paused_until) html += '<h3>NOT-AUS</h3><ul><li class="bad">Pausiert bis ' + t(n.paused_until) + ' — „weitermachen“ hebt es auf.</li></ul>';
       if (n.proposals.length) html += '<h3>OFFENE VORSCHLÄGE</h3><ul>' + n.proposals.map(function (p) {
         return '<li class="prop"><b>' + esc(p.title) + '</b><br>' + esc(p.why) + '</li>'; }).join('') + '</ul>';
+      if (n.tasks && n.tasks.length) html += '<h3>AUFGABEN</h3><ul>' + n.tasks.map(function (t) {
+        var cls = t.status === 'COMPLETED' ? 'ok' : (/FAIL|TIMED|CANCEL/.test(t.status) ? 'bad' : 'prop');
+        return '<li class="' + cls + '"><small>' + esc(t.status) + ' · ' + t.done + '/' + t.total + '</small><b>'
+          + esc(t.title) + '</b>' + (t.report ? '<br>' + esc(t.report) : '') + '</li>'; }).join('') + '</ul>';
       html += '<h3>MELDUNGEN</h3><ul>' + (n.items.map(function (e) {
         return '<li><small>' + t(e.at) + ' · ' + esc(e.kind) + '</small>' + esc(e.text) + '</li>'; }).join('')
         || '<li>Noch keine Meldungen seit dem Start.</li>') + '</ul>';
@@ -1106,6 +1113,7 @@ function connectEvents() {
     // The wake word is heard by the PC's microphone — a phone elsewhere must not start listening.
     if (ev.t === 'wake') return window.__remote ? undefined : Wake.heard();
     if (ev.t === 'timers') return Timers.set(ev.items || []);
+    if (ev.t === 'task') { log('note', 'AUFGABE', ev.title + ' · ' + ev.status + ' · ' + ev.done + '/' + ev.total); return; }
     if (ev.t === 'say' && window.__remote) ev = Object.assign({}, ev, { silent: true });   // the PC reads it out
     if (ev.t === 'say' || ev.t === 'alarm') { Push.queue.push(ev); drainPush(); Notes.bump(); }
   };
