@@ -119,7 +119,7 @@ def build_graph(force=False):
                     tags=[t.strip() for t in (meta.get("tags") or "").split(",") if t.strip()],
                     updated=meta.get("updated", ""),
                     snippet=snippet, degree=0,
-                    # Home-Assistant-Entitäten für lebendige Sterne (siehe briefing.live)
+                    # Home Assistant entities for live stars (see briefing.live)
                     online=meta.get("online", ""), pegel=meta.get("pegel", ""),
                     groesse=meta.get("groesse", ""),   # extra radius for a hand-picked star
                 )

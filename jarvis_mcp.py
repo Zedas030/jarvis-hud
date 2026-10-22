@@ -135,6 +135,32 @@ TOOLS += [
                            "search": {"type": "string"}},
         },
     },
+    {
+        "name": "mail_mark_read",
+        "description": ("Mark unread inbox mails as read (only the read flag, nothing is moved or deleted). "
+                        "`search`: substring of sender or subject (as mail_inbox showed it), or `all`=true for every "
+                        "unread mail. `unread`=true does the opposite: marks matching read mails as unread again. "
+                        "Harmless and reversible, no confirmation needed."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"search": {"type": "string"}, "all": {"type": "boolean"}, "unread": {"type": "boolean"}},
+        },
+    },
+]
+
+TOOLS += [
+    {
+        "name": "weather",
+        "description": ("Weather forecast (Open-Meteo) for the user's home or any `place` (city name). Per day: sky, "
+                        "min/max temperature, rain probability and amount, wind, UV index, sunshine hours, sunrise "
+                        "and sunset; plus the current conditions. `days` (default 2 = today and tomorrow, max 14). "
+                        "`hourly`=true adds the next 24 hours in 2-hour steps (temperature, rain chance, sky). "
+                        "Read-only, no confirmation needed."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"days": {"type": "integer"}, "place": {"type": "string"}, "hourly": {"type": "boolean"}},
+        },
+    },
 ]
 
 TOOLS += [
@@ -198,6 +224,75 @@ TOOLS += [
     },
 ]
 
+TOOLS += [
+    {
+        "name": "reminder_add",
+        "description": ("Set a timer, alarm clock or reminder; Jarvis rings and speaks at that moment. "
+                        "`kind`: reminder (default), alarm or timer. `at`: 'YYYY-MM-DD HH:MM' local time. "
+                        "`text`: what to remind of (reminder) or a label (timer). No confirmation needed."),
+        "inputSchema": {"type": "object", "properties": {
+            "kind": {"type": "string"}, "at": {"type": "string"}, "text": {"type": "string"}},
+            "required": ["at"]},
+    },
+    {
+        "name": "reminder_list",
+        "description": "List the open timers, alarms and reminders with their ids.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "reminder_cancel",
+        "description": "Delete a timer/alarm/reminder by `id` from reminder_list, or `id`='all' for everything.",
+        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+    },
+    {
+        "name": "list_read",
+        "description": "Read the shopping list (`list`='einkauf') or the to-do list (`list`='todo').",
+        "inputSchema": {"type": "object", "properties": {"list": {"type": "string"}}, "required": ["list"]},
+    },
+    {
+        "name": "list_add",
+        "description": "Add entries to the shopping list ('einkauf') or the to-do list ('todo'). `items`: short entries.",
+        "inputSchema": {"type": "object", "properties": {
+            "list": {"type": "string"}, "items": {"type": "array", "items": {"type": "string"}}},
+            "required": ["list", "items"]},
+    },
+    {
+        "name": "list_remove",
+        "description": "Tick off one entry (`item`, as list_read shows it) on the shopping or to-do list.",
+        "inputSchema": {"type": "object", "properties": {"list": {"type": "string"}, "item": {"type": "string"}},
+                        "required": ["list", "item"]},
+    },
+    {
+        "name": "routine_list",
+        "description": "Show the user's routines (trigger phrases and steps) as JSON.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "routine_save",
+        "description": (
+            "Create or replace a routine: when the user says one of `triggers`, the steps run without the LLM. "
+            "Steps, in order, each an object with exactly one of: "
+            "{\"say\": text Jarvis speaks}, "
+            "{\"do\": a short German command the local router understands, answer not spoken — e.g. "
+            "'Licht Wohnzimmer aus', 'Steckdose Ventilator an', 'Wecker morgen um 7', 'Timer 10 Minuten'}, "
+            "{\"tell\": a German question whose answer is spoken — e.g. 'Wann klingelt mein Wecker?', "
+            "'Wie wird das Wetter morgen?', 'Was steht auf der Einkaufsliste?'}, "
+            "{\"ha\": 'domain.service', \"entity_id\": ..., \"data\": {...}} for light/switch/fan/media_player/scene "
+            "(entity_id 'all' only for light and media_player; look up ids with home_states), "
+            "{\"wait\": seconds}. Triggers: short phrases in lower case, e.g. 'gute nacht'."),
+        "inputSchema": {"type": "object", "properties": {
+            "name": {"type": "string"},
+            "triggers": {"type": "array", "items": {"type": "string"}},
+            "steps": {"type": "array", "items": {"type": "object"}}},
+            "required": ["name", "triggers", "steps"]},
+    },
+    {
+        "name": "routine_delete",
+        "description": "Delete a routine by `name`.",
+        "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+    },
+]
+
 # Which tools each group brings. The router in the server picks the groups per
 # request and passes them in JARVIS_TOOL_GROUPS, so a question about the weather
 # does not carry the definitions of mail, NAS and calendar tools along.
@@ -206,10 +301,14 @@ GROUPS = {
     "web": {"web_fetch", "open_website"},
     "calendar": {"calendar_events", "calendar_add"},
     "home": {"home_states", "home_control"},
-    "mail": {"mail_inbox"},
+    "mail": {"mail_inbox", "mail_mark_read"},
+    "weather": {"weather"},
     "music": {"music"},
     "systems": {"pi_status", "nas_status", "network_devices"},
     "health": {"garmin_health"},
+    "timers": {"reminder_add", "reminder_list", "reminder_cancel"},
+    "lists": {"list_read", "list_add", "list_remove"},
+    "routines": {"routine_list", "routine_save", "routine_delete", "home_states"},
 }
 ACTIVE_GROUPS = [g.strip() for g in os.environ.get("JARVIS_TOOL_GROUPS", "").split(",") if g.strip()]
 # Hard cap per tool result — results are sent again with every later API call of the turn.
@@ -402,6 +501,95 @@ def _mail(args):
         return f"IMAP-Anmeldung fehlgeschlagen ({e}). IMAP aktiviert und Passwort richtig?"
     except Exception as e:  # noqa: BLE001
         return f"Postfach nicht erreichbar: {e}"
+
+
+def _mail_mark(args):
+    import email
+    import email.header
+    import imaplib
+    if not (MAIL_USER and MAIL_PASSWORD):
+        return _mail({})
+    q = (args.get("search") or "").strip().lower()
+    if not q and not args.get("all"):
+        return "Welche Mails? `search` (Absender/Betreff) oder `all`=true angeben."
+    unread = bool(args.get("unread"))
+
+    def dec(v):
+        return str(email.header.make_header(email.header.decode_header(v or ""))).strip()
+
+    try:
+        box = imaplib.IMAP4_SSL(MAIL_HOST, 993, timeout=20)
+        box.login(MAIL_USER, MAIL_PASSWORD)
+        box.select("INBOX")
+        uids = box.uid("search", None, "SEEN" if unread else "UNSEEN")[1][0].split()
+        if unread:
+            uids = uids[-200:]          # only look at the newest read mails
+        hit = []
+        for uid in uids:
+            raw = box.uid("fetch", uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT)])")[1][0][1]
+            msg = email.message_from_bytes(raw)
+            frm, subj = dec(msg.get("From")), dec(msg.get("Subject"))
+            if not q or q in frm.lower() or q in subj.lower():
+                hit.append((uid, subj or "(ohne Betreff)"))
+        if unread and not args.get("all"):
+            hit = hit[-5:]              # "wieder ungelesen" means the latest few, not the whole archive
+        if hit:
+            box.uid("STORE", b",".join(u for u, _ in hit).decode(), "-FLAGS" if unread else "+FLAGS", "(\\Seen)")
+        box.logout()
+        if not hit:
+            return "Keine passenden " + ("gelesenen" if unread else "ungelesenen") + " Mails gefunden."
+        what = "als ungelesen" if unread else "als gelesen"
+        return f"{len(hit)} Mails {what} markiert: " + "; ".join(s for _, s in hit[:10])[:1500]
+    except imaplib.IMAP4.error as e:
+        return f"IMAP-Fehler ({e})."
+    except Exception as e:  # noqa: BLE001
+        return f"Postfach nicht erreichbar: {e}"
+
+
+def _weather(args):
+    import datetime as dt
+    import urllib.parse
+    import briefing
+    import jarvis_profile as profile
+    lat, lon, where = briefing.LAT, briefing.LON, profile.place_suffix().strip(" ()") or "zu Hause"
+    place = (args.get("place") or "").strip()
+    if place:
+        hits = briefing._get("https://geocoding-api.open-meteo.com/v1/search?count=1&language=de&name="
+                             + urllib.parse.quote(place)).get("results") or []
+        if not hits:
+            return f"Ort '{place}' nicht gefunden."
+        lat, lon = hits[0]["latitude"], hits[0]["longitude"]
+        where = ", ".join(x for x in (hits[0].get("name"), hits[0].get("country")) if x)
+    days = max(1, min(int(args.get("days") or 2), 14))
+    d = briefing._get(
+        "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=%s&forecast_days=%d"
+        "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,uv_index"
+        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,"
+        "precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset"
+        "&hourly=temperature_2m,precipitation_probability,weather_code"
+        % (lat, lon, briefing.TZ_Q, max(days, 2)), timeout=15)
+    sky = briefing.WEATHER_CODES
+    wd = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+    c = d.get("current") or {}
+    out = [f"Wetter {where}. Jetzt: {sky.get(c.get('weather_code'), 'wechselhaft')}, {c.get('temperature_2m')} °C "
+           f"(gefühlt {c.get('apparent_temperature')}), Wind {c.get('wind_speed_10m')} km/h, UV {c.get('uv_index')}."]
+    day = d["daily"]
+    for i in range(days):
+        date = dt.date.fromisoformat(day["time"][i])
+        out.append(f"{wd[date.weekday()]} {date:%d.%m.}: {sky.get(day['weather_code'][i], 'wechselhaft')}, "
+                   f"{day['temperature_2m_min'][i]:.0f} bis {day['temperature_2m_max'][i]:.0f} °C, "
+                   f"Regen {day['precipitation_probability_max'][i] or 0} % ({day['precipitation_sum'][i] or 0} mm), "
+                   f"Wind bis {day['wind_speed_10m_max'][i] or 0:.0f} km/h, UV {day['uv_index_max'][i] or 0:.0f}, "
+                   f"Sonne {(day['sunshine_duration'][i] or 0) / 3600:.1f} h, "
+                   f"Aufgang {day['sunrise'][i][-5:]}, Untergang {day['sunset'][i][-5:]}.")
+    if args.get("hourly"):
+        h, now = d["hourly"], dt.datetime.now().strftime("%Y-%m-%dT%H:00")
+        start = next((k for k, t in enumerate(h["time"]) if t >= now), 0)
+        out.append("Stündlich: " + "; ".join(
+            f"{h['time'][k][-5:]} {h['temperature_2m'][k]:.0f}° {h['precipitation_probability'][k] or 0}% "
+            f"{sky.get(h['weather_code'][k], 'wechselhaft')}"
+            for k in range(start, min(start + 24, len(h["time"])), 2)))
+    return "\n".join(out)
 
 
 HA_URL = os.environ.get("HA_URL", "http://homeassistant.local:8123").strip().rstrip("/")
@@ -619,6 +807,20 @@ def _calendar(name, args):
         return f"Kalenderfehler: {e}"
 
 
+def _internal(op, args):
+    """Timers live in the HUD server (it rings them), so their tools ask it over
+    the same local, per-launch token as the permission gate."""
+    url = PERM_URL.replace("/api/permission/request", "/api/internal")
+    body = json.dumps({"op": op, "args": args}).encode()
+    req = urllib.request.Request(url, data=body, method="POST", headers={
+        "content-type": "application/json", "X-Jarvis-Perm": PERM_TOKEN})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read()).get("text") or "?"
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        return f"Jarvis-Server nicht erreichbar ({e})."
+
+
 def _ask(tool_name, tool_input):
     body = json.dumps({"tool_name": tool_name, "input": tool_input}).encode()
     req = urllib.request.Request(PERM_URL, data=body, method="POST", headers={
@@ -691,6 +893,13 @@ def main():
                     text = f"Musik-Fehler: {e}"
             elif name == "mail_inbox":
                 text = _mail(args)
+            elif name == "mail_mark_read":
+                text = _mail_mark(args)
+            elif name == "weather":
+                try:
+                    text = _weather(args)
+                except Exception as e:  # noqa: BLE001
+                    text = f"Wetterdienst nicht erreichbar: {e}"
             elif name in ("nas_status", "garmin_health"):
                 try:
                     text = _nas_status() if name == "nas_status" else _garmin(args)
@@ -705,6 +914,20 @@ def main():
                     text = f"Fehler: {e}"
             elif name == "web_fetch":
                 text = _web_fetch(args.get("url"))
+            elif name in ("reminder_add", "reminder_list", "reminder_cancel"):
+                text = _internal(name, args)
+            elif name in ("list_read", "list_add", "list_remove"):
+                try:
+                    import lists
+                    text = lists.tool(name, args)
+                except Exception as e:  # noqa: BLE001
+                    text = f"Listen-Fehler: {e}"
+            elif name in ("routine_list", "routine_save", "routine_delete"):
+                try:
+                    import routines
+                    text = routines.tool(name, args)
+                except Exception as e:  # noqa: BLE001
+                    text = f"Routinen-Fehler: {e}"
             elif name in ("memory_search", "memory_read", "memory_save"):
                 try:
                     text = _memory(name, args)

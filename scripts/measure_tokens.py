@@ -1,13 +1,13 @@
 """
-Token-Messung für Jarvis: ruft `claude -p` so auf wie der Server und zählt pro
-API-Aufruf input / cache_read / cache_write / output. Varianten schalten
-einzelne Bestandteile weg, damit sich ihr Gewicht als Differenz ablesen lässt.
+Token measurement for Jarvis: calls `claude -p` the way the server does and counts
+input / cache_read / cache_write / output per API call. Variants switch off
+single parts so their weight shows up as the difference.
 
     .venv\\Scripts\\python.exe scripts\\measure_tokens.py components
     .venv\\Scripts\\python.exe scripts\\measure_tokens.py requests
-    .venv\\Scripts\\python.exe scripts\\measure_tokens.py components --new   (nach dem Umbau)
+    .venv\\Scripts\\python.exe scripts\\measure_tokens.py components --new   (after the rework)
 
-Jeder Lauf startet einen frischen Prozess ohne --resume (Verlauf = 0).
+Every run starts a fresh process without --resume (history = 0).
 """
 import json
 import os

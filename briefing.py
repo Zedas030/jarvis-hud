@@ -217,7 +217,10 @@ def _check_network():
 
     for s in commands.update_state(merge):
         a = s.get("attributes", {})
-        _new_device_note(a.get("friendly_name") or s["entity_id"].split(".", 1)[1], a.get("ip", ""), a.get("mac", ""))
+        name = a.get("friendly_name") or s["entity_id"].split(".", 1)[1]
+        _new_device_note(name, a.get("ip", ""), a.get("mac", ""))
+        import events
+        events.publish("say", f"Sir, ein neues Gerät ist im WLAN: {name}. Kennen Sie das?", kind="network")
 
 
 def network_block():

@@ -31,5 +31,20 @@
   "person": "person.user",
   "battery_ignore": [
     "sensor.phone_battery_level"
+  ],
+  "appliances": [
+    {
+      "name": "Waschmaschine",
+      "power": "sensor.waschmaschine_power",
+      "on_w": 10,
+      "run_min": 3,
+      "off_w": 4,
+      "off_min": 3
+    },
+    {
+      "name": "Trockner",
+      "article": "der ",
+      "power": "sensor.trockner_power"
+    }
   ]
 }

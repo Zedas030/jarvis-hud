@@ -21,6 +21,7 @@ from urllib.parse import urlparse, parse_qs
 
 ROOT = pathlib.Path(__file__).resolve().parent
 UI = ROOT / "ui"
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 _env = ROOT / ".env"
 if _env.exists():
@@ -32,32 +33,73 @@ if _env.exists():
 
 # Supervisor: the HUD runs as a child process. When the code changes the child
 # exits with RESTART_CODE once nobody is talking, and is started again here.
+# A crash is restarted too, with a growing pause; five crashes within ten
+# minutes mean something is broken for good (port taken, bad .env) — then it stops.
 RESTART_CODE = 3
 if __name__ == "__main__" and os.environ.get("JARVIS_CHILD") != "1":
     import subprocess
     child_env = dict(os.environ, JARVIS_CHILD="1")
+    crashes = []
     while True:
+        started = time.time()
         try:
             rc = subprocess.call([sys.executable, str(pathlib.Path(__file__).resolve())] + sys.argv[1:],
                                  env=child_env)
         except KeyboardInterrupt:
             sys.exit(0)
-        if rc != RESTART_CODE:
-            sys.exit(rc)
-        print("\n  Code geändert — Neustart mit frischer Sitzung.\n", flush=True)
         child_env["JARVIS_OPEN"] = "0"   # the open page reloads itself
+        if rc == RESTART_CODE:
+            print("\n  Code geändert — Neustart mit frischer Sitzung.\n", flush=True)
+            continue
+        if rc == 0:
+            sys.exit(0)
+        crashes = [t for t in crashes if t > time.time() - 600] + [time.time()]
+        try:
+            (ROOT / "logs").mkdir(exist_ok=True)
+            with (ROOT / "logs" / "crash.log").open("a", encoding="utf-8") as fh:
+                fh.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} Exit-Code {rc} nach "
+                         f"{int(time.time() - started)} s\n")
+        except OSError:
+            pass
+        if len(crashes) >= 5:
+            print(f"\n  Jarvis ist {len(crashes)}-mal in zehn Minuten abgestürzt — ich höre auf. "
+                  "Details oben und in logs/crash.log.\n", flush=True)
+            sys.exit(rc)
+        pause = min(60, 2 ** len(crashes))
+        print(f"\n  Jarvis ist abgestürzt (Code {rc}) — Neustart in {pause} s.\n", flush=True)
+        try:
+            time.sleep(pause)
+        except KeyboardInterrupt:
+            sys.exit(0)
 
 import commands    # noqa: E402
+import devices     # noqa: E402
 import icloud_calendar  # noqa: E402
 import billing  # noqa: E402
 import briefing    # noqa: E402
+import answer_cache  # noqa: E402
 import dashboard   # noqa: E402
+import events      # noqa: E402
+import learning    # noqa: E402
+import pc          # noqa: E402
+import fallback_llm  # noqa: E402
 import memory      # noqa: E402
 import router      # noqa: E402
 import runtime     # noqa: E402
+import scheduler   # noqa: E402
 import voice       # noqa: E402
+import wakeword    # noqa: E402
+import watchers    # noqa: E402
 
 PORT = int(os.environ.get("JARVIS_PORT", "8720"))
+# Remote access (iPhone, iPad): a second port, also on localhost only, that
+# `tailscale serve` forwards HTTPS to. Everything arriving there needs a paired
+# device (devices.py); the PC's own port stays as it was.
+REMOTE = os.environ.get("JARVIS_REMOTE", "0").strip().lower() in ("1", "true", "yes", "on")
+REMOTE_PORT = int(os.environ.get("JARVIS_REMOTE_PORT", str(PORT + 1)))
+REMOTE_HOSTS = {h.strip().lower() for h in os.environ.get("JARVIS_REMOTE_HOSTS", "").split(",") if h.strip()}
+REMOTE_PUBLIC = {"/pair.html", "/manifest.webmanifest", "/icon-180.png", "/icon-512.png"}
+LOCAL_ONLY = {"/api/permission/request", "/api/internal", "/api/pair/start", "/api/devices", "/api/devices/revoke"}
 API_TOKEN = secrets.token_urlsafe(32)
 BOOT_ID = secrets.token_hex(4)          # the page reloads itself when this changes
 LAST_POST = [time.time()]               # any talking, listening or speaking counts as activity
@@ -151,6 +193,9 @@ def log_usage(route, model, groups, usage, system_chars=0, prefix_chars=0, messa
     return row
 
 
+# Jarvis' own voice in the quiet hours (JARVIS_QUIET_HOURS): this share of the slider value.
+NIGHT_VOLUME = float(os.environ.get("JARVIS_NIGHT_VOLUME", "0.5"))
+
 BRIEFING_LLM = os.environ.get("JARVIS_BRIEFING_LLM", "1").strip() not in ("0", "false", "no", "off")
 BRIEFING_PROMPT = (commands.LEAN_PERSONA + "\n\nFormuliere aus den Fakten ein gesprochenes Tagesbriefing: "
                    "Begrüßung passend zur Tageszeit, dann Termine, Wetter mit Golf-Einschätzung, Speicher und "
@@ -181,19 +226,29 @@ def _describe_call(tool, data):
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    remote = False            # True on REMOTE_PORT (RemoteHandler)
 
     def log_message(self, fmt, *args):
         if os.environ.get("JARVIS_VERBOSE"):
             sys.stderr.write("  " + (fmt % args) + "\n")
 
-    def _json(self, body, code=200):
+    def _json(self, body, code=200, headers=None):
         data = json.dumps(body).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(data)
+
+    def _redirect(self, to):
+        self.send_response(302)
+        self.send_header("Location", to)
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
 
     def _bytes(self, data, ctype, code=200):
         self.send_response(code)
@@ -210,10 +265,32 @@ class Handler(BaseHTTPRequestHandler):
         return self.rfile.read(n) if n else b""
 
     def _host_ok(self):
-        return self.headers.get("Host", "") in {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
+        host = self.headers.get("Host", "")
+        if self.remote:
+            name = host.lower().split(":")[0]
+            return name in REMOTE_HOSTS if REMOTE_HOSTS else name.endswith(".ts.net")
+        return host in {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 
     def _origin_ok(self):
+        if self.remote:
+            return self.headers.get("Origin") == "https://" + self.headers.get("Host", "")
         return self.headers.get("Origin") in {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
+
+    def _device_ok(self):
+        return bool(devices.check(devices.token_from_cookie(self.headers.get("Cookie"))))
+
+    def _pair(self):
+        """A device types the code from the PC's HUD and gets its cookie."""
+        if not self._host_ok() or not self._origin_ok():
+            return self._json({"error": "origin rejected"}, 403)
+        try:
+            req = json.loads(self._read(MAX_JSON) or b"{}")
+        except (ValueError, TypeError):
+            return self._json({"error": "bad json"}, 400)
+        token = devices.pair(req.get("code"), req.get("name"))
+        if not token:
+            return self._json({"error": "Code falsch oder abgelaufen."}, 403)
+        return self._json({"ok": True}, headers={"Set-Cookie": devices.cookie_header(token)})
 
     def _token_ok(self):
         supplied = self.headers.get("X-Jarvis-Token", "")
@@ -223,6 +300,10 @@ class Handler(BaseHTTPRequestHandler):
         if not self._host_ok():
             return self._json({"error": "invalid host"}, 403)
         p = urlparse(self.path).path
+        if self.remote and p not in REMOTE_PUBLIC and not self._device_ok():
+            if p.startswith("/api/"):
+                return self._json({"error": "device not paired"}, 401)
+            return self._redirect("/pair.html")
 
         if p == "/api/status":
             g = memory.build_graph()
@@ -237,7 +318,17 @@ class Handler(BaseHTTPRequestHandler):
                 tts=_tts_status(),
                 usage=commands.load().get("usage"),
                 billing=billing.summary(),
-                session=SESSION["id"], boot=BOOT_ID))
+                wake=wakeword.status(), timers=scheduler.public(), quiet=events.quiet_now(),
+                night_volume=NIGHT_VOLUME,
+                fallback=fallback_llm.status(),
+                session=SESSION["id"], boot=BOOT_ID, remote=self.remote, remote_enabled=REMOTE))
+
+        if p == "/api/events":
+            # EventSource cannot send headers, so the token comes as a query parameter.
+            tok = parse_qs(urlparse(self.path).query).get("token", [""])[0]
+            if not (tok and secrets.compare_digest(tok, API_TOKEN)):
+                return self._json({"error": "unauthorized"}, 401)
+            return self._events()
 
         if p == "/api/graph":
             force = parse_qs(urlparse(self.path).query).get("force", ["0"])[0] == "1"
@@ -269,14 +360,24 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         p = urlparse(self.path).path
         LAST_POST[0] = time.time()
+        if self.remote:
+            if p in LOCAL_ONLY:
+                return self._json({"error": "only on the PC"}, 403)
+            if p == "/api/pair":
+                return self._pair()
+            if not self._device_ok():
+                return self._json({"error": "device not paired"}, 401)
         if p == "/api/permission/request":
             return self._permission_request()
+        if p == "/api/internal":
+            return self._internal()
         if not self._host_ok() or not self._origin_ok():
             return self._json({"error": "origin rejected"}, 403)
         if not self._token_ok():
             return self._json({"error": "unauthorized"}, 401)
         ctype = self.headers.get("Content-Type", "").split(";", 1)[0].lower()
-        if p in {"/api/run", "/api/speak", "/api/new", "/api/cancel", "/api/balance"} and ctype != "application/json":
+        if p in {"/api/run", "/api/speak", "/api/new", "/api/cancel", "/api/balance", "/api/duck",
+                 "/api/pair/start", "/api/devices", "/api/devices/revoke"} and ctype != "application/json":
             return self._json({"error": "application/json required"}, 415)
         try:
             raw = self._read(MAX_AUDIO if p == "/api/listen" else MAX_JSON)
@@ -303,6 +404,25 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"text": voice.transcribe(raw, self.headers.get("Content-Type", "audio/webm"))})
             except Exception as e:  # noqa: BLE001
                 return self._json({"error": str(e)[:400], "text": ""}, 503)
+
+        if p == "/api/pair/start":
+            code, ttl = devices.start_pairing()
+            return self._json({"code": code, "ttl": ttl, "remote": REMOTE})
+
+        if p == "/api/devices":
+            return self._json({"devices": devices.listing(), "remote": REMOTE})
+
+        if p == "/api/devices/revoke":
+            did = (json.loads(raw or b"{}") or {}).get("id")
+            return self._json({"ok": devices.revoke(did)})
+
+        if p == "/api/duck":
+            if self.remote:                    # the phone talks, the PC's Spotify stays as it is
+                return self._json({"ok": True})
+            # Spotify quieter while Jarvis talks (pc.py); runs off the request thread, COM can be slow.
+            on = (json.loads(raw or b"{}") or {}).get("on") is True
+            threading.Thread(target=pc.duck, args=(on,), daemon=True).start()
+            return self._json({"ok": True})
 
         if p == "/api/balance":
             try:
@@ -343,10 +463,57 @@ class Handler(BaseHTTPRequestHandler):
 
         return self._json({"error": "no such endpoint"}, 404)
 
-    def _permission_request(self):
+    def _perm_ok(self):
         supplied = self.headers.get("X-Jarvis-Perm", "")
-        if not (self.client_address[0] == "127.0.0.1"
-                and supplied and secrets.compare_digest(supplied, PERM_TOKEN)):
+        return (self.client_address[0] == "127.0.0.1"
+                and bool(supplied) and secrets.compare_digest(supplied, PERM_TOKEN))
+
+    def _events(self):
+        """Server-Sent Events: timers ringing, notices, wake word. One open stream per HUD tab."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+        def send(ev):
+            self.wfile.write(f"id: {ev['id']}\ndata: {json.dumps(ev, ensure_ascii=False)}\n\n".encode())
+
+        events.CLIENTS[0] += 1
+        try:
+            self.wfile.write(b"retry: 3000\n\n")
+            backlog, cursor = events.connect()
+            for ev in backlog:
+                send(ev)
+            self.wfile.flush()
+            while True:
+                fresh = events.wait(cursor, 15)
+                if not fresh:
+                    self.wfile.write(b": ping\n\n")     # keeps the connection (and dead-tab detection) alive
+                for ev in fresh:
+                    send(ev)
+                    cursor = max(cursor, ev["id"])
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            pass
+        finally:
+            events.CLIENTS[0] -= 1
+
+    def _internal(self):
+        """Jarvis' own MCP server asks for things that live here (timers)."""
+        if not self._perm_ok():
+            return self._json({"error": "unauthorized"}, 401)
+        try:
+            req = json.loads(self._read(MAX_JSON) or b"{}")
+        except (ValueError, TypeError):
+            return self._json({"error": "bad json"}, 400)
+        op, args = str(req.get("op") or ""), req.get("args") or {}
+        if op in ("reminder_add", "reminder_list", "reminder_cancel"):
+            return self._json({"text": scheduler.tool(op, args)})
+        return self._json({"error": "unknown op"}, 404)
+
+    def _permission_request(self):
+        if not self._perm_ok():
             return self._json({"error": "unauthorized"}, 401)
         try:
             req = json.loads(self._read(MAX_JSON) or b"{}")
@@ -404,16 +571,35 @@ class Handler(BaseHTTPRequestHandler):
                 log_usage("local:" + route["handler"], None, [], {}, message=message, reply=reply,
                           ms=int((time.time() - t0) * 1000))
                 return
+            cached = answer_cache.get(message, route["groups"])
+            if cached:                                   # same question minutes ago: no second call
+                emit(dict(t="note", message="aus dem Zwischenspeicher — 0 Tokens"))
+                emit(dict(t="delta", text=cached))
+                emit(dict(t="complete", ms=int((time.time() - t0) * 1000)))
+                commands.remember_turn(message, cached)
+                log_usage("cache", None, route["groups"], {}, message=message, reply=cached,
+                          ms=int((time.time() - t0) * 1000))
+                return
             system = commands.lean_system(route["groups"])
             prefix = commands.lean_prefix(message, route["groups"])
+        why = ("Claude nicht erreichbar" if runtime.runtime_kind() != "claude" else
+               "Claude-Limit erreicht" if fallback_llm.claude_blocked(commands.load().get("usage")) else None)
+        if why and fallback_llm.available():
+            return self._local_llm(message, prefix, emit, t0, is_briefing, why, route["groups"])
         emit(dict(t="note", message=f"{route['model']} · {', '.join(route['groups']) or 'ohne Werkzeuge'}"))
         hit = memory.top_match(message)
         if hit and not is_briefing:
             emit(dict(t="focus", id=hit))
         ACTIVE["emit"] = emit
         reply, usage, before = [], {}, memory.build_graph(force=True)["total"]
+        failed, tools = None, []
         try:
             for ev in runtime.run_lean(message, route["model"], route["groups"], system, prefix):
+                if ev.get("t") == "error" and not "".join(reply).strip() and fallback_llm.available():
+                    failed = ev.get("message") or "Fehler"    # not a word said yet: the local model takes over
+                    break
+                if ev.get("t") == "tool" and ev.get("phase") == "use":
+                    tools.append((ev.get("name") or "", ev.pop("args", None) or {}))
                 if ev.get("t") == "delta":
                     reply.append(ev.get("text") or "")
                 if ev.get("t") == "usage":
@@ -431,6 +617,11 @@ class Handler(BaseHTTPRequestHandler):
                     commands.remember_turn(message if not is_briefing else "(Tagesbriefing)", text)
                     if memory.build_graph(force=True)["total"] != before:
                         emit(dict(t="graph"))
+                    if not is_briefing:
+                        answer_cache.put(message, route["groups"], text, [n for n, _ in tools])
+                        learned = learning.observe(message, tools)
+                        if learned:
+                            emit(dict(t="note", message=f"gelernt: „{learned}“ geht künftig ohne LLM"))
                 emit(ev)
         except (BrokenPipeError, ConnectionResetError):
             pass
@@ -451,6 +642,66 @@ class Handler(BaseHTTPRequestHandler):
                                             f"{row['api_calls']} Aufruf(e)".replace(",", ".")))
             except OSError:
                 pass
+        if failed:
+            self._local_llm(message, prefix, emit, t0, is_briefing, f"Claude-Fehler ({failed[:80]})",
+                            route["groups"])
+
+    def _local_llm(self, message, prefix, emit, t0, is_briefing, why, groups=()):
+        """A free stand-in answers instead of Claude (fallback_llm.py): Groq, Gemini or
+        Ollama, with the same context and the same Jarvis tools."""
+        groups = [] if is_briefing else list(groups or [])
+        system = BRIEFING_PROMPT if is_briefing else commands.lean_system(groups)
+        reply, tools, usage, who = [], [], {}, None
+        before = memory.build_graph(force=True)["total"]
+        ACTIVE["emit"] = emit            # confirmation cards for tools like calendar_add
+        try:
+            # the briefing facts hold calendar and mail, so only private-safe providers
+            for ev in fallback_llm.run(system, prefix, message, groups, private=is_briefing):
+                t = ev.get("t")
+                if t == "provider":
+                    who = ev
+                    emit(dict(t="note", message=f"{why} — antwortet {ev['label']} ({ev['model']})"
+                                                + (f" · {', '.join(groups)}" if groups else "")))
+                    continue
+                if t == "usage":
+                    usage = ev
+                    continue
+                if t == "tool" and ev.get("phase") == "use":
+                    tools.append((ev.get("name") or "", ev.pop("args", None) or {}))
+                if t == "delta":
+                    reply.append(ev.get("text") or "")
+                if t == "error":
+                    ev = dict(ev, message=f"{why}. {ev.get('message', '')}"[:300])
+                emit(ev)
+                if t == "error":
+                    return
+            emit(dict(t="complete", ms=int((time.time() - t0) * 1000)))
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        except Exception as e:  # noqa: BLE001
+            try:
+                emit(dict(t="error", message=f"Auch das Ersatz-Modell antwortet nicht: {e}"[:300]))
+            except OSError:
+                pass
+            return
+        finally:
+            ACTIVE["emit"] = None
+            for entry in list(PENDING.values()):
+                entry["event"].set()
+        text = "".join(reply)
+        if not is_briefing:
+            try:
+                memory.log_turn(message, text)
+            except OSError:
+                pass
+            learned = learning.observe(message, tools)
+            if learned:
+                emit(dict(t="note", message=f"gelernt: „{learned}“ geht künftig ohne LLM"))
+        commands.remember_turn(message if not is_briefing else "(Tagesbriefing)", text)
+        if memory.build_graph(force=True)["total"] != before:
+            emit(dict(t="graph"))
+        log_usage("fallback:" + (who["name"] if who else "?"), who["model"] if who else None, groups, usage,
+                  len(system), len(prefix), message, text, int((time.time() - t0) * 1000))
 
     def _stream(self, raw):
         try:
@@ -558,6 +809,10 @@ class Handler(BaseHTTPRequestHandler):
             _prewarm_soon()
 
 
+class RemoteHandler(Handler):
+    remote = True
+
+
 RESTART_QUIET_S = int(os.environ.get("JARVIS_RESTART_QUIET_S", "90"))
 
 
@@ -619,10 +874,17 @@ def main():
                {g['vault']}
   voice        {voice.describe()}
   listening    {voice.describe_stt()}
+  wake word    {wakeword.MODE}{' (' + wakeword.WORD_MODEL + ')' if wakeword.MODE == 'oww' else ''} · quiet hours {events.QUIET_HOURS or 'off'}
+  fallback     {' → '.join(f"{r['name']}{'' if r['ok'] else ' (–)'}" for r in fallback_llm.status()['chain']) or 'off'}
   workdir      {runtime.WORKDIR}
   open         http://localhost:{PORT}
+  remote       {f'127.0.0.1:{REMOTE_PORT} for tailscale serve · {len(devices.listing())} devices'
+                if REMOTE else 'off (JARVIS_REMOTE=1)'}
 """, flush=True)
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    if REMOTE:
+        remote_srv = ThreadingHTTPServer(("127.0.0.1", REMOTE_PORT), RemoteHandler)
+        threading.Thread(target=remote_srv.serve_forever, daemon=True).start()
     _prewarm_soon()
     threading.Thread(target=icloud_calendar.agenda_block, daemon=True).start()
     threading.Thread(target=voice.preload_local_stt, daemon=True).start()
@@ -631,6 +893,9 @@ def main():
         import tts_chain
         tts_chain.start()          # provider balances in the background
     briefing.start_watchdog()
+    scheduler.start()              # timers, alarms, reminders, planned commands
+    watchers.start()               # proactive notices (appliances, appointments, storage, NAS)
+    wakeword.start()               # openWakeWord, if JARVIS_WAKE=oww
     if os.environ.get("JARVIS_CHILD") == "1":    # only a supervised child can be restarted
         threading.Thread(target=_watch_code, daemon=True).start()
     if os.environ.get("JARVIS_OPEN", "1") != "0":

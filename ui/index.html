@@ -2,8 +2,15 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="jarvis-token" content="__JARVIS_TOKEN__">
+<meta name="theme-color" content="#04070c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>JARVIS · Claude Code</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -22,6 +29,7 @@
     <div class="chip-lg" id="chipWeather"><span class="ico">☁</span><div><b id="wNow">—</b><em id="wSub">Wetter lädt</em></div></div>
     <div class="chip-lg" id="chipGolf"><span class="ico">⛳</span><div><b id="gVerdict">—</b><em>Golf heute</em></div></div>
     <div class="chip-lg" id="chipEvent"><span class="ico">◷</span><div><b id="eTitle">—</b><em id="eWhen">Kalender</em></div></div>
+    <div class="chip-lg timer" id="chipTimer" hidden><span class="ico">⏱</span><div><b id="tNext">—</b><em id="tSub">Timer</em></div></div>
     <div class="sysdots" title="Gateway · Brain · Voice">
       <span><i class="dot ok"></i><b id="pGateway">booting</b></span>
       <span><i class="dot ok"></i><b id="pBrain">Claude CLI</b></span>
@@ -75,6 +83,7 @@
       <button class="tool" id="btnFit" title="Fit graph to view">⊙ Fit</button>
       <button class="tool" id="btnLabels" title="Toggle labels">Aa</button>
       <button class="tool" id="btnDim" title="Toggle contrast">◐</button>
+      <button class="tool" id="btnPair" title="iPhone, iPad koppeln oder entfernen">📱 Geräte</button>
       <span class="stagecount" id="stageCount"></span>
     </div>
 
@@ -155,6 +164,17 @@
     </section>
   </aside>
 </main>
+
+<div class="pairbox" id="pairBox" hidden>
+  <section class="panel">
+    <h2>Geräte <em>Fernzugriff</em></h2>
+    <p class="hint">Auf dem iPhone oder iPad die Jarvis-Adresse öffnen und diesen Code eingeben.</p>
+    <div class="paircode" id="pairCode">······</div>
+    <div class="pairhint" id="pairHint"></div>
+    <div class="pairbtns"><button id="pairNew">Neuen Code</button><button id="pairClose">Schließen</button></div>
+    <ul class="pairlist" id="pairList"></ul>
+  </section>
+</div>
 
 <script src="graph.js"></script>
 <script src="app.js"></script>

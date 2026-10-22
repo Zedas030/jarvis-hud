@@ -525,6 +525,59 @@
       self.ty = my - (my - self.ty) * (next / self.scale);
       self.scale = next;
     }, { passive: false });
+
+    /* Touch (iPad): one finger turns, two fingers pinch-zoom and pan, a tap
+       selects. preventDefault keeps Safari from scrolling the page and from
+       firing the emulated mouse events on top. */
+    var pinch = null;
+    function mid(t) {
+      var rect = cv.getBoundingClientRect();
+      return { x: (t[0].clientX + t[1].clientX) / 2 - rect.left, y: (t[0].clientY + t[1].clientY) / 2 - rect.top,
+               d: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) };
+    }
+    cv.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      var t = e.touches;
+      if (t.length === 1) {
+        self.grab = { x: t[0].clientX, y: t[0].clientY, yaw: self.yaw, pitch: self.pitch,
+                      tx: self.tx, ty: self.ty, node: self._at(t[0]), moved: false, pan: false };
+        pinch = null;
+      } else if (t.length === 2) {
+        self.grab = null;   // a second finger turns the gesture into zoom/pan, never a tap
+        var m = mid(t);
+        pinch = { m: m, scale: self.scale, tx: self.tx, ty: self.ty };
+      }
+    }, { passive: false });
+    cv.addEventListener('touchmove', function (e) {
+      e.preventDefault();
+      var t = e.touches, g = self.grab;
+      if (pinch && t.length === 2) {
+        var m = mid(t), p = pinch;
+        var next = Math.max(0.2, Math.min(4, p.scale * m.d / Math.max(p.m.d, 1)));
+        // keep the point under the fingers' first midpoint under their current one
+        self.tx = m.x - (p.m.x - p.tx) * (next / p.scale);
+        self.ty = m.y - (p.m.y - p.ty) * (next / p.scale);
+        self.scale = next;
+        self.idleSince = performance.now();
+      } else if (g && t.length === 1) {
+        var dx = t[0].clientX - g.x, dy = t[0].clientY - g.y;
+        if (Math.abs(dx) + Math.abs(dy) > 8) g.moved = true;
+        if (!g.moved) return;
+        self.yaw = g.yaw + dx * 0.006;
+        self.pitch = Math.max(-1.35, Math.min(1.35, g.pitch + dy * 0.006));
+        self.idleSince = performance.now();
+      }
+    }, { passive: false });
+    cv.addEventListener('touchend', function (e) {
+      e.preventDefault();
+      if (e.touches.length) { if (e.touches.length < 2) pinch = null; return; }
+      var g = self.grab;
+      self.grab = null; pinch = null;
+      if (!g || g.moved) return;
+      if (g.node) self.setFocus(g.node.id, false);
+      else self.setFocus(null);
+    }, { passive: false });
+    cv.addEventListener('touchcancel', function () { self.grab = null; pinch = null; });
   };
 
   global.MemoryGraph = MemoryGraph;

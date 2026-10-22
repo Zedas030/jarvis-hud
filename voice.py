@@ -241,6 +241,8 @@ def transcribe_elevenlabs(audio, mime="audio/webm"):
 def speak_full(text):
     """-> (audio bytes, mime, provider). Uses the provider chain (tts_chain.py)
     when TTS_CHAIN is set, otherwise the single-provider behaviour below."""
+    import pronounce
+    text = pronounce.apply(text)          # "NAS" -> "Nass", "kWh" -> "Kilowattstunden" ...
     if os.environ.get("TTS_CHAIN", "").strip():
         import tts_chain
         return tts_chain.speak(text)
@@ -325,9 +327,9 @@ def transcribe(audio, mime="audio/webm"):
 
 
 # ── free providers: Microsoft neural voices + local Whisper ─────
-# Sprechen über edge-tts (die Vorlese-Stimmen von Microsoft Edge): kostenlos,
-# kein Konto, ~1 s. Hören über faster-whisper lokal auf der CPU: kostenlos,
-# offline, ~1 s für einen kurzen Satz, kein Ton verlässt den Rechner.
+# Speaking via edge-tts (the read-aloud voices of Microsoft Edge): free, no
+# account, ~1 s. Listening via faster-whisper locally on the CPU: free,
+# offline, ~1 s for a short sentence, no audio leaves the machine.
 TTS_CHOICE = os.environ.get("JARVIS_TTS", "auto").strip().lower()      # auto|edge|elevenlabs|fish
 EDGE_VOICE = os.environ.get("EDGE_VOICE", "de-DE-ConradNeural").strip()
 EDGE_RATE = os.environ.get("EDGE_RATE", "+5%").strip()

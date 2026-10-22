@@ -178,7 +178,7 @@ def build_command(message, session_id=None, system=None):
     if PERMISSION:
         cmd += ["--permission-mode", PERMISSION]
     if ALLOWED_TOOLS and PERMISSION != "bypassPermissions":
-        cmd += ["--allowedTools", ALLOWED_TOOLS + ",mcp__jarvis__open_website,mcp__jarvis__calendar_events,mcp__jarvis__network_devices,mcp__jarvis__pi_status,mcp__jarvis__home_states,mcp__jarvis__home_control,mcp__jarvis__mail_inbox,mcp__jarvis__music,mcp__jarvis__nas_status,mcp__jarvis__garmin_health"]
+        cmd += ["--allowedTools", ",".join([ALLOWED_TOOLS] + [f"mcp__jarvis__{t}" for t in sorted(NO_CONFIRM)])]
     mcp = _mcp_config()
     if mcp:
         cmd += ["--mcp-config", mcp]
@@ -372,7 +372,8 @@ def _consume(p, started, session_id):
                     yield dict(t="delta", text=block["text"])
                 elif btype == "tool_use":
                     yield dict(t="tool", phase="use", name=block.get("name", "tool"),
-                               input=_short(block.get("input", "")))
+                               input=_short(block.get("input", "")),
+                               args=block.get("input") if isinstance(block.get("input"), dict) else None)
             continue
 
         if kind == "user":
@@ -539,8 +540,9 @@ POOL_SIZE = int(os.environ.get("JARVIS_POOL_SIZE", "3"))
 GROUP_BUILTINS = {"web": ["WebSearch"], "pc": ["PowerShell"], "ha_full": ["ToolSearch"]}
 # tools that run without a confirmation card; the rest goes through mcp__jarvis__approve
 NO_CONFIRM = {"web_fetch", "open_website", "memory_search", "memory_read", "memory_save", "calendar_events",
-              "home_states", "home_control", "mail_inbox", "music", "pi_status", "nas_status",
-              "network_devices", "garmin_health"}
+              "home_states", "home_control", "mail_inbox", "mail_mark_read", "weather", "music", "pi_status", "nas_status",
+              "network_devices", "garmin_health", "reminder_add", "reminder_list", "reminder_cancel",
+              "list_read", "list_add", "list_remove", "routine_list", "routine_save", "routine_delete"}
 
 _POOL = {}            # key -> (_Proc, spawned_at)
 _POOL_LOCK = threading.Lock()

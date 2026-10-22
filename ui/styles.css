@@ -425,3 +425,121 @@ body.boot .corestate{opacity:0}
 #btnMic[data-state=needs-click] .micdot{background:#ffb340}
 #btnMic[data-state=blocked]{color:#ff6ba6;border-color:#ff6ba6;background:rgba(255,107,166,.08)}
 #btnMic[data-state=blocked] .micdot{background:#ff6ba6}
+/* wake word mode, waiting for "Jarvis" */
+#btnMic[data-state=sleeping]{color:var(--ink-dim);border-color:rgba(46,217,155,.3)}
+#btnMic[data-state=sleeping] .micdot{background:rgba(46,217,155,.55);animation:pulse 3s ease-in-out infinite}
+
+/* notices Jarvis gives by himself (timers, appliances, appointments) */
+.bubble.jarvis.push{border-left:2px solid var(--amber)}
+.bubble.jarvis.push.silent{opacity:.7;font-style:italic}
+.chip-lg.timer{border-color:rgba(255,179,64,.5)}
+.chip-lg.timer b,.chip-lg.timer .ico{color:var(--amber);font-variant-numeric:tabular-nums}
+.chip-lg[hidden]{display:none}
+
+/* ── devices (pairing on the PC) ── */
+body.remote #btnPair{display:none}
+.pairbox{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(2,5,9,.72);backdrop-filter:blur(4px)}
+.pairbox[hidden]{display:none}
+.pairbox .panel{width:min(400px,calc(100vw - 32px));gap:10px;padding:18px}
+.pairbox .hint{font-size:11px;line-height:1.5;color:var(--ink-dim)}
+.paircode{font-size:40px;letter-spacing:.24em;text-align:center;color:var(--cy);font-variant-numeric:tabular-nums;
+  text-shadow:0 0 22px rgba(95,228,255,.45);padding:6px 0}
+.pairhint{min-height:16px;text-align:center;font-size:10px;color:var(--amber)}
+.pairbtns{display:flex;gap:8px}
+.pairbtns button{flex:1;background:var(--panel2);border:1px solid var(--line-hot);color:var(--cy);border-radius:8px;
+  padding:8px;cursor:pointer;font:inherit;font-size:11px}
+.pairbtns button#pairClose{color:var(--ink-dim);border-color:var(--line)}
+.pairlist{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:4px;max-height:220px;overflow:auto}
+.pairlist li{display:flex;align-items:center;gap:8px;font-size:11px;padding:7px 9px;border:1px solid var(--line);border-radius:8px}
+.pairlist li b{font-weight:500;color:var(--ink)}
+.pairlist li em{font-style:normal;font-size:9px;color:var(--ink-dim);margin-left:auto}
+.pairlist li button{background:none;border:1px solid rgba(255,107,166,.5);color:var(--pink);border-radius:5px;
+  cursor:pointer;font-size:10px;padding:2px 7px}
+.pairlist li.empty{color:var(--ink-dim);justify-content:center}
+
+/* ── phone (iPhone in portrait): talking first, widgets below, no graph ── */
+@media (max-width:760px){
+  html,body{height:auto;min-height:100%}
+  body{overflow-x:hidden;overflow-y:auto;font-size:14px;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+  .topbar{flex-wrap:wrap;gap:10px;padding:10px 14px}
+  .eyebrow,.sysdots{display:none}
+  .reactor-mini{width:30px;height:30px}
+  .reactor-mini span{inset:8px}
+  .brandtext h1{font-size:18px}
+  .clock{position:static;transform:none;align-items:flex-end;margin-left:auto}
+  .clock b{font-size:20px}
+  .pills{order:3;width:100%;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .pills::-webkit-scrollbar{display:none}
+  .chip-lg{flex:0 0 auto}
+  .grid{display:flex;flex-direction:column;overflow:visible;padding:10px 12px 0;gap:12px}
+  .stage{order:-1;overflow:visible;gap:10px}
+  .stagetools,.canvaswrap{display:none}
+  .convo{display:flex;max-height:none;min-height:46vh}
+  .convo .transcript{max-height:58vh}
+  .bubble{max-width:92%;font-size:14px}
+  .askbar{position:sticky;bottom:0;z-index:4;flex-wrap:wrap;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-radius:12px 12px 0 0;background:rgba(7,13,21,.96)}
+  .asklabel{display:none}
+  #ask{flex:1 1 100%;font-size:16px;padding:6px 2px}      /* 16px: iOS does not zoom into the field */
+  #btnMic{flex:1 1 auto;min-width:0;padding:12px;font-size:13px}
+  .stop,.send{padding:12px 14px;font-size:13px}
+  .rail{gap:12px}
+  .rail.left .panel:first-child,.dialpanel,.panel.usage,.logpanel{display:none}
+  .rail .panel,.rail.left .panel.widget.grow{flex:0 0 auto;max-height:none}
+  .rail.right{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+}
+
+/* The wake word is heard by the PC only — on a phone or tablet the tip would mislead. */
+body.remote .saytip{display:none}
+#graph{touch-action:none}
+
+/* ── tablet (iPad, touch, 761–1366 px): the full HUD with touch-sized controls ── */
+@media (min-width:761px) and (max-width:1366px) and (pointer:coarse){
+  html,body{height:100dvh}
+  body{padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+  .topbar{gap:14px;padding:12px 18px}
+  .eyebrow,.sysdots{display:none}
+  .clock{position:static;transform:none;align-items:flex-start}
+  .pills{margin-left:auto}
+  .grid{padding:12px 14px calc(14px + env(safe-area-inset-bottom));gap:12px}
+  .rail.right .panel.usage,.logpanel{display:none}
+  /* fingers, not a mouse pointer */
+  .tool{padding:10px 16px;font-size:12px}
+  .mcell,.hubs li,.filter li{padding-top:9px;padding-bottom:9px}
+  .askbar{gap:10px;padding:10px 12px}
+  .asklabel{display:none}
+  #ask{flex:1;min-width:0;font-size:16px}               /* 16px: iOS does not zoom into the field */
+  #btnMic{min-width:0}
+  #btnMic,.stop,.send{padding:12px 16px;font-size:13px}
+  .bubble{font-size:14px}
+  .bubble.confirm button{padding:10px 18px}
+  .pairlist li button{padding:6px 11px}
+}
+
+/* landscape (1024–1366 wide): the PC's three columns, a bit narrower */
+@media (min-width:761px) and (max-width:1366px) and (pointer:coarse) and (orientation:landscape){
+  .grid{grid-template-columns:236px 1fr 248px}
+  .chip-lg b{max-width:110px}
+  .dial{width:88px;height:88px}
+}
+
+/* portrait (768–1024 wide): talking and graph on top, both rails side by side below */
+@media (min-width:761px) and (max-width:1366px) and (pointer:coarse) and (orientation:portrait){
+  html,body{height:auto;min-height:100dvh}
+  body{overflow-x:hidden;overflow-y:auto}
+  .pills{order:3;width:100%;margin-left:0;overflow-x:auto;scrollbar-width:none}
+  .pills::-webkit-scrollbar{display:none}
+  .topbar{flex-wrap:wrap}
+  .chip-lg{flex:1 0 auto}
+  .grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto;align-content:start;align-items:start;overflow:visible}
+  .stage{grid-column:1 / -1;grid-row:1;overflow:visible}
+  .rail.left{grid-column:1;grid-row:2}
+  .rail.right{grid-column:2;grid-row:2}
+  .canvaswrap{flex:0 0 auto;height:32vh;min-height:260px}
+  .convo{max-height:none}
+  .convo .transcript{max-height:34vh}
+  .askbar{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:4;background:rgba(7,13,21,.96)}
+  .rail .panel,.rail.left .panel:first-child,.rail.left .panel.widget.grow,.rail.right .panel.grow{flex:0 0 auto;max-height:none}
+  .rail.left .panel:first-child{max-height:260px}
+}

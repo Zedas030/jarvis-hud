@@ -1,8 +1,9 @@
 """
 Intent router — decides per message, before any LLM is involved:
 
-  local   simple commands answered by code alone (0 tokens): switch devices,
-          music keys, time/date, weather/golf, solar, NAS, Pi.
+  local   simple commands answered by code alone (0 tokens): routines, timers,
+          alarms and reminders, shopping/to-do lists, switch devices, music keys,
+          time/date, weather/golf, sunrise/sunset, solar, NAS, Pi.
   llm     everything else, with the smallest fitting setup: which tool groups
           the request needs and whether Haiku is enough or Sonnet is needed.
 
@@ -15,6 +16,7 @@ import json
 import os
 import random
 import re
+import threading
 import time
 import urllib.request
 
@@ -49,15 +51,21 @@ GROUP_RULES = [
     ("home", r"\b(licht|lampe|led\b|steckdose|schalt|kühlschrank|spülmaschine|waschmaschine|drucker|zelt|bett\b|heizung|thermostat|temperatur im|grad im|luftreiniger|"
              r"ventilator|szene|wohnzimmer|schlafzimmer|gaming|küche|boiler|smart ?home|home ?assistant|"
              r"solar|akku|speicher|strom|watt|sensor|luft|feucht|echo|fire ?tv|fernseher|tv\b)"),
-    ("mail", r"\b(mail|e-mail|postfach|posteingang|newsletter|nachricht von|geschrieben)"),
+    ("mail", r"\b(mail|e-mail|postfach|posteingang|newsletter|nachricht von|geschrieben|gelesen)"),
     ("calendar", r"\b(termin|kalender|eintragen|trag\w* .*ein|erinner|verabredung|meeting|wann (ist|habe))"),
     ("systems", r"\b(pi\b|raspi|raspberry|nas\b|synology|netzwerk|wlan|router|fritz|gerät|server|pi-hole|pihole|ip\b)"),
     ("health", r"\b(schlaf|geschlafen|schritte|puls|garmin|body ?battery|stress|fitness|training|lauf)"),
     ("music", r"\b(musik|spotify|song|lied|playlist|album|abspielen)"),
+    ("weather", r"\b(wetter|vorhersage|sonne|sonnig|sonnen|uv\b|uv-|regen|regnet|schirm|schnee|schneit|gewitter|"
+                r"sturm|wind\b|windig|nebel|frost|glatt|temperatur(?! im)|grad draußen|wie warm|wie kalt|"
+                r"wird es hell|hell wird|wird es dunkel|dunkel wird|wie lange (ist|bleibt) es .{0,25}\bhell|tageslicht)"),
     ("web", r"\b(such|recherch|google|internet|online|website|webseite|seite|öffne|news|nachrichten|aktuell|"
-            r"preis|kostet|wer ist|wer war|was ist|wie viel kostet|wetter|bundesliga|spiel|ergebnis|kurs|aktie)"),
+            r"preis|kostet|wer ist|wer war|was ist|wie viel kostet|bundesliga|spiel|ergebnis|kurs|aktie)"),
     ("pc", r"\b(programm|starte|befehl|powershell|kommandozeile|datei|ordner|installier|bildschirm|screenshot|"
            r"fenster|desktop|computer|rechner)"),
+    ("timers", r"\b(timer|wecker|weck|erinner|schlummer|alarm|countdown)"),
+    ("lists", r"\b(einkauf|to-?do|aufgabenliste|erledigungsliste)"),
+    ("routines", r"\b(routine|wenn ich .{1,40} sage|sobald ich .{1,40} sage|immer wenn ich)"),
 ]
 SMART_HINTS = re.compile(
     r"\b(erklär|warum|wieso|analys|vergleich|plan|schreib|formulier|zusammenfass|recherch|überleg|hilf mir|"
@@ -110,9 +118,32 @@ def _forecast():
     d = briefing._get("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=%s"
                       "&forecast_days=3&current=temperature_2m,weather_code"
                       "&daily=weather_code,temperature_2m_max,temperature_2m_min,"
-                      "precipitation_probability_max,wind_speed_10m_max" % (briefing.LAT, briefing.LON, briefing.TZ_Q))
+                      "precipitation_probability_max,wind_speed_10m_max,sunrise,sunset"
+                      % (briefing.LAT, briefing.LON, briefing.TZ_Q))
     _WX.update(at=time.time(), d=d)
     return d
+
+
+def _sun(n):
+    rise = _has(n, "sonnenaufgang", "sonne auf", "wird es hell", "hell wird")
+    sets = _has(n, "sonnenuntergang", "sonne unter", "wird es dunkel", "dunkel wird")
+    both = _has(n, "sonnenzeiten", r"wie lange (ist|bleibt) es .{0,25}\bhell", "tageslicht")
+    if not (rise or sets or both) or _has(n, "woche", "wochenende", "nächste") or _has(n, "golf"):
+        return None
+    try:
+        day = _forecast()["daily"]
+    except Exception:  # noqa: BLE001
+        return None
+    i = 2 if _has(n, "übermorgen") else 1 if _has(n, "morgen") and not _has(n, "heute morgen") else 0
+    up, down = day["sunrise"][i][-5:], day["sunset"][i][-5:]
+    when = ("heute", "morgen", "übermorgen")[i]
+    if both or (rise and sets):
+        a, b = (dt.datetime.fromisoformat(day[k][i]) for k in ("sunrise", "sunset"))
+        h, m = divmod(round((b - a).total_seconds() / 60), 60)
+        return f"Die Sonne geht {when} um {up} auf und um {down} unter, {h} Stunden {m} Minuten Tageslicht, {_sir()}."
+    if rise:
+        return _say(f"Sonnenaufgang {when} um {up} Uhr, {_sir()}.", f"Die Sonne geht {when} um {up} auf, {_sir()}.")
+    return _say(f"Sonnenuntergang {when} um {down} Uhr, {_sir()}.", f"Die Sonne geht {when} um {down} unter, {_sir()}.")
 
 
 def _weather(n):
@@ -241,13 +272,16 @@ def _music(n):
 
 
 # Devices: friendly names from Home Assistant. Config switches (child lock,
-# LEDs, auto-update) are never targets; sockets that keep things alive are
-# never switched off without Claude (and his confirmation rules).
+# status LEDs of sockets, auto-update, FRITZ!Box internet access) are never
+# targets; sockets that keep things alive are never switched off without
+# Claude (and his confirmation rules). A *light* called "LED Wohnzimmer" is a
+# real lamp, though — only switches named "... LED" are indicator lights.
 _DEV = {"at": 0.0, "list": []}
-_CONFIG_WORDS = re.compile(r"kindersicherung|automatisch|\bled\b|display|update|abschaltung|shuffle|wiederholen|"
-                           r"nicht stören|stummschalt", re.I)
-PROTECTED_OFF = re.compile(r"router|\bpc\b|raspi|\bpi\b|kühlschrank|smart hub|nas", re.I)
-_DOMAIN_WORDS = {"licht": "light", "lampe": "light", "lampen": "light", "steckdose": "switch",
+_CONFIG_WORDS = re.compile(r"kindersicherung|automatisch|display|update|abschaltung|shuffle|wiederholen|"
+                           r"nicht stören|stummschalt|internetzugang|internet access", re.I)
+_INDICATOR_LED = re.compile(r"\bled\b", re.I)
+PROTECTED_OFF = re.compile(r"router|\bpc\b|raspi|\bpi\b|kühlschrank|smart hub|nas|fritz|wi-?fi|wlan", re.I)
+_DOMAIN_WORDS = {"licht": "light", "lampe": "light", "lampen": "light", "led": "light", "steckdose": "switch",
                  "ventilator": "fan", "szene": "scene"}
 _FILLER = {"der", "die", "das", "den", "dem", "im", "in", "am", "an", "aus", "ein", "bitte", "mal", "mach", "mache",
            "schalte", "schalt", "jarvis", "und", "auf", "zu", "von", "sir", "kannst", "du", "die", "alle", "einschalten",
@@ -265,6 +299,8 @@ def _devices():
         name = (s.get("attributes", {}).get("friendly_name") or eid).strip()
         if dom not in ("light", "switch", "fan", "scene") or _CONFIG_WORDS.search(name):
             continue
+        if dom == "switch" and (_INDICATOR_LED.search(name) or eid.endswith("_led")):
+            continue                               # the status LED of a socket, not a lamp
         out.append({"eid": eid, "dom": dom, "name": name, "words": set(_norm(name).split())})
     _DEV.update(at=time.time(), list=out)
     return out
@@ -321,8 +357,9 @@ def _home(n):
     scene = re.search(r"\b(szene|stimmung)\s+(\w[\w ]*)", n)
     if not (on or off or pct or scene):
         return None
-    if _has(n, "wenn", "automati", "jeden", "täglich", "um \\d", "timer", "später", "warum", "ob "):
-        return None                                # schedules/conditions: LLM
+    if _has(n, "wenn", "automati", "jeden", "täglich", "um \\d", "timer", "später", "warum", "ob ",
+            "in \\w+ (sekunden?|minuten?|stunden?)\\b"):
+        return None                                # schedules/conditions: scheduler or LLM
     try:
         devs = _devices()
     except Exception:  # noqa: BLE001
@@ -344,12 +381,24 @@ def _home(n):
         exact = [d for d in best if d["words"] <= words]   # "TV" beats "TV Schlafzimmer" for "schalt das TV an"
         if len(exact) == 1:
             best = exact
-    if not best or len(best) > 4:
+    import learning
+    learned = learning.alias(n)                    # a wording Claude once resolved for us
+    if learned:
+        by_eid = {d["eid"]: d for d in devs}
+        best = [by_eid.get(e) or {"eid": e, "dom": e.split(".")[0], "name": e.split(".", 1)[1].replace("_", " "),
+                                  "words": set()} for e in learned]
+        hint = hint or best[0]["dom"]
+    lights = [d for d in devs if d["dom"] == "light"]
+    if not best and hint == "light" and re.search(r"\balle\b", n) and lights and not pct:
+        best = lights                              # "mach alle Lichter aus"
+    elif not best or len(best) > 4:
         return None
-    if len(best) > 1 and not hint:
-        return None                                # "mach Wohnzimmer an" — which one? ask the LLM
+    if len(best) > 1 and not hint and not all(d["dom"] == "light" for d in best):
+        return None                                # "mach Wohnzimmer an" with a lamp and a socket — ask the LLM
     service = "turn_on" if (on or pct or scene) and not off else "turn_off"
-    if service == "turn_off" and any(PROTECTED_OFF.search(d["name"]) for d in best):
+    # Only what keeps things alive is protected — a lamp called "LED PC" is just a lamp.
+    if service == "turn_off" and any(d["dom"] != "light" and (PROTECTED_OFF.search(d["name"])
+                                                               or PROTECTED_OFF.search(d["eid"])) for d in best):
         return None
     import jarvis_mcp
     done = []
@@ -367,22 +416,97 @@ def _home(n):
         .replace(" ist", " sind", 1 if len(done) > 1 else 0)
 
 
-LOCAL_HANDLERS = [_home_state, _home, _music, _time, _date, _weather, _solar, _nas, _pi]
+# Some handlers need the original wording (what to remind of, what goes on the
+# shopping list); the normalised text has lost case and punctuation.
+# Per thread: the scheduler runs planned commands from its own thread.
+_RAW = threading.local()
 
 
-def route(message, ha_full=False):
-    """{'kind': 'local', 'reply': ..., 'handler': ...} or the llm_route dict."""
-    text = (message or "").strip()
-    if LOCAL_ENABLED and text and len(text) < 160 and not text.startswith("/"):
-        n = _norm(text)
-        if text.rstrip().endswith("?") and not QUESTION.search(n):
-            n = " ist" + n                         # "Luftreiniger an?" is a question too
-        for h in LOCAL_HANDLERS:
+def _raw():
+    return getattr(_RAW, "text", "")
+
+
+def _timers(n):
+    import scheduler
+    return scheduler.handle(n, _raw())
+
+
+def _lists(n):
+    import lists
+    return lists.handle(n, _raw())
+
+
+def _routine(n):
+    import routines
+    if re.search(r"\b(welche|was für|zeig\w*|liste?)\b.*\broutinen\b", n):
+        return routines.describe()
+    r = routines.find(_raw())
+    return routines.run(r, run_local) if r else None
+
+
+def _pronounce(n):
+    import pronounce
+    return pronounce.handle(n, _raw())
+
+
+def _pc(n):
+    import pc
+    return pc.handle(n, _raw())
+
+
+def _commute(n):
+    import commute
+    return commute.handle(n, _raw())
+
+
+def _parcels(n):
+    import parcels
+    return parcels.handle(n, _raw())
+
+
+def _report(n):
+    if not re.search(r"\b(verbrauchsbericht|tokenbericht|token bericht|was hast du (dazu)?gelernt|"
+                     r"wie viele? tokens?|wie viel hab\w* ich verbraucht)\b", n):
+        return None
+    import learning
+    return learning.spoken_report(7)
+
+
+LOCAL_HANDLERS = [_routine, _timers, _lists, _pronounce, _report, _pc, _commute, _parcels, _home_state, _home,
+                  _music, _time, _date, _sun, _weather, _solar, _nas, _pi]
+
+
+def _local(text, handlers):
+    n = _norm(text)
+    if text.rstrip().endswith("?") and not QUESTION.search(n):
+        n = " ist" + n                             # "Luftreiniger an?" is a question too
+    saved, _RAW.text = _raw(), text
+    try:
+        for h in handlers:
             try:
                 reply = h(n)
             except Exception:  # noqa: BLE001
                 reply = None
             if reply:
                 reply = re.sub(r",\s*\.", ".", reply).replace(" ,", ",").replace("  ", " ")
-                return {"kind": "local", "reply": reply, "handler": h.__name__.strip("_")}
+                return reply, h.__name__.strip("_")
+    finally:
+        _RAW.text = saved
+    return None, None
+
+
+def run_local(text):
+    """Only the local path, for routine steps and scheduled commands: reply or None.
+    Routines cannot call routines, so a loop is impossible."""
+    reply, _ = _local((text or "").strip(), [h for h in LOCAL_HANDLERS if h is not _routine])
+    return reply
+
+
+def route(message, ha_full=False):
+    """{'kind': 'local', 'reply': ..., 'handler': ...} or the llm_route dict."""
+    text = (message or "").strip()
+    if LOCAL_ENABLED and text and len(text) < 160 and not text.startswith("/"):
+        reply, handler = _local(text, LOCAL_HANDLERS)
+        if reply:
+            return {"kind": "local", "reply": reply, "handler": handler}
     return llm_route(text, ha_full)

@@ -95,7 +95,9 @@ function updateMicButton() {
   else if (Live.sending) { st = 'busy'; text = 'Verstehe …'; }
   else if (Live.speaking) { st = 'speaking'; text = 'Spricht · reinreden'; }
   else if (running) { st = 'busy'; text = briefingActive ? 'Briefing · reden bricht ab' : 'Denkt …'; }
-  else { st = 'listening'; text = 'Hört zu'; }
+  else if (Ringing.on) { st = 'speaking'; text = 'Klingelt · reden = aus'; }
+  else if (!Wake.awake()) { st = 'sleeping'; text = 'Sag „Jarvis“'; }
+  else { st = 'listening'; text = Wake.mode() === 'off' ? 'Hört zu' : 'Ich höre …'; }
   btn.dataset.state = st;
   btn.classList.toggle('live', Live.on && st !== 'blocked');
   if (label.textContent !== text) label.textContent = text;
@@ -282,19 +284,23 @@ function safely(fn) { try { fn(); } catch (e) { console.warn('[jarvis] status di
 async function loadStatus() {
   var s;
   try {
-    s = await (await fetch('/api/status', { headers: headers() })).json();
+    var res = await fetch('/api/status', { headers: headers() });
+    if (res.status === 401) { location.href = '/pair.html'; return; }   // this device was removed
+    s = await res.json();
   } catch (e) { setText('#pGateway', 'offline'); return; }
+  window.__remote = !!s.remote;
+  document.body.classList.toggle('remote', !!s.remote);
   // The server restarted after a code change: reload for the new code and token,
   // but never mid-conversation — otherwise try again on the next poll.
   if (window.__boot && s.boot && s.boot !== window.__boot) {
-    if (!running && !Live.speaking && !Live.sending && !Live.armed && !Speech.active) location.reload();
+    if (!running && !Live.speaking && !Live.sending && !Live.armed && !Speech.active && !Ringing.on) location.reload();
     return;
   }
   window.__boot = s.boot;
   // Capabilities first — the mic and voice depend on these.
   window.__serverVoice = s.server_voice;
   window.__serverSTT = s.server_stt;
-  safely(function () { setText('#pGateway', 'online :' + location.port); });
+  safely(function () { setText('#pGateway', s.remote ? 'remote' : 'online :' + location.port); });
   safely(function () { setText('#pBrain', s.runtime === 'claude' ? (s.version || 'Claude CLI') : 'MOCK'); });
   safely(function () { setText('#pVoice', s.voice_name || (s.server_voice ? 'Fish Audio' : 'browser')); });
   safely(function () {
@@ -307,6 +313,18 @@ async function loadStatus() {
   safely(function () { if (s.billing) renderBilling(s.billing); });
   safely(function () { if (s.tts) renderTts(s.tts); });
   safely(function () { if (s.listener) window.__listener = s.listener; });
+  safely(function () { if (s.wake) Wake.configure(s.wake); });
+  safely(function () {
+    window.__quiet = !!s.quiet;
+    if (typeof s.night_volume === 'number') window.__nightVolume = s.night_volume;
+  });
+  safely(function () { if (s.timers) Timers.set(s.timers); });
+  safely(function () {
+    var f = s.fallback, el = $('#pBrain');
+    if (el && f && f.mode !== 'off') el.title = 'Ersatz bei Claude-Ausfall: ' + (f.chain || []).map(function (r) {
+      return r.name + ' ' + r.model + (r.ok ? ' (bereit)' : ' — ' + r.why);
+    }).join(' → ');
+  });
   updateMicButton();
 }
 
@@ -660,9 +678,29 @@ var currentAudio = null;
     voiceVolume = slider.value / 100;
     label.textContent = slider.value;
     localStorage.setItem('jarvis.volume', String(voiceVolume));
-    if (currentAudio) currentAudio.volume = voiceVolume;
+    if (currentAudio) currentAudio.volume = outVolume();
   });
 })();
+
+/* What actually comes out: the slider, softer during the quiet hours (JARVIS_NIGHT_VOLUME). */
+function outVolume() {
+  return voiceVolume * (window.__quiet ? (window.__nightVolume == null ? 0.5 : window.__nightVolume) : 1);
+}
+
+/* Spotify quieter while he talks (server: pc.duck). Released a moment after the
+   last sentence, so the music does not pump between sentences. */
+var Duck = { on: false, timer: null };
+function duckMusic(on) {
+  clearTimeout(Duck.timer);
+  var send = function (v) {
+    if (Duck.on === v) return;
+    Duck.on = v;
+    fetch('/api/duck', { method: 'POST', headers: headers({ 'content-type': 'application/json' }),
+      body: JSON.stringify({ on: v }) }).catch(function () {});
+  };
+  if (on) send(true);
+  else Duck.timer = setTimeout(function () { if (!Speech.active && !Live.speaking) send(false); }, 900);
+}
 
 /* Runs fn once on the next click/key — browsers only unlock audio after one. */
 function afterGesture(fn) {
@@ -679,7 +717,7 @@ function playBlob(blob) {
   return new Promise(function (resolve) {
     var url = URL.createObjectURL(blob);
     var audio = new Audio(url);
-    audio.volume = voiceVolume;
+    audio.volume = outVolume();
     currentAudio = audio;
     var finished = false;
     var done = function () {
@@ -729,7 +767,7 @@ function speakBrowser(text) {
   if (!window.speechSynthesis) return Promise.resolve();
   return new Promise(function (resolve) {
     var u = new SpeechSynthesisUtterance(stripTones(text));
-    u.rate = 1.02; u.pitch = 0.92; u.volume = voiceVolume; u.lang = 'de-DE';
+    u.rate = 1.02; u.pitch = 0.92; u.volume = outVolume(); u.lang = 'de-DE';
     u.onend = resolve; u.onerror = resolve;
     stopSpeaking = function () { speechSynthesis.cancel(); resolve(); };
     speechSynthesis.speak(u);
@@ -767,6 +805,7 @@ async function playSpeechQueue() {
   Speech.active = true;
   setVoiceState('SPEAKING', 'hot');
   Live.speaking = true;
+  duckMusic(true);
   try {
     while (Speech.queue.length && !Speech.cancelled) {
       var item = Speech.queue.shift();
@@ -780,6 +819,8 @@ async function playSpeechQueue() {
     stopSpeaking = null;
     Live.speaking = false;
     Live.spokeAt = performance.now();
+    duckMusic(false);
+    if (!Speech.cancelled) Wake.followUp(answerText);   // "Und morgen?" needs no wake word
     if (!Live.armed && !running) setVoiceState(Live.on ? 'LISTENING' : 'IDLE', Live.on ? 'hot' : '');
     var w = Speech.waiters; Speech.waiters = [];
     w.forEach(function (f) { f(); });
@@ -797,6 +838,7 @@ function speechDrained() {
 async function speak(text) {
   setVoiceState('SPEAKING', 'hot');
   Live.speaking = true;
+  duckMusic(true);
   try {
     if (window.__serverVoice) {
       try {
@@ -812,7 +854,7 @@ async function speak(text) {
     await new Promise(function (resolve) {
       var u = new SpeechSynthesisUtterance(stripTones(text));
       u.rate = 1.02; u.pitch = 0.92;
-      u.volume = voiceVolume;
+      u.volume = outVolume();
       u.lang = 'de-DE';
       u.onend = resolve; u.onerror = resolve;
       stopSpeaking = function () { speechSynthesis.cancel(); resolve(); };
@@ -823,9 +865,209 @@ async function speak(text) {
     stopSpeaking = null;
     Live.speaking = false;
     Live.spokeAt = performance.now();
+    duckMusic(false);
+    Wake.followUp(text);
     if (!Live.armed) setVoiceState(Live.on ? 'LISTENING' : 'IDLE', Live.on ? 'hot' : '');
   }
 }
+
+/* ── wake word ─────────────────────────────────
+   JARVIS_WAKE on the server: off = every utterance counts (as before);
+   text = only utterances addressed to "Jarvis" — at the start ("Jarvis, mach
+   das Licht an") or at the end ("Mach das Licht an, Jarvis"); oww = the
+   server also hears "Hey Jarvis" (openWakeWord) and opens the mic for a few
+   seconds. After every answer there is a follow-up window without the wake word. */
+var WAKE_NAME = '(?:jarvis|javis|jarwis|jervis|tscharvis|dschawis|charvis|jarvi)';
+var WAKE_RE = new RegExp('^\\W*(?:(?:hey|hi|hallo|ok|okay|he|ey|du)\\W+)?' + WAKE_NAME + '\\b[\\s,.!?:;-]*', 'i');
+var WAKE_END_RE = new RegExp('[\\s,;-]+(?:bitte\\W+)?' + WAKE_NAME + '\\W*$', 'i');
+var Wake = {
+  cfg: { mode: 'off', window_s: 7, followup_s: 8 },
+  until: 0,
+  configure: function (s) { Wake.cfg = Object.assign(Wake.cfg, s || {}); },
+  mode: function () { return Wake.cfg.mode || 'off'; },
+  awake: function () {
+    return Wake.mode() === 'off' || !!pendingConfirm || performance.now() < Wake.until;
+  },
+  open: function (seconds) {
+    Wake.until = Math.max(Wake.until, performance.now() + seconds * 1000);
+    updateMicButton();
+    setTimeout(updateMicButton, seconds * 1000 + 50);
+  },
+  /* after Jarvis spoke: a moment to answer him — longer if he asked something */
+  followUp: function (text) {
+    if (Wake.mode() === 'off') return;
+    var asked = /\?\s*$/.test(stripTones(text || ''));
+    Wake.open((Wake.cfg.followup_s || 8) * (asked ? 1.6 : 1));
+  },
+  /* the server heard "Hey Jarvis" */
+  lastHeard: -1e9,
+  heard: function () {
+    Wake.lastHeard = performance.now();
+    if (!Live.on) return;
+    if (Live.speaking || Speech.active || Ringing.on) { interruptSpeech(); Ringing.stop(); }
+    Wake.open(Wake.cfg.window_s || 7);
+    wakeChime();
+    log('note', 'WAKE', 'Aktivierungswort gehört');
+  },
+  /* text mode: strip the wake word, or say the utterance was not meant for us */
+  check: function (text, startedAwake) {
+    var m = WAKE_RE.exec(text);
+    if (m) return { ok: true, text: text.slice(m[0].length).trim() };
+    var e = WAKE_END_RE.exec(text);
+    // keep the full stop / question mark, or the sentence sounds unfinished and is held back
+    if (e) return { ok: true, text: text.slice(0, e.index).trim() + ((/[.!?]\s*$/.exec(text) || [''])[0].trim()) };
+    if (startedAwake) return { ok: true, text: text };
+    return { ok: false, text: text };
+  }
+};
+
+function wakeChime() {
+  try {
+    beepCtx = beepCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (beepCtx.state !== 'running') beepCtx.resume();
+    [880, 1320].forEach(function (f, i) {
+      var t = beepCtx.currentTime + 0.02 + i * 0.09;
+      var osc = beepCtx.createOscillator(), gain = beepCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.06 * voiceVolume + 0.01, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      osc.connect(gain); gain.connect(beepCtx.destination);
+      osc.start(t); osc.stop(t + 0.13);
+    });
+  } catch (e) { /* no audio, no chime */ }
+}
+
+/* ── alarm ringing ─────────────────────────────
+   Timers, the alarm clock and reminders ring before Jarvis speaks. Talking,
+   Esc, Space or the Stop button end the ringing (it counts as "speaking", so
+   the normal barge-in path stops it). */
+var Ringing = {
+  on: false, timer: null, done: null,
+  interrupted: false,
+  start: function (seconds) {
+    return new Promise(function (resolve) {
+      Ringing.on = true;
+      Ringing.interrupted = false;
+      Ringing.done = resolve;
+      Live.speaking = true;
+      stopSpeaking = function () { Ringing.interrupted = true; Ringing.stop(); };
+      setVoiceState('KLINGELT', 'hot');
+      var end = performance.now() + seconds * 1000;
+      (function pulse() {
+        if (!Ringing.on) return;
+        if (performance.now() > end) return Ringing.stop();
+        try {
+          beepCtx = beepCtx || new (window.AudioContext || window.webkitAudioContext)();
+          if (beepCtx.state !== 'running') beepCtx.resume();
+          [0, 0.18, 0.36].forEach(function (off) {
+            var t = beepCtx.currentTime + 0.02 + off;
+            var osc = beepCtx.createOscillator(), gain = beepCtx.createGain();
+            osc.type = 'triangle'; osc.frequency.value = 1046;
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(0.18 * Math.max(voiceVolume, 0.3), t + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+            osc.connect(gain); gain.connect(beepCtx.destination);
+            osc.start(t); osc.stop(t + 0.15);
+          });
+        } catch (e) { /* no audio — the text still appears */ }
+        Ringing.timer = setTimeout(pulse, 1300);
+      })();
+    });
+  },
+  stop: function () {
+    if (!Ringing.on) return;
+    Ringing.on = false;
+    clearTimeout(Ringing.timer);
+    if (stopSpeaking && !Speech.active) stopSpeaking = null;
+    Live.speaking = false;
+    Live.spokeAt = performance.now();
+    var d = Ringing.done; Ringing.done = null;
+    if (d) d();
+    updateMicButton();
+  }
+};
+
+/* ── push from the server (/api/events) ────────
+   Timers ringing, "Die Waschmaschine ist fertig", appointments, new devices,
+   the wake word. Spoken only when nothing else is going on; during the quiet
+   hours notices are only shown (alarms still ring). */
+var Push = { queue: [], busy: false, es: null };
+
+function connectEvents() {
+  try {
+    Push.es = new EventSource('/api/events?token=' + encodeURIComponent(TOKEN));
+  } catch (e) { return; }
+  Push.es.onmessage = function (m) {
+    var ev;
+    try { ev = JSON.parse(m.data); } catch (e) { return; }
+    // The wake word is heard by the PC's microphone — a phone elsewhere must not start listening.
+    if (ev.t === 'wake') return window.__remote ? undefined : Wake.heard();
+    if (ev.t === 'timers') return Timers.set(ev.items || []);
+    if (ev.t === 'say' && window.__remote) ev = Object.assign({}, ev, { silent: true });   // the PC reads it out
+    if (ev.t === 'say' || ev.t === 'alarm') { Push.queue.push(ev); drainPush(); }
+  };
+}
+
+function pushBlocked() {
+  return running || Live.armed || Live.sending || Live.speaking || Speech.active || !!pendingConfirm;
+}
+
+async function drainPush() {
+  if (Push.busy) return;
+  Push.busy = true;
+  try {
+    while (Push.queue.length) {
+      if (pushBlocked()) { await new Promise(function (r) { setTimeout(r, 800); }); continue; }
+      var ev = Push.queue.shift();
+      var b = bubble('jarvis', ev.text || '');
+      b.classList.add('push');
+      log(ev.t === 'alarm' ? 'run' : 'note', ev.t === 'alarm' ? 'WECKER' : 'MELDUNG', ev.text || '');
+      if (ev.t === 'alarm') {
+        await Ringing.start(ev.kind === 'alarm' ? 45 : 8);
+        // Talked over the ringing ("Stopp", "Schlummern"): he listens instead of reading it out.
+        if (ev.text && !Ringing.interrupted) await speak(ev.text);
+        else Wake.followUp('?');
+      } else if (ev.silent) {
+        b.classList.add('silent');
+      } else if (ev.text) {
+        wakeChime();
+        await speak(ev.text);
+      }
+    }
+  } finally { Push.busy = false; }
+}
+
+/* Countdown chip in the top bar: the next timer, alarm or reminder. */
+var Timers = {
+  items: [],
+  set: function (items) { Timers.items = (items || []).slice().sort(function (a, b) { return a.at - b.at; }); Timers.render(); },
+  render: function () {
+    var chip = $('#chipTimer');
+    if (!chip) return;
+    var now = Date.now() / 1000, list = Timers.items.filter(function (i) { return i.at > now - 2; });
+    if (!list.length) { chip.hidden = true; return; }
+    chip.hidden = false;
+    var next = list[0], left = Math.max(0, Math.round(next.at - now)), txt;
+    if (next.kind === 'timer' || left < 3600) {
+      var h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), s = left % 60;
+      txt = (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
+    } else {
+      var d = new Date(next.at * 1000);
+      txt = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      if (d.toDateString() !== new Date().toDateString()) txt = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d.getDay()] + ' ' + txt;
+    }
+    var label = { timer: 'Timer', alarm: 'Wecker', reminder: 'Erinnerung', action: 'Geplant' }[next.kind] || '';
+    $('#tNext').textContent = txt;
+    $('#tSub').textContent = label + (next.text ? ' · ' + next.text : '') + (list.length > 1 ? ' · +' + (list.length - 1) : '');
+    $('#chipTimer .ico').textContent = next.kind === 'alarm' ? '⏰' : next.kind === 'reminder' ? '🔔' : '⏱';
+    chip.title = list.map(function (i) {
+      return ({ timer: 'Timer', alarm: 'Wecker', reminder: 'Erinnerung', action: 'Geplant' }[i.kind] || i.kind) + ' '
+        + new Date(i.at * 1000).toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+        + (i.text ? ' — ' + i.text : '');
+    }).join('\n');
+  }
+};
 
 /* ── live voice ───────────────────────────────
    Hold the mic open, watch the input level, and cut an utterance when you stop
@@ -1005,6 +1247,7 @@ var Live = {
         else if (t - Live.bargeSince > BARGE_MS && interruptSpeech()) {
           Live.bargeSince = 0;
           if (running) cancelRun();
+          Wake.open(4);               // talking over him is talking to him — no wake word needed
           Live.start(t - BARGE_MS);   // you are already talking: record right away
         }
       } else {
@@ -1083,10 +1326,13 @@ var Live = {
     try {
       Live.chunks = [];
       Live.recorder = new MediaRecorder(Live.stream);
+      // Was this meant for him? Decided in send(): awake when it started, the
+      // server heard "Hey Jarvis" meanwhile, or the transcript starts with "Jarvis".
+      var rec = { at: now, awake: Wake.awake() || Live.ptt };
       Live.recorder.ondataavailable = function (e) { if (e.data.size) Live.chunks.push(e.data); };
       Live.recorder.onstop = function () {
         var blob = new Blob(Live.chunks, { type: Live.recorder.mimeType || 'audio/webm' });
-        if (Live.sending) { Live.sending = false; Live.send(blob); }
+        if (Live.sending) { Live.sending = false; Live.send(blob, rec); }
       };
       Live.recorder.start();
       Live.armed = true;
@@ -1113,7 +1359,7 @@ var Live = {
     setVoiceState(Live.on ? 'LISTENING' : 'IDLE', Live.on ? 'hot' : '');
   },
 
-  async send(blob) {
+  async send(blob, rec) {
     try {
       var res = await fetch('/api/listen', {
         method: 'POST',
@@ -1140,6 +1386,24 @@ var Live = {
         else log('note', 'FREIGABE', 'sag "bestätigt" oder "nein"');
         setVoiceState('LISTENING', 'hot');
         return;
+      }
+      // Wake word: room talk, TV and phone calls stay with the room.
+      if (Wake.mode() !== 'off' && !Live.partial && !Live.continuing) {
+        var heardWake = !!(rec && (rec.awake || Wake.lastHeard >= rec.at - 2500));
+        var w = Wake.check(text, heardWake);
+        if (!w.ok) {
+          log('note', 'VOICE', 'ohne „Jarvis“ — nicht für mich');
+          setVoiceState('LISTENING', 'hot');
+          return;
+        }
+        text = w.text;
+        if (text.replace(/[^\p{L}\p{N}]/gu, '').length < 2) {   // just "Jarvis?" — he is listening now
+          Wake.open(Wake.cfg.window_s || 7);
+          wakeChime();
+          log('note', 'WAKE', 'ich höre');
+          setVoiceState('LISTENING', 'hot');
+          return;
+        }
       }
       // A held-back unfinished start ("Als Allererstes mal bitte, ähm,") gets the rest glued on.
       if (Live.partial) {
@@ -1269,6 +1533,9 @@ var BRIEFING = 'Tagesbriefing zum Start';
 
 async function bootSequence() {
   await loadStatus();
+  // A phone or tablet starts quiet: no open microphone in the pocket, no briefing
+  // the PC already gave — the mic button (tap = live, hold = push-to-talk) does it.
+  if (window.__remote) return;
   if (window.__serverSTT && localStorage.getItem('jarvis.live') !== '0') Live.enable();
   var today = new Date().toLocaleDateString('sv-SE');   // YYYY-MM-DD, local time
   // Bump BRIEFING_RESET to get one extra briefing on the next load (for testing).
@@ -1283,6 +1550,62 @@ async function bootSequence() {
   localStorage.setItem('jarvis.briefingDay', today);
   briefingActive = true;
   try { await transmit(BRIEFING); } finally { briefingActive = false; }
+}
+
+/* ── devices (remote access) ───────────────────
+   Only on the PC: a six-digit code for a new iPhone/iPad (typed on its
+   /pair.html), and the list of paired devices, each removable. */
+var Devices = {
+  timer: null,
+  api: async function (path, body) {
+    var r = await fetch(path, { method: 'POST', headers: headers({ 'Content-Type': 'application/json' }),
+                                body: JSON.stringify(body || {}) });
+    return r.json();
+  },
+  open: async function () {
+    $('#pairBox').hidden = false;
+    $('#pairCode').textContent = '······';
+    $('#pairHint').textContent = '';
+    await Devices.list();
+  },
+  close: function () { $('#pairBox').hidden = true; clearInterval(Devices.timer); },
+  newCode: async function () {
+    var d = await Devices.api('/api/pair/start');
+    $('#pairCode').textContent = d.code.slice(0, 3) + ' ' + d.code.slice(3);
+    var until = Date.now() + d.ttl * 1000;
+    clearInterval(Devices.timer);
+    var tick = function () {
+      var left = Math.max(0, Math.round((until - Date.now()) / 1000));
+      $('#pairHint').textContent = left ? 'Auf dem Gerät eingeben · noch ' + Math.floor(left / 60) + ':'
+        + String(left % 60).padStart(2, '0') : 'Abgelaufen — neuen Code holen.';
+      if (!left) { $('#pairCode').textContent = '······'; clearInterval(Devices.timer); Devices.list(); }
+    };
+    tick();
+    Devices.timer = setInterval(function () { tick(); }, 1000);
+    if (!d.remote) $('#pairHint').textContent = 'Fernzugriff ist aus: JARVIS_REMOTE=1 in .env setzen.';
+  },
+  list: async function () {
+    var d = await Devices.api('/api/devices'), ul = $('#pairList');
+    ul.innerHTML = d.devices.length ? '' : '<li class="empty">Noch kein Gerät gekoppelt.</li>';
+    d.devices.forEach(function (dev) {
+      var li = document.createElement('li');
+      li.innerHTML = '<b>' + esc(dev.name) + '</b><em>' + esc(dev.seen ? 'zuletzt ' + dev.seen : 'gekoppelt ' + dev.created)
+        + '</em><button title="Gerät entfernen">✕</button>';
+      li.querySelector('button').onclick = async function () {
+        if (!confirm(dev.name + ' entfernen? Es muss danach neu gekoppelt werden.')) return;
+        await Devices.api('/api/devices/revoke', { id: dev.id });
+        Devices.list();
+      };
+      ul.appendChild(li);
+    });
+  }
+};
+
+function setupDevices() {
+  if (window.__remote) return;
+  $('#btnPair').onclick = Devices.open;
+  $('#pairNew').onclick = Devices.newCode;
+  $('#pairClose').onclick = Devices.close;
 }
 
 /* ── boot ─────────────────────────────────── */
@@ -1315,7 +1638,10 @@ window.addEventListener('DOMContentLoaded', function () {
     localStorage.setItem('jarvis.log', logPanel.classList.contains('closed') ? 'closed' : 'open');
   };
   setupMic();
+  setupDevices();
   setVoiceState('IDLE', '');
+  connectEvents();
+  setInterval(Timers.render, 1000);
   bootSequence();
 
   // Stop: only lit while he is thinking or talking; cuts both off.

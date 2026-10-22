@@ -1,0 +1,19 @@
+[
+  {
+    "name": "Gute Nacht",
+    "triggers": ["gute nacht", "ich geh schlafen", "ich gehe schlafen"],
+    "steps": [
+      {"ha": "light.turn_off", "entity_id": "all"},
+      {"tell": "Wann klingelt mein Wecker?"},
+      {"say": "Schlafen Sie gut, Sir."}
+    ]
+  },
+  {
+    "name": "Guten Morgen",
+    "triggers": ["ich bin wach", "morgenroutine"],
+    "steps": [
+      {"tell": "Wie wird das Wetter heute?"},
+      {"tell": "Was steht auf der Einkaufsliste?"}
+    ]
+  }
+]

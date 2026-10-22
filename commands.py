@@ -214,7 +214,11 @@ verändert — Automationen, Skripte, Dashboards, Einstellungen, Backups, Neusta
 als Systemänderung: erst im Gespräch fragen, dann ausführen. Schalten bleibt bei home_control.
 
 E-Mail: mail_inbox liest das Postfach des Users (IMAP) (nur lesen, ohne Rückfrage).
+mail_mark_read markiert Mails als gelesen (oder mit unread wieder ungelesen), ohne Rückfrage.
 Fasse Mails kurz zusammen, lies nie ganze Mails, Links oder Codes vor.
+
+Wetter: weather liefert Vorhersage (bis 14 Tage, auch für andere Orte), UV, Sonnenstunden, Sonnenauf- und
+-untergang und mit hourly die nächsten Stunden — nur lesend, ohne Rückfrage. Nicht im Web nach Wetter suchen.
 
 Musik: Das Werkzeug music steuert Spotify (abspielen/pausieren, weiter, zurück, lauter, leiser,
 suchen) — ohne Rückfrage, wenn der User es verlangt.
@@ -251,7 +255,10 @@ LEAN_GROUP_RULES = {
     "ha_full": "Home-Assistant-Server (mcp__homeassistant__*): Verlauf, Logs, Automationen. Lesen frei; Änderungen "
                "erst im Gespräch ankündigen.",
     "mail": "E-Mail: mail_inbox liest das Postfach (IMAP, nur lesen). Kurz zusammenfassen, Werbung weglassen, nie ganze Mails, "
-            "Links oder Codes vorlesen.",
+            "Links oder Codes vorlesen. mail_mark_read markiert als gelesen (search = Absender/Betreff, all = alle "
+            "ungelesenen; unread = wieder ungelesen), ohne Rückfrage.",
+    "weather": "Wetter: weather (days bis 14, place für andere Orte, hourly für die nächsten Stunden) liefert Himmel, "
+               "Temperatur, Regen, Wind, UV, Sonnenstunden, Sonnenauf-/untergang. Nur das Gefragte nennen, nicht im Web suchen.",
     "calendar": "Kalender: calendar_events liest, calendar_add trägt ein (der User bestätigt per Karte; vorher kurz "
                 "Titel und Uhrzeit klären).",
     "systems": "Systeme: pi_status, nas_status, network_devices lesen frei. Befehle auf dem Pi nur per "
@@ -262,6 +269,14 @@ LEAN_GROUP_RULES = {
            "'Websites' (memory_read). open_website öffnet Seiten im eingestellten Browser.",
     "pc": "PC (Windows): Befehle per PowerShell nur mit Bestätigung des Users. Sag vorher in einem Satz, was du vorhast "
           "und warum; die Beschreibung des Befehls auf Deutsch. Lehnt er ab, kein Umweg. Programme: Start-Process.",
+    "timers": "Timer/Wecker/Erinnerungen: reminder_add (kind reminder|alarm|timer, at 'YYYY-MM-DD HH:MM'), "
+              "reminder_list, reminder_cancel. Jarvis klingelt und spricht zur Zeit selbst. Erinnerungen an einen "
+              "Zeitpunkt hierhin, nicht in den Kalender, außer der User will einen Termin.",
+    "lists": "Listen: list_read, list_add, list_remove mit list 'einkauf' (Einkaufsliste) oder 'todo' (To-do-Liste). "
+             "Einträge kurz, ohne Artikel.",
+    "routines": "Routinen: routine_save legt fest, was auf einen Satz hin passiert (läuft danach ohne dich); "
+                "routine_list, routine_delete. Schritte möglichst als do/tell mit einfachen deutschen Befehlen; "
+                "nenne dem User danach kurz Auslöser und Schritte.",
 }
 
 

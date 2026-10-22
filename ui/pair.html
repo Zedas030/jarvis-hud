@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04070c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>JARVIS · Gerät koppeln</title>
+<style>
+  :root{--bg:#04070c;--cy:#5fe4ff;--cy-dim:#2b8ba8;--ink:#dbe9f5;--ink-dim:#6f8aa3;--pink:#ff6ba6;--amber:#ffb340;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
+  body{background:radial-gradient(700px 500px at 50% 30%,#0a1a26 0%,transparent 65%),var(--bg);color:var(--ink);
+    font-family:var(--mono);display:flex;align-items:center;justify-content:center;
+    padding:calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}
+  main{width:100%;max-width:380px;text-align:center}
+  .core{width:72px;height:72px;margin:0 auto 22px;border-radius:50%;border:1px solid rgba(95,228,255,.5);position:relative;
+    box-shadow:0 0 30px rgba(95,228,255,.25),inset 0 0 18px rgba(95,228,255,.2)}
+  .core::after{content:"";position:absolute;inset:22px;border-radius:50%;background:var(--cy);box-shadow:0 0 20px var(--cy)}
+  h1{font-size:22px;letter-spacing:.42em;font-weight:600;padding-left:.42em;text-shadow:0 0 18px rgba(95,228,255,.35)}
+  p{color:var(--ink-dim);font-size:13px;line-height:1.5;margin:14px 0 22px}
+  input{width:100%;background:#08111b;border:1px solid rgba(80,160,200,.35);color:var(--ink);border-radius:10px;
+    font:inherit;font-size:16px;padding:13px 14px;margin-bottom:10px;text-align:center}
+  #code{font-size:28px;letter-spacing:.3em}
+  input:focus{outline:none;border-color:var(--cy);box-shadow:0 0 14px rgba(95,228,255,.25)}
+  button{width:100%;background:rgba(95,228,255,.1);border:1px solid var(--cy);color:var(--cy);border-radius:10px;
+    font:inherit;font-size:16px;letter-spacing:.12em;padding:13px;margin-top:4px;cursor:pointer}
+  button:disabled{opacity:.5}
+  .msg{min-height:20px;margin-top:14px;font-size:13px;color:var(--pink)}
+  .tip{margin-top:26px;padding:12px 14px;border:1px solid rgba(255,179,64,.4);border-radius:10px;
+    font-size:12px;line-height:1.5;color:var(--amber);text-align:left}
+  .tip[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+  <div class="core"></div>
+  <h1>JARVIS</h1>
+  <p>Dieses Gerät ist noch nicht gekoppelt. Am PC auf <b>📱 Geräte</b> → <b>Neuen Code</b> tippen und den Code hier eingeben.</p>
+  <form id="f">
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" required>
+    <input id="name" autocomplete="off" maxlength="40" placeholder="Name, z. B. iPhone">
+    <button id="go">Koppeln</button>
+  </form>
+  <div class="msg" id="msg"></div>
+  <div class="tip" id="tip" hidden>
+    Tipp fürs <span id="tipDev">iPhone</span>: Erst <span id="tipWhere">unten</span> auf <b>Teilen</b> → <b>Zum Home-Bildschirm</b>, dann Jarvis vom Home-Bildschirm
+    öffnen und dort koppeln. Die App vom Home-Bildschirm hat ihre eigene Anmeldung, Safari zählt dafür nicht.
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  document.getElementById('tip').hidden = !(ios && !standalone);
+  // not "name": a top-level var of that name is window.name, a string
+  var devName = document.getElementById('name');
+  // iPadOS Safari calls itself a Mac — a touch screen that large is an iPad
+  var ipad = /iPad/.test(navigator.userAgent) || (ios && screen.width >= 700);
+  devName.value = ipad ? 'iPad' : ios ? 'iPhone' : '';
+  if (ipad) {   // on the iPad, Share sits top right in Safari's toolbar
+    document.getElementById('tipDev').textContent = 'iPad';
+    document.getElementById('tipWhere').textContent = 'oben rechts';
+  }
+  document.getElementById('f').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = document.getElementById('go'), msg = document.getElementById('msg');
+    btn.disabled = true; msg.textContent = '';
+    try {
+      var r = await fetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: document.getElementById('code').value, name: devName.value }) });
+      var d = await r.json();
+      if (r.ok && d.ok) { location.replace('/'); return; }
+      msg.textContent = d.error || 'Das hat nicht geklappt.';
+    } catch (err) { msg.textContent = 'Jarvis nicht erreichbar. Läuft der PC?'; }
+    btn.disabled = false;
+  });
+})();
+</script>
+</body>
+</html>
