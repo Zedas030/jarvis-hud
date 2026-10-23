@@ -217,7 +217,7 @@ Every setting is documented in [`.env.example`](.env.example). Personal data bel
 | PC and volume | `JARVIS_DUCK` (0.3, 0 = off), `JARVIS_DUCK_APPS` (spotify.exe), `JARVIS_NIGHT_VOLUME` (0.5) | Music quieter while speaking, voice volume in quiet hours; your own apps in `config/apps.json` |
 | Pronunciation | `config/aussprache.json` | Your own entries, created by voice |
 | Services | `ICLOUD_*`, `MAIL_*`, `HA_*`, `SYNOLOGY_*`, `JARVIS_PI_*`, `GARMIN_*` | Integrations; each one is optional |
-| Devices | `config/home.json` | Maps dashboard fields (solar, battery, rooms, router, air) to Home Assistant entities, plus `appliances` (power meters for "… is done") |
+| Devices | `config/home.json` | Maps dashboard fields (solar, battery, rooms, router, air) to Home Assistant entities, plus `appliances` (power meters for "… is done") and `device_aliases` (extra words per device, e.g. "Wohnzimmer" and "Lampe" for a light Home Assistant only calls "LED"; picked up without a restart within 5 minutes) |
 | Routines | `config/routines.json` | Created by voice; format in `config/routines.example.json` |
 
 > **Important:** never set `ANTHROPIC_API_KEY`. Claude Code would then bill through the API instead of the subscription. The server removes the variable from the child processes' environment as a precaution.

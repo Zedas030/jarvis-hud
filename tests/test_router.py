@@ -158,6 +158,35 @@ class HomeRules(Base):
         self.llm("Schalte das WiFi Main aus")
         self.assertEqual(CALLS, [])
 
+    def test_device_aliases(self):
+        # The living-room lamp HA calls just "LED", next to a dead lamp; the user says Licht, Lampe, Steckdose.
+        house = [("light.licht", "LED", "on"), ("light.lampe_wohnzimmer", "Tot", "unavailable"),
+                 ("light.kueche", "Küche", "off"), ("switch.pc", "PC", "on")]
+        states, aliases = briefing._ha_states, router._aliases
+        briefing._ha_states = lambda: [{"entity_id": e, "state": s, "attributes": {"friendly_name": n}}
+                                       for e, n, s in house]
+        router._aliases = lambda: {"light.licht": ["Wohnzimmer", "Licht", "Lampe", "Steckdose"]}
+        router._DEV["at"] = 0
+        try:
+            self.assertNotIn("light.lampe_wohnzimmer", {d["eid"] for d in router._devices()})
+            for text in ("Wohnzimmer, Licht aus", "Wohnzimmer aus", "Licht aus", "Lampe an",
+                         "Mach die Steckdose im Wohnzimmer aus", "LED an"):
+                CALLS.clear()
+                self.local(text, "home")
+                self.assertEqual([c[0] for c in CALLS], ["light.licht"], text)
+            CALLS.clear()
+            self.local("Licht Küche an", "home")             # a real name beats the generic alias word
+            self.assertEqual(CALLS, [("light.kueche", "turn_on", {})])
+            CALLS.clear()
+            self.local("Mach alle Lichter aus", "home")      # the dead lamp is left out
+            self.assertEqual(sorted(c[0] for c in CALLS), ["light.kueche", "light.licht"])
+            self.assertIn("an", self.local("Ist das Licht im Wohnzimmer an?", "home_state"))
+        finally:
+            briefing._ha_states, router._aliases = states, aliases
+            router._DEV["at"] = 0
+            router._devices()
+            router._DEV["at"] = time.time() + 10 ** 9
+
     def test_conditions_are_not_switched_now(self):
         self.llm("Wenn ich Gute Nacht sage, mach alle Lichter aus", "routines", "home")
         self.assertEqual(CALLS, [])

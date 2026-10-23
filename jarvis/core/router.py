@@ -320,10 +320,18 @@ _FILLER = {"der", "die", "das", "den", "dem", "im", "in", "am", "an", "aus", "ei
            "ausschalten", "anmachen", "ausmachen", "prozent", "%", "licht", "lampe", "steckdose", "lichter", "lampen"}
 
 
+def _aliases():
+    """Extra words per entity from config/home.json → "device_aliases": the lamp HA calls "LED" is also
+    "Wohnzimmer", "Licht" or "Steckdose" to the user. Read with every device refresh, no restart needed."""
+    import jarvis_profile
+    return jarvis_profile._load_home().get("device_aliases") or {}
+
+
 def _devices():
     if _DEV["at"] > time.time() - 300:
         return _DEV["list"]
     import briefing
+    aliases = _aliases()
     out = []
     for s in briefing._ha_states():
         eid = s["entity_id"]
@@ -333,7 +341,11 @@ def _devices():
             continue
         if dom == "switch" and (_INDICATOR_LED.search(name) or eid.endswith("_led")):
             continue                               # the status LED of a socket, not a lamp
-        out.append({"eid": eid, "dom": dom, "name": name, "words": set(_norm(name).split())})
+        if s.get("state") == "unavailable":
+            continue                               # a dead lamp must not tie with the live one
+        base = set(_norm(name).split())
+        alias = set(_norm(" ".join(aliases.get(eid) or [])).split())
+        out.append({"eid": eid, "dom": dom, "name": name, "base": base, "words": base | alias, "alias": alias})
     _DEV.update(at=time.time(), list=out)
     return out
 
@@ -342,12 +354,18 @@ QUESTION = re.compile(r"^\s*(ist|sind|läuft|laufen|brennt|brennen|hat|haben|wie
                       r"steht|stehen|status|zustand|gibt es|weißt du)\b")
 
 
-def _match_devices(n, hint=None):
-    words = {w for w in n.split() if w not in _FILLER and len(w) > 1}
+def _match_devices(n, hint=None, devs=None):
+    said = set(n.split())
+    words = {w for w in said if w not in _FILLER and len(w) > 1}
+    devs = _devices() if devs is None else devs
+    if not any(d["words"] & words for d in devs):
+        words = said                               # only generic words ("Licht aus"): an alias may claim them
+        devs = [d for d in devs if d["alias"] & said]
     best, score = [], 0
-    for d in _devices():
-        if hint and d["dom"] != hint and not (hint == "switch" and d["dom"] == "fan"):
-            continue
+    for d in devs:
+        if hint and d["dom"] != hint and not (hint == "switch" and d["dom"] == "fan") \
+                and not d["alias"] & said & _DOMAIN_WORDS.keys():
+            continue                               # "Steckdose" for a lamp the user calls a socket is fine
         sc = len(d["words"] & words)
         if not sc:
             continue
@@ -356,7 +374,7 @@ def _match_devices(n, hint=None):
         elif sc == score:
             best.append(d)
     if len(best) > 1:
-        exact = [d for d in best if d["words"] <= words]
+        exact = [d for d in best if d["base"] <= words]   # "TV" beats "TV Schlafzimmer" for "schalt das TV an"
         if len(exact) == 1:
             best = exact
     return best
@@ -396,23 +414,8 @@ def _home(n):
         devs = _devices()
     except Exception:  # noqa: BLE001
         return None
-    words = {w for w in n.split() if w not in _FILLER and len(w) > 1}
     hint = next((d for w, d in _DOMAIN_WORDS.items() if re.search(r"\b" + w, n)), None)
-    best, score = [], 0
-    for d in devs:
-        if hint and d["dom"] != hint and not (hint == "switch" and d["dom"] == "fan"):
-            continue
-        sc = len(d["words"] & words)
-        if not sc:
-            continue
-        if sc > score:
-            best, score = [d], sc
-        elif sc == score:
-            best.append(d)
-    if len(best) > 1:
-        exact = [d for d in best if d["words"] <= words]   # "TV" beats "TV Schlafzimmer" for "schalt das TV an"
-        if len(exact) == 1:
-            best = exact
+    best = _match_devices(n, hint, devs)
     import learning
     learned = learning.alias(n)                    # a wording Claude once resolved for us
     if learned:
