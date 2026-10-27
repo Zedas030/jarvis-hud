@@ -86,6 +86,26 @@ class Chain(unittest.TestCase):
         tts_chain.speak("Drei.")
         self.assertEqual(a["b"].said[-1], "Drei.")
 
+    def test_stream_uses_streaming_provider(self):
+        a = self.setup()
+        a["a"].stream = lambda text: (iter([b"aud", b"io"]), "audio/mpeg")
+        chunks, mime, name = tts_chain.speak_stream("Hallo.")
+        self.assertEqual((b"".join(chunks), name), (b"audio", "a"))
+
+    def test_stream_wraps_plain_provider(self):
+        self.setup(a="transient")
+        chunks, mime, name = tts_chain.speak_stream("Hallo.")
+        self.assertEqual((list(chunks), name), ([b"audio-b"], "b"))
+
+    def test_stream_failing_before_first_chunk_moves_on(self):
+        a = self.setup()
+
+        def broken(text):
+            raise tts_chain.Transient("Timeout")
+        a["a"].stream = broken
+        _, _, name = tts_chain.speak_stream("Hallo.")
+        self.assertEqual(name, "b")
+
     def test_all_failing_raises(self):
         self.setup(a="transient", b="exhausted", c="transient")
         with self.assertRaises(RuntimeError):

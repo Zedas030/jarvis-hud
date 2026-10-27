@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to config/scripts.json. Jarvis may only start these scripts, always with a confirmation card. path: .ps1, .bat, .cmd or .py; args are fixed here (the model cannot add any); timeout in seconds. The names are what you say, so German.",
+  "_comment": "Nach config/scripts.json kopieren. Nur diese Skripte darf Jarvis starten, immer mit Bestätigungskarte. path: .ps1, .bat, .cmd oder .py; args fest vorgegeben (das Modell kann keine anhängen); timeout in Sekunden.",
   "temp aufräumen": {
     "path": "C:\\Skripte\\temp-aufraeumen.ps1",
     "beschreibung": "Löscht Dateien in %TEMP%, die älter als 7 Tage sind",

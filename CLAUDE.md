@@ -37,7 +37,10 @@ port and state file (see README, "Entwicklung und Diagnose"); `JARVIS_RUNTIME=mo
   data and taints the request (`jarvis_mcp.handle_call`).
 - No work topics are stored anywhere (`privacy.py`).
 - Background jobs never change anything themselves: they create a proposal (`proposals.py`) that
-  the user accepts on a card.
+  the user accepts on a card. One exception, chosen by the user: `mail_events.py` enters bookings
+  from senders in `JARVIS_MAIL_EVENTS_TRUSTED`, and `shipments.py` enters expected deliveries as
+  all-day entries, straight into the calendar (fixed code, no model, no links, announced, undoable
+  via `mail_events_undo`). Do not widen it without asking.
 - Jarvis never edits his own code at runtime.
 - Never set `ANTHROPIC_API_KEY`; personal data lives only in `.env`, `config/*.json` (not the
   examples), `vault/`, `logs/`, `backups/`, `state.json` — all ignored by git.

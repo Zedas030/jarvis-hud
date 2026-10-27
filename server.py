@@ -11,6 +11,7 @@ import json
 import mimetypes
 import os
 import pathlib
+import re
 import secrets
 import sys
 import threading
@@ -24,14 +25,20 @@ sys.path.insert(0, str(ROOT))
 import paths  # noqa: E402,F401 — the jarvis/<group> folders
 UI = ROOT / "ui"
 mimetypes.add_type("application/manifest+json", ".webmanifest")
+mimetypes.add_type("application/wasm", ".wasm")        # the wake word runtime (ui/vendor); Windows often knows neither
+mimetypes.add_type("text/javascript", ".mjs")
 
 _env = ROOT / ".env"
+_FROM_ENV_FILE = set()      # keys this process took from .env (not from the real environment)
 if _env.exists():
     for line in _env.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, _, v = line.partition("=")
-            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            k = k.strip()
+            if k not in os.environ:
+                _FROM_ENV_FILE.add(k)
+            os.environ.setdefault(k, v.strip().strip('"').strip("'"))
 
 # Supervisor: the HUD runs as a child process. When the code changes the child
 # exits with RESTART_CODE once nobody is talking, and is started again here.
@@ -40,7 +47,11 @@ if _env.exists():
 RESTART_CODE = 3
 if __name__ == "__main__" and os.environ.get("JARVIS_CHILD") != "1":
     import subprocess
-    child_env = dict(os.environ, JARVIS_CHILD="1")
+    # The child reads .env itself on every start. Handing it the values read here
+    # would pin them for good: a changed key (another voice, a new password) only
+    # took effect after closing the whole Jarvis window.
+    child_env = {k: v for k, v in os.environ.items() if k not in _FROM_ENV_FILE}
+    child_env["JARVIS_CHILD"] = "1"
     crashes = []
     while True:
         started = time.time()
@@ -100,8 +111,11 @@ import memory      # noqa: E402
 import router      # noqa: E402
 import runtime     # noqa: E402
 import scheduler   # noqa: E402
+import spotify     # noqa: E402
 import voice       # noqa: E402
 import wakeword    # noqa: E402
+import ambience    # noqa: E402
+import overlay     # noqa: E402
 import watchers    # noqa: E402
 
 PORT = int(os.environ.get("JARVIS_PORT", "8720"))
@@ -111,9 +125,32 @@ PORT = int(os.environ.get("JARVIS_PORT", "8720"))
 REMOTE = os.environ.get("JARVIS_REMOTE", "0").strip().lower() in ("1", "true", "yes", "on")
 REMOTE_PORT = int(os.environ.get("JARVIS_REMOTE_PORT", str(PORT + 1)))
 REMOTE_HOSTS = {h.strip().lower() for h in os.environ.get("JARVIS_REMOTE_HOSTS", "").split(",") if h.strip()}
-REMOTE_PUBLIC = {"/pair.html", "/manifest.webmanifest", "/icon-180.png", "/icon-512.png"}
-LOCAL_ONLY = {"/api/permission/request", "/api/internal", "/api/pair/start", "/api/devices", "/api/devices/revoke"}
+REMOTE_PUBLIC = {"/pair.html", "/manifest.webmanifest", "/icon-180.png", "/icon-512.png",
+                 "/icon-192.png", "/icon-32.png", "/favicon.svg"}   # what pair.html and the manifest name
+LOCAL_ONLY = {"/api/permission/request", "/api/internal", "/api/pair/start", "/api/devices", "/api/devices/revoke",
+              "/api/hud"}   # the desktop card belongs to the PC's own HUD, not a phone
 API_TOKEN = secrets.token_urlsafe(32)
+DASHBOARD_LAYOUTS = frozenset(("tablet", "stark", "classic", "aurora", "ivory", "midnight", "cockpit",
+                               "bento", "horizon", "editorial", "neon", "zen", "orbit", "solstice",
+                               "atelier", "mono", "nexus", "tide", "prism"))
+DASHBOARD_DEFAULT = "solstice"
+
+
+def _saved_dashboard_layout(device="pc"):
+    """The view this device picked last. Each device keeps its own: the iPad station must not follow
+    whatever the PC tried out. Before a device has picked one, the old shared choice still counts."""
+    state = commands.load()
+    for layout in ((state.get("dashboard_layouts") or {}).get(device), state.get("dashboard_layout")):
+        if isinstance(layout, str) and layout in DASHBOARD_LAYOUTS:
+            return layout
+    return DASHBOARD_DEFAULT
+
+
+def _save_dashboard_layout(device, layout):
+    def put(state):
+        views = state.get("dashboard_layouts")
+        state["dashboard_layouts"] = dict(views if isinstance(views, dict) else {}, **{device: layout})
+    commands.update_state(put)
 BOOT_ID = secrets.token_hex(4)          # the page reloads itself when this changes
 LAST_POST = [time.time()]               # any talking, listening or speaking counts as activity
 RUN_LOCK = threading.Lock()
@@ -255,7 +292,8 @@ def _describe_call(tool, data):
     if tool.startswith("mcp__jarvis__") and not tool.endswith("calendar_add"):
         return policy.describe(tool, data)
     if tool.endswith("calendar_add"):
-        parts = [f"Neuer Termin: {data.get('title', '?')}",
+        parts = [f"⚠ {data['_hinweis']}" if data.get("_hinweis") else "",
+                 f"Neuer Termin: {data.get('title', '?')}",
                  f"{data.get('start', '?')}" + (f" bis {data['end']}" if data.get("end") else ""),
                  data.get("location") or "", data.get("calendar") or ""]
         return "\n".join(p for p in parts if p)
@@ -270,6 +308,15 @@ def _describe_call(tool, data):
             head = f"{kind}: {why}" if why else kind
             return f"{head}\n\n{data[key]}"[:700]
     return json.dumps(data, ensure_ascii=False)[:600]
+
+
+class Server(ThreadingHTTPServer):
+    def handle_error(self, request, client_address):
+        # the browser gave up on a request (Jarvis interrupted, a new question, tab reloaded):
+        # nothing went wrong here, so no traceback in the console
+        if isinstance(sys.exc_info()[1], ConnectionError):
+            return
+        super().handle_error(request, client_address)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -298,18 +345,44 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
 
-    def _bytes(self, data, ctype, code=200):
+    def _bytes(self, data, ctype, code=200, cache="no-store"):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache)
         self.end_headers()
         self.wfile.write(data)
+
+    def _speak_stream(self, chunks, mime, provider):
+        """Chunked transfer: the HUD starts playing while the provider is still
+        speaking. Errors before the first chunk were already handled by the chain;
+        if it breaks off later, the sentence simply ends early."""
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Jarvis-Voice", provider)
+        self.end_headers()
+        try:
+            for c in chunks:
+                if c:
+                    self.wfile.write(b"%x\r\n%s\r\n" % (len(c), c))
+            self.wfile.write(b"0\r\n\r\n")
+        except OSError:                    # cut off in the HUD: nobody listens any more
+            self.close_connection = True
+        except Exception as e:  # noqa: BLE001 — provider broke off mid-sentence
+            print(f"  Stimme abgebrochen: {str(e)[:120]}", flush=True)
+            self.close_connection = True
+        finally:
+            close = getattr(chunks, "close", None)
+            if close:
+                close()
 
     def _read(self, limit):
         n = int(self.headers.get("Content-Length", 0))
         if n < 0 or n > limit:
             raise ValueError("body too large")
+        self._body_read = True
         return self.rfile.read(n) if n else b""
 
     def _host_ok(self):
@@ -323,6 +396,12 @@ class Handler(BaseHTTPRequestHandler):
         if self.remote:
             return self.headers.get("Origin") == "https://" + self.headers.get("Host", "")
         return self.headers.get("Origin") in {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
+
+    def _layout_device(self):
+        """Whose view: the PC's own browser, or a paired phone/iPad by its device id."""
+        if not self.remote:
+            return "pc"
+        return devices.check(devices.token_from_cookie(self.headers.get("Cookie"))) or "remote"
 
     def _device_ok(self):
         return bool(devices.check(devices.token_from_cookie(self.headers.get("Cookie"))))
@@ -353,6 +432,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "device not paired"}, 401)
             return self._redirect("/pair.html")
 
+        if p == "/api/layout":
+            return self._json({"layout": _saved_dashboard_layout(self._layout_device())})
+
         if p == "/api/status":
             g = memory.build_graph()
             return self._json(dict(
@@ -366,7 +448,7 @@ class Handler(BaseHTTPRequestHandler):
                 tts=_tts_status(),
                 usage=commands.load().get("usage"),
                 billing=billing.summary(),
-                wake=wakeword.status(), timers=scheduler.public(), quiet=events.quiet_now(),
+                wake=wakeword.status(), spotify=spotify.status(), ambience=ambience.status(), timers=scheduler.public(), quiet=events.quiet_now(),
                 night_volume=NIGHT_VOLUME,
                 fallback=fallback_llm.status(),
                 persona=personality.label(),
@@ -389,6 +471,14 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/dashboard":
             return self._json(dashboard.data())
 
+        if p == "/api/sysmon":
+            # the top strip's live figures of this PC, polled every two seconds (sysmon.py)
+            import sysmon
+            try:
+                return self._json(sysmon.sample())
+            except Exception as e:  # noqa: BLE001 — psutil or nvidia-smi missing
+                return self._json({"error": str(e)[:120]})
+
         if p == "/api/notifications":
             return self._json(notifications())
 
@@ -406,12 +496,36 @@ class Handler(BaseHTTPRequestHandler):
         data = f.read_bytes()
         if rel == "index.html":
             data = data.replace(b"__JARVIS_TOKEN__", API_TOKEN.encode())
+            data = data.replace(b"__JARVIS_LAYOUT__", _saved_dashboard_layout(self._layout_device()).encode("ascii"))
         ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
-        return self._bytes(data, ctype)
+        # ui/vendor/ holds versioned folders (ort-1.20.1, oww-v0.5.1): 14 MB the iPad keeps instead
+        # of fetching them on every load; a new version is a new path
+        cache = "private, max-age=31536000, immutable" if rel.startswith("vendor/") else "no-store"
+        return self._bytes(data, ctype, cache=cache)
 
     def do_POST(self):
+        # A POST answered without reading its body (rejected, wrong token, "only on the PC")
+        # leaves the body in a kept-alive connection; the next request on it then starts
+        # with that JSON and fails with 400 — on the iPad that was a bare error page, or a
+        # HUD without its stylesheet. A small leftover body is read away, a big one closes the connection.
+        self._body_read = False
+        try:
+            self._do_post()
+        finally:
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if not self._body_read and n > 0:
+                if n <= 1 << 20:
+                    self.rfile.read(n)
+                else:
+                    self.close_connection = True
+
+    def _do_post(self):
         p = urlparse(self.path).path
-        LAST_POST[0] = time.time()
+        # The restart after a code change waits for quiet. The HUD's sign of life (every few
+        # seconds) and clips of room noise are no conversation — counting them kept the old
+        # code running for good. A clip that held words counts once it is transcribed.
+        if p not in ("/api/hud", "/api/listen"):
+            LAST_POST[0] = time.time()
         if self.remote:
             if p in LOCAL_ONLY:
                 return self._json({"error": "only on the PC"}, 403)
@@ -428,17 +542,31 @@ class Handler(BaseHTTPRequestHandler):
         if not self._token_ok():
             return self._json({"error": "unauthorized"}, 401)
         ctype = self.headers.get("Content-Type", "").split(";", 1)[0].lower()
-        if p in {"/api/run", "/api/speak", "/api/new", "/api/cancel", "/api/balance", "/api/duck",
-                 "/api/pair/start", "/api/devices", "/api/devices/revoke"} and ctype != "application/json":
+        if p in {"/api/run", "/api/speak", "/api/new", "/api/cancel", "/api/balance", "/api/duck", "/api/musichold", "/api/hud", "/api/restart",
+                 "/api/layout", "/api/pair/start", "/api/devices", "/api/devices/revoke"} and ctype != "application/json":
             return self._json({"error": "application/json required"}, 415)
         try:
             raw = self._read(MAX_AUDIO if p == "/api/listen" else MAX_JSON)
         except (TypeError, ValueError):
             return self._json({"error": "body too large"}, 413)
 
+        if p == "/api/layout":
+            try:
+                body = json.loads(raw or b"{}")
+            except (ValueError, TypeError):
+                return self._json({"error": "bad json"}, 400)
+            layout = body.get("layout") if isinstance(body, dict) else None
+            if layout not in DASHBOARD_LAYOUTS:
+                return self._json({"error": "unknown layout"}, 400)
+            _save_dashboard_layout(self._layout_device(), layout)
+            return self._json({"ok": True, "layout": layout})
+
         if p == "/api/speak":
             try:
-                text = (json.loads(raw or b"{}").get("text") or "").strip()
+                body = json.loads(raw or b"{}")
+                text = (body.get("text") or "").strip()
+                if body.get("stream"):
+                    return self._speak_stream(*voice.speak_stream(text))
                 data, mime, provider = voice.speak_full(text)
                 self.send_response(200)
                 self.send_header("Content-Type", mime)
@@ -453,7 +581,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if p == "/api/listen":
             try:
-                return self._json({"text": voice.transcribe(raw, self.headers.get("Content-Type", "audio/webm"))})
+                text = voice.transcribe(raw, self.headers.get("Content-Type", "audio/webm"))
+                if text:
+                    LAST_POST[0] = time.time()
+                return self._json({"text": text})
             except Exception as e:  # noqa: BLE001
                 return self._json({"error": str(e)[:400], "text": ""}, 503)
 
@@ -468,12 +599,46 @@ class Handler(BaseHTTPRequestHandler):
             did = (json.loads(raw or b"{}") or {}).get("id")
             return self._json({"ok": devices.revoke(did)})
 
+        if p == "/api/wakelog":
+            # the wake word on a phone or iPad reports what it did (wakeword.device_log)
+            if self.remote:
+                did = devices.check(devices.token_from_cookie(self.headers.get("Cookie")))
+                name = next((d["name"] for d in devices.listing() if d["id"] == did and d["name"]), did)
+                wakeword.device_log(name, (json.loads(raw or b"{}") or {}).get("text", ""))
+            return self._json({"ok": True})
+
+        if p == "/api/hud":
+            # tab visibility and voice state, for the desktop card while the tab is hidden (overlay.py)
+            overlay.report(json.loads(raw or b"{}") or {})
+            return self._json({"ok": True})
+
+        if p == "/api/restart":
+            # The HUD's restart button: same exit as after a code change, so the supervisor
+            # starts a fresh server at once (and .env is read again) — no crash entry.
+            if os.environ.get("JARVIS_CHILD") != "1":
+                return self._json({"ok": False, "error": "Nicht unter dem Supervisor gestartet (start-jarvis.bat)."})
+            runtime.cancel_active()
+            threading.Timer(0.5, lambda: os._exit(RESTART_CODE)).start()   # let this answer leave first
+            return self._json({"ok": True})
+
         if p == "/api/duck":
             if self.remote:                    # the phone talks, the PC's Spotify stays as it is
                 return self._json({"ok": True})
             # Spotify quieter while Jarvis talks (pc.py); runs off the request thread, COM can be slow.
             on = (json.loads(raw or b"{}") or {}).get("on") is True
             threading.Thread(target=pc.duck, args=(on,), daemon=True).start()
+            return self._json({"ok": True})
+
+        if p == "/api/musichold":
+            # The wake word pauses Spotify on any device of the account (the phone on the living room
+            # speaker too), so a remote HUD may ask as well. Off the request thread: the Web API takes a moment.
+            body = json.loads(raw or b"{}") or {}
+            who = "iPad/Handy" if self.remote else "PC"
+            if body.get("on") is True:
+                threading.Thread(target=spotify.hold, args=(who,), daemon=True).start()
+            else:
+                threading.Thread(target=spotify.release, args=(who, str(body.get("why", ""))[:120]),
+                                 daemon=True).start()
             return self._json({"ok": True})
 
         if p == "/api/balance":
@@ -498,6 +663,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/new":
             runtime.cancel_active()
             SESSION["id"] = None
+            router.forget_topic()
             return self._json({"ok": True})
 
         if p == "/api/cancel":
@@ -594,7 +760,11 @@ class Handler(BaseHTTPRequestHandler):
         """Lean path: local router first, otherwise one small stateless Claude call."""
         t0 = time.time()
         commands.update_state(lambda d: d.__setitem__("last_turn_at", time.time()))
-        is_briefing = message.strip().lower().startswith(("/briefing", "tagesbriefing zum start"))
+        low = message.strip().lower()
+        # "Kannst du mir das Tagesbriefing nochmal geben?" too, not only the HUD's start line:
+        # as a normal turn it got no tools and Jarvis said he could not fetch anything.
+        is_briefing = low.startswith(("/briefing", "tagesbriefing zum start")) or bool(
+            re.search(r"\b(tages)?briefing\b", low) and not re.search(r"\b(aus|abschalt\w*|abbrech\w*|stopp?|nicht)\b", low))
         if is_briefing:
             facts = briefing.briefing_facts()
             today = time.strftime("%Y-%m-%d")
@@ -877,7 +1047,9 @@ RESTART_QUIET_S = int(os.environ.get("JARVIS_RESTART_QUIET_S", "90"))
 
 
 def _code_stamp():
-    files = list(ROOT.glob("*.py")) + [f for f in UI.iterdir() if f.suffix in (".js", ".html", ".css")]
+    # jarvis/<group>/ too: the router and the voice live there, not only next to server.py
+    files = (list(ROOT.glob("*.py")) + list((ROOT / "jarvis").glob("*/*.py"))
+             + [f for f in UI.iterdir() if f.suffix in (".js", ".html", ".css")])
     return {str(f): f.stat().st_mtime for f in files if f.is_file()}
 
 
@@ -941,9 +1113,9 @@ def main():
   remote       {f'127.0.0.1:{REMOTE_PORT} for tailscale serve · {len(devices.listing())} devices'
                 if REMOTE else 'off (JARVIS_REMOTE=1)'}
 """, flush=True)
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    srv = Server(("127.0.0.1", PORT), Handler)
     if REMOTE:
-        remote_srv = ThreadingHTTPServer(("127.0.0.1", REMOTE_PORT), RemoteHandler)
+        remote_srv = Server(("127.0.0.1", REMOTE_PORT), RemoteHandler)
         threading.Thread(target=remote_srv.serve_forever, daemon=True).start()
     _prewarm_soon()
     threading.Thread(target=icloud_calendar.agenda_block, daemon=True).start()
@@ -958,6 +1130,10 @@ def main():
     reflection.start()             # learning loop: Lernprotokoll, weekly rules proposal
     weekly_review.start()          # Garmin once a day, weekly review on Sunday
     homelab_watch.start()          # outages and unusual values in the homelab
+    import mail_events
+    mail_events.start()            # bookings in mail -> calendar (trusted senders) or a proposal
+    import shipments
+    shipments.start()              # deliveries in mail -> expected day in the calendar, reminder
     suggestions.start()            # a new ability twice a week
     memory_tools.start()           # daily vault backup (backups/), audit log trimming
     assistant.start()              # watched topics (web search, at most a few a day)
@@ -965,6 +1141,8 @@ def main():
     docsearch.start()              # local full-text index of the shared folders (hourly, incremental)
     router.EMERGENCY_HOOKS.update(deny=_deny_open_cards, cancel=runtime.cancel_active)
     wakeword.start()               # openWakeWord, if JARVIS_WAKE=oww
+    ambience.start()               # music / sport / TV playing in the house (Home Assistant)
+    overlay.start()                # desktop card while the HUD tab is hidden
     if os.environ.get("JARVIS_CHILD") == "1":    # only a supervised child can be restarted
         threading.Thread(target=_watch_code, daemon=True).start()
     if os.environ.get("JARVIS_OPEN", "1") != "0":

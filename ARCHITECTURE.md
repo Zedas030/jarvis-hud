@@ -37,17 +37,18 @@ via `Path(__file__).resolve().parents[2]`, never via their own folder.
 
 | Area | Modules |
 |---|---|
-| Core (`jarvis/core`) | `server.py` (root), `router.py`, `runtime.py`, `commands.py`, `events.py`, `scheduler.py`, `background.py` |
+| Core (`jarvis/core`) | `server.py` (root), `router.py`, `runtime.py`, `commands.py`, `events.py`, `scheduler.py`, `background.py`, `hostos.py` (what differs between Windows and Linux, PORTING.md) |
 | Tools | `jarvis_mcp.py` (MCP server; `call_tool` = dispatch, `handle_call` = policy wrapper) |
 | Safety | `policy.py`, `audit.py`, `emergency.py`, `privacy.py`, `proposals.py` |
 | Memory | `memory.py` (vault, graph, diary), `memory_tools.py` (provenance, forget, export, backup), `answer_cache.py`, `learning.py` |
-| Voice | `voice.py`, `tts_chain.py`, `local_tts_server.py`, `wakeword.py`, `pronounce.py` |
+| Voice | `voice.py`, `tts_chain.py`, `local_tts_server.py`, `wakeword.py`, `ambience.py` (music/sport/TV playing, from Home Assistant), `pronounce.py` |
 | Personality | `personality.py` |
 | Proactive | `watchers.py`, `scheduler.py`, `homelab_watch.py`, `briefing.py` |
 | Learning | `reflection.py`, `weekly_review.py`, `suggestions.py`, `background.py` |
+| Music | `spotify.py` (Web API on every device of the account: pause on the wake word, play on after; music tool) |
 | Windows | `pc.py` (volume, apps, ducking), `desktop.py` (windows, files, clipboard, OCR, scripts) |
 | Infrastructure | `infra.py`, `dashboard.py`, `jarvis_profile.py` |
-| Organisation | `assistant.py` (drafts, day prep, research, watched topics, plans), `lists.py`, `routines.py`, `commute.py`, `parcels.py`, `icloud_calendar.py` |
+| Organisation | `assistant.py` (drafts, day prep, research, watched topics, plans), `lists.py`, `routines.py`, `commute.py`, `parcels.py`, `printer.py` (3D printer from Home Assistant), `icloud_calendar.py` |
 | Stand-ins | `fallback_llm.py` |
 | Resources | `resources.py` (VRAM budget, unload/pause rules, Ollama model choice) |
 | Context | `context.py` (sources with timeout, TTL cache, age and trust; local day overview) |
@@ -76,3 +77,20 @@ reflection (5 min), weekly_review (10 min), homelab_watch (5 min), suggestions (
 vault backup (1 h, not pausable), watchlist (30 min), resources (30 s, not pausable), docsearch (1 h).
 Check tasks run in their own threads on demand. Plus `scheduler` (1 s), `watchers` (30 s),
 `briefing` network watchdog.
+
+## Layouts (ui/)
+
+`app.js` does all talking, listening and fetching. `tablet.js` rearranges its parts into the room display;
+`stark.js` (+ `stark.css`) restyles that room display as the Stark-HUD and draws the arc reactor. The layout is
+kept per device in `state.json` → `dashboard_layouts` (`pc` for the PC's browser, the device id for a paired
+iPad or phone), so the iPad station keeps its view whatever the PC picks; the old shared `dashboard_layout`
+is only the starting point for a device that has not picked one, the local-storage value a fallback. A pick
+the server refused (old token after a restart) stays in local storage as pending and is sent again after the reload. `layouts.js` supplies the catalogue for both
+dropdowns: tablet, stark, classic, aurora, ivory, midnight, cockpit, bento, horizon, editorial, neon, zen,
+orbit. `layouts.css` contains the ten additional responsive arrangements; all reuse tablet.js controls
+and data. Cockpit, Orbit and Nexus reuse the Stark instruments. `layouts-plus.js` adds Solstice
+(solar altitude and lunar illumination), Atelier, Mono, Nexus, Tide and Prisma, plus expanded mail and
+system cards. `celestial.js` computes approximate sun/moon values locally; dashboard weather supplies the
+configured weather coordinates and dated sunrise/sunset values. No browser geolocation is requested.
+Favorites (`jarvis.layoutFavorites`) are stored per device and appear first in both menus.
+`?view=<id>` previews any layout.

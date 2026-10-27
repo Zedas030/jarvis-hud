@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to config/home.json and enter the entity IDs from Home Assistant (Developer tools → States). Leave fields empty that have no matching device.",
+  "_comment": "Kopieren nach config/home.json und die Entity-IDs aus Home Assistant eintragen (Entwicklerwerkzeuge → Zustände). Felder ohne passendes Gerät leer lassen.",
   "storage_name": "Batteriespeicher",
   "solar_power": [
     "sensor.solar_power"
@@ -29,6 +29,7 @@
     "temp": "sensor.router_cpu_temperature"
   },
   "person": "person.user",
+  "station_night": "binary_sensor.ipad_focus",
   "battery_ignore": [
     "sensor.phone_battery_level"
   ],
@@ -53,6 +54,14 @@
       "Licht",
       "Lampe",
       "Stehlampe"
+    ]
+  },
+  "climate_groups": {
+    "Living Room": [
+      "climate.living_room"
+    ],
+    "Bedroom": [
+      "climate.bedroom"
     ]
   }
 }

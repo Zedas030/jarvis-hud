@@ -9,6 +9,7 @@ Proactive notices — Jarvis speaks up by himself. Plain rules, 0 tokens.
   storage      "Der Speicher ist voll, gute Zeit für die Waschmaschine" — once a day
   nas          a disk not healthy or the volume over 90 % — once a day
   network      a new device in the WLAN (from the network watchdog in briefing.py)
+  printer      "Der 3D-Druck ist fertig", failed, paused for a reason, an error (printer.py)
 
 Every notice is published on the event bus; the HUD speaks it, or only shows
 it during the quiet hours (JARVIS_QUIET_HOURS). Each one comes once per key
@@ -175,6 +176,12 @@ def nas():
         once("nas_full", f"Sir, das NAS ist zu {s['used_pct']} Prozent voll.", kind="systems")
 
 
+# ── 3D printer ───────────────────────────────────────────────
+def printer_watch(states):
+    import printer
+    printer.watch(states, lambda key, text: once(key, text, kind="printer"))
+
+
 def start():
     if not ENABLED:
         return
@@ -188,7 +195,8 @@ def start():
                 states = briefing._ha_states()
             except Exception:  # noqa: BLE001 — HA restarting
                 pass
-            for check in (lambda: appliances(states), calendar, lambda: storage(states), nas, parcel_today):
+            for check in (lambda: appliances(states), calendar, lambda: storage(states), nas, parcel_today,
+                          lambda: printer_watch(states)):
                 try:
                     check()
                 except Exception as e:  # noqa: BLE001 — one dead source must not silence the rest

@@ -19,6 +19,7 @@ import threading
 import time
 
 import commands
+import hostos
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 MODEL = os.environ.get("JARVIS_BACKGROUND_MODEL", "haiku").strip()
@@ -54,7 +55,7 @@ def _claude(system, prompt, tools=""):
         cmd += ["--allowedTools", tools]
     p = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",
                        env=runtime._env_for_child(), cwd=runtime.WORKDIR, timeout=TIMEOUT,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       **hostos.QUIET)
     try:
         out = json.loads(p.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError):

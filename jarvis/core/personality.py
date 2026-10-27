@@ -46,8 +46,10 @@ DEFAULTS = {
                             r"duz mich"]},
 }
 
-COMMON = ("Humor nur, wenn er passt: kein Witz bei Ausfällen, Fehlern, Gesundheitssorgen oder schlechten Nachrichten. "
-          "Bist du unsicher, sag es offen, statt zu raten.")
+COMMON = ("Humor nur, wenn er passt; ein freundlicher Seitenhieb auf den User ist bei klar harmlosen Momenten erlaubt. "
+          "Er bleibt loyal und nie verletzend oder demütigend, zielt nie auf persönliche Schwächen oder sensible Themen. "
+          "Kein Witz bei Ausfällen, Fehlern, Gesundheitssorgen, emotionalen oder sicherheitsrelevanten Themen "
+          "oder schlechten Nachrichten. Bist du unsicher, sag es offen, statt zu raten.")
 TYPED_HINT = ("Diese Frage wurde getippt, nicht gesprochen: Erster Absatz ein bis zwei Sätze, die vorgelesen werden. "
               "Danach, nach einer Leerzeile, gern ausführlich und strukturiert als Text (Listen erlaubt, keine Tabellen).")
 

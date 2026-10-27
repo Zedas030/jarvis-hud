@@ -31,7 +31,7 @@ class Compare(unittest.TestCase):
                  ("Mag Kaffee schwarz", ["Mag Kaffee"], "related")]
         for new, old, kind in cases:
             self.assertEqual(mi.compare(new, old)[0], kind, new)
-        for new, old in (("Mag Golf", ["Mag Jazz"]), ("NAS hat IP 192.0.2.20", ["Pi hat IP 192.0.2.10"])):
+        for new, old in (("Mag Golf", ["Mag Jazz"]), ("NAS hat IP <nas-ip>", ["Pi hat IP <pi-ip>"])):
             self.assertIsNone(mi.compare(new, old), new)
 
 

@@ -20,6 +20,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the repository
 sys.path.insert(0, HERE)
 import paths  # noqa: E402,F401 — puts the jarvis/<group> folders on sys.path (this runs as its own process)
+import hostos  # noqa: E402
 _env = os.path.join(HERE, ".env")
 if os.path.exists(_env):   # calendar credentials etc. — read directly, never via argv
     for _line in open(_env, encoding="utf-8"):
@@ -112,10 +113,14 @@ TOOLS += [
     },
     {
         "name": "home_control",
-        "description": ("Control a Home Assistant device. `service` e.g. turn_on, turn_off, toggle, "
-                        "media_play_pause, media_next_track, volume_set; `entity_id` from home_states; "
-                        "optional `data` like {\"brightness_pct\": 40} or {\"volume_level\": 0.3}. "
-                        "Only lights, switches, fans, media players and scenes — nothing else."),
+        "description": ("Control a Home Assistant device. `entity_id` must come from home_states. "
+                        "Lights, switches, fans, media players and scenes support their usual services. "
+                        "A direct user request to turn a socket (`switch.*`) on or off is already authorization: "
+                        "execute switch.turn_on/off immediately; do not ask or call approve. If the target is unclear, "
+                        "ask which socket. Only room-level climate entities listed in config/home.json → climate_groups can be controlled; "
+                        "do not target their individual radiator entities. "
+                        "climate.set_temperature with {\"temperature\": 20}, or climate.set_hvac_mode "
+                        "with a supported heat/off/auto mode. No other climate entity or service is allowed."),
         "inputSchema": {
             "type": "object",
             "properties": {"entity_id": {"type": "string"}, "service": {"type": "string"},
@@ -128,8 +133,8 @@ TOOLS += [
 TOOLS += [
     {
         "name": "mail_inbox",
-        "description": ("Read the user's mail inbox via IMAP (read-only): newest mails with sender, subject, date "
-                        "and a short preview. `unread_only` (default true), `limit` (default 5, max 15), "
+        "description": ("Read the user's mail inbox via IMAP (read-only): newest mails of the last 24 hours with "
+                        "sender, subject, date and a short preview. `unread_only` (default true), `limit` (default 5, max 15), "
                         "optional `search` in subject/sender. Never sends, deletes or marks anything."),
         "inputSchema": {
             "type": "object",
@@ -168,8 +173,9 @@ TOOLS += [
 TOOLS += [
     {
         "name": "music",
-        "description": ("Control music on the user's PC (Spotify desktop app) via the system media keys. "
-                        "`action`: play_pause, next, previous, volume_up, volume_down, mute, or search "
+        "description": ("Control the user's Spotify: play/pause/next/previous reach whatever device plays "
+                        "(phone on the speaker, PC) when the Spotify login is set up, else the PC's media keys. "
+                        "`action`: play, pause, play_pause, next, previous, volume_up, volume_down, mute, or search "
                         "(opens Spotify with `query` searched — he picks/plays from there). "
                         "Starts Spotify first if it is not running. Harmless, no confirmation needed."),
         "inputSchema": {
@@ -431,9 +437,11 @@ TOOLS += [
         "name": "mail_draft",
         "description": ("Create an email DRAFT in the user's mailbox (Drafts folder) — never sends. `to`, `subject`, "
                         "`body` (German unless asked otherwise). Shows a confirmation card; explain first, "
-                        "`begruendung` = that explanation."),
+                        "`begruendung` = that explanation. `account`: which mailbox when there are several "
+                        "(name or address; default the first)."),
         "inputSchema": {"type": "object", "properties": {"to": {"type": "string"}, "subject": {"type": "string"},
-                                                         "body": {"type": "string"}, "begruendung": {"type": "string"}},
+                                                         "body": {"type": "string"}, "account": {"type": "string"},
+                                                         "begruendung": {"type": "string"}},
                         "required": ["to", "subject", "body", "begruendung"]},
     },
     {
@@ -486,6 +494,88 @@ TOOLS += [
         "description": "Tick off a step of a plan: `title` of the plan, `step` = words from the step.",
         "inputSchema": {"type": "object", "properties": {"title": {"type": "string"}, "step": {"type": "string"}},
                         "required": ["title", "step"]},
+    },
+]
+
+TOOLS += [
+    {
+        "name": "mail_events_scan",
+        "description": ("Find bookings in the mails of the last 24 hours: calendar attachments of "
+                        "confirmations (PC CADDIE tee times, golftimer, Golf House ...). Only future ones; "
+                        "cancelled ones and those already in the calendar (same day, similar title) left out, "
+                        "an overlap with another entry named. Lists an id per event."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "shipments_status",
+        "description": ("Orders on their way, from the shipping mails of every account: shop, carrier, expected "
+                        "day (from the mail or DHL), status (unterwegs, heute, abholbereit, zugestellt)."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "mail_events_undo",
+        "description": ("Take what Jarvis entered automatically from mail (bookings of trusted senders, "
+                        "expected deliveries) out of the calendar again — the user said 'rückgängig'. "
+                        "`hours`: how far back, default 24."),
+        "inputSchema": {"type": "object", "properties": {"hours": {"type": "number"}}},
+    },
+    {
+        "name": "mail_events_add",
+        "description": ("Enter events from mail_events_scan in the calendar: `ids` = list of ids, or \"alle\". "
+                        "One confirmation card lists them all; explain in German first, `begruendung`."),
+        "inputSchema": {"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "string"}},
+                                                         "begruendung": {"type": "string"}},
+                        "required": ["ids", "begruendung"]},
+    },
+]
+
+TOOLS += [
+    {
+        "name": "homelab_status",
+        "description": ("Live figures from Prometheus (what Grafana shows): `topic` internet (throughput now, "
+                        "today's volume and peak, line rate, FRITZ!Box uptime), wlan (devices per band), pi "
+                        "(temperature, CPU, RAM, disk), pc (CPU, RAM, free disk), or alles."),
+        "inputSchema": {"type": "object", "properties": {"topic": {"type": "string",
+                                                                   "enum": ["internet", "wlan", "pi", "pc", "alles"]}}},
+    },
+    {
+        "name": "metrics_query",
+        "description": ("Free PromQL against Prometheus, read only, for questions over time ('wann war die Last "
+                        "heute am höchsten'). `expr` PromQL; `hours` > 0 = the last hours as ~8 points per series. "
+                        "Metrics: node_* (Pi), windows_* (this PC), fritz_* (FRITZ!Box: fritz_wan_datarate_bytes "
+                        "{direction=rx|tx} in bytes/s — not the wrapping byte counter), homeassistant_*."),
+        "inputSchema": {"type": "object", "properties": {"expr": {"type": "string"}, "hours": {"type": "number"}},
+                        "required": ["expr"]},
+    },
+    {
+        "name": "pihole_status",
+        "description": "Pi-hole: queries and share blocked (24 h), filter on/off, top blocked domains, busiest devices.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+]
+
+TOOLS += [
+    {
+        "name": "updates_check",
+        "description": ("Check every device Jarvis reaches for updates: Home Assistant update entities (FRITZ!Box, "
+                        "add-ons, firmware), the Synology NAS (DSM, packages), the Raspberry Pi (apt, Pi-hole, "
+                        "Docker images incl. Home Assistant itself), FRITZ! repeaters, and smart-home devices whose "
+                        "firmware is older than the same model elsewhere in the house. Lists one id per update; "
+                        "rows marked 'nur Anzeige' cannot be installed by Jarvis."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "update_install",
+        "description": ("Install ONE update by `target` = an id from updates_check (e.g. ha:update.fritz_box, "
+                        "nas:pkg:CMS, pi:apt, pi:pihole). Shows a confirmation card; explain in German first what "
+                        "restarts, `begruendung` = that explanation. One call per device."),
+        "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}, "begruendung": {"type": "string"}},
+                        "required": ["target", "begruendung"]},
+    },
+    {
+        "name": "update_status",
+        "description": "How a running update on the Raspberry Pi is going (last log lines, reboot wanted).",
+        "inputSchema": {"type": "object", "properties": {}},
     },
 ]
 
@@ -603,7 +693,7 @@ TOOLS += [
 GROUPS = {
     "memory": {"memory_search", "memory_read", "memory_save"},
     "web": {"web_fetch", "open_website"},
-    "calendar": {"calendar_events", "calendar_add"},
+    "calendar": {"calendar_events", "calendar_add", "mail_events_scan", "mail_events_add", "mail_events_undo"},
     "home": {"home_states", "home_control", "home_check"},
     "weather": {"weather"},
     "music": {"music"},
@@ -618,7 +708,8 @@ GROUPS = {
                      "memory_review"},
     "audit": {"audit_today"},
     "phone": {"phone_notify"},
-    "mail": {"mail_inbox", "mail_mark_read", "mail_draft"},
+    "mail": {"mail_inbox", "mail_mark_read", "mail_draft", "mail_events_scan", "mail_events_add",
+             "shipments_status", "mail_events_undo"},
     "dayprep": {"day_prep", "calendar_events", "context_snapshot"},
     "tasks": {"task_run", "task_status", "task_cancel"},
     "research": {"web_fetch", "research_save", "watch_add", "watch_list", "watch_remove"},
@@ -628,6 +719,8 @@ GROUPS = {
     "clipboard": {"clipboard_read"},
     "screen": {"screen_read", "screen_describe"},
     "scripts": {"script_list", "script_run"},
+    "updates": {"updates_check", "update_install", "update_status"},
+    "homelab": {"homelab_status", "metrics_query", "pihole_status"},
 }
 ACTIVE_GROUPS = [g.strip() for g in os.environ.get("JARVIS_TOOL_GROUPS", "").split(",") if g.strip()]
 # Hard cap per tool result — results are sent again with every later API call of the turn.
@@ -718,7 +811,7 @@ def _memory(name, args):
         return "Nicht gespeichert: Arbeitsthemen merke ich mir nicht."
     import memory_tools as mt
     import memory_intel as mi
-    path = memory.MEMORY_DIR / (note + ".md")
+    path = memory.note_path(note)
     path.parent.mkdir(parents=True, exist_ok=True)
     text = mi.link_entities(text, note)
     stamp = mt.tag(args.get("quelle"), until=args.get("bis"))
@@ -766,7 +859,7 @@ MEDIA_KEYS = {"play_pause": 0xB3, "next": 0xB0, "previous": 0xB1,
 
 def _spotify_running():
     out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq Spotify.exe", "/NH"], capture_output=True,
-                         text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                         text=True, **hostos.QUIET)
     return "Spotify.exe" in out.stdout
 
 
@@ -779,12 +872,18 @@ def _music(args):
         q = (args.get("query") or "").strip()
         if not q:
             return "Wonach soll ich suchen?"
-        os.startfile("spotify:search:" + urllib.parse.quote(q))
+        hostos.open_target("spotify:search:" + urllib.parse.quote(q))
         return f"Spotify zeigt die Suche nach „{q}“."
+    import spotify
+    if action in ("play", "pause", "play_pause", "next", "previous"):
+        if spotify.control(action):
+            return f"Erledigt: {action}."
+        spotify.forget()                  # the keys below decide; the wake word hold must not undo them
+        action = "play_pause" if action in ("play", "pause") else action
     if action not in MEDIA_KEYS:
-        return f"Unbekannte Aktion. Möglich: {', '.join(MEDIA_KEYS)}, search."
+        return f"Unbekannte Aktion. Möglich: play, pause, {', '.join(MEDIA_KEYS)}, search."
     if action == "play_pause" and not _spotify_running():
-        os.startfile("spotify:")
+        hostos.open_target("spotify:")
         time.sleep(4)   # let the app come up before it gets the key
     times = 5 if action.startswith("volume") else 1   # one key press is only ~2 %
     for _ in range(times):
@@ -802,10 +901,10 @@ def _mail(args):
     import email
     import email.header
     import email.utils
-    import imaplib
-    if not (MAIL_USER and MAIL_PASSWORD):
-        return ("Postfach noch nicht verbunden: In .env fehlen MAIL_USER und MAIL_PASSWORD, und beim Mail-Anbieter "
-                "muss unter Einstellungen → POP3/IMAP der IMAP-Zugriff aktiviert sein. Das trägt der User selbst ein.")
+    import mailboxes
+    if not mailboxes.configured():
+        return ("Postfach noch nicht verbunden: In .env fehlen MAIL_USER und MAIL_PASSWORD (weitere Konten als "
+                "MAIL2_…), und beim Mail-Anbieter muss der IMAP-Zugriff aktiviert sein. Das trägt der User selbst ein.")
 
     def dec(v):
         return str(email.header.make_header(email.header.decode_header(v or ""))).strip()
@@ -819,38 +918,42 @@ def _mail(args):
         return ""
 
     limit = max(1, min(int(args.get("limit") or 5), 15))
-    try:
-        box = imaplib.IMAP4_SSL(MAIL_HOST, 993, timeout=20)
-        box.login(MAIL_USER, MAIL_PASSWORD)
-        box.select("INBOX", readonly=True)   # readonly: nothing gets marked as read
-        crit = ["UNSEEN"] if args.get("unread_only", True) else ["ALL"]
-        _, data = box.search(None, *crit)
-        ids = data[0].split()[-limit:][::-1]
-        q = (args.get("search") or "").lower()
+    unread_only = args.get("unread_only", True)
+    q = (args.get("search") or "").lower()
+    many = len(mailboxes.accounts()) > 1
+
+    def read(acc, box):
+        # box is read-only: nothing gets marked; never further back than mailboxes.LOOKBACK_H
+        ids = mailboxes.recent(box, criteria=("UNSEEN",) if unread_only else ())
         rows = []
-        for i in ids:
+        for i in ids[-limit:][::-1]:
             _, parts = box.fetch(i, "(BODY.PEEK[])")
             msg = email.message_from_bytes(parts[0][1])
             frm, subj = dec(msg.get("From")), dec(msg.get("Subject"))
             if q and q not in frm.lower() and q not in subj.lower():
                 continue
-            when = email.utils.parsedate_to_datetime(msg.get("Date")).strftime("%d.%m. %H:%M") \
-                if msg.get("Date") else "?"
-            rows.append(f"{when} · {frm}\n  {subj}\n  {preview(msg)}")
-        box.logout()
-        head = f"{len(data[0].split())} {'ungelesene' if crit == ['UNSEEN'] else ''} Mails im Posteingang.\n"
-        return (head + "\n".join(rows))[:6000] if rows else head + "Keine passenden Mails."
-    except imaplib.IMAP4.error as e:
-        return f"IMAP-Anmeldung fehlgeschlagen ({e}). IMAP aktiviert und Passwort richtig?"
-    except Exception as e:  # noqa: BLE001
-        return f"Postfach nicht erreichbar: {e}"
+            sent = email.utils.parsedate_to_datetime(msg.get("Date")) if msg.get("Date") else None
+            tag = f"[{acc['name']}] " if many else ""
+            rows.append((sent.timestamp() if sent else 0,
+                         f"{tag}{sent.strftime('%d.%m. %H:%M') if sent else '?'} · {frm}\n  {subj}\n  {preview(msg)}"))
+        return acc["name"], len(ids), rows
+
+    results, errors = mailboxes.each(read, timeout=20)
+    if not results:
+        return "Postfach nicht erreichbar: " + "; ".join(errors)
+    kind = "ungelesene " if unread_only else ""
+    head = ", ".join(f"{n}: {c}" for n, c, _ in results) if many else str(results[0][1])
+    head = (f"{head} {kind}Mails der letzten {mailboxes.LOOKBACK_H} Stunden im Posteingang."
+            + (f" Nicht erreichbar: {'; '.join(errors)}." if errors else "") + "\n")
+    rows = sorted((r for _, _, rs in results for r in rs), key=lambda r: -r[0])[:limit]
+    return (head + "\n".join(text for _, text in rows))[:6000] if rows else head + "Keine passenden Mails."
 
 
 def _mail_mark(args):
     import email
     import email.header
-    import imaplib
-    if not (MAIL_USER and MAIL_PASSWORD):
+    import mailboxes
+    if not mailboxes.configured():
         return _mail({})
     q = (args.get("search") or "").strip().lower()
     if not q and not args.get("all"):
@@ -860,10 +963,7 @@ def _mail_mark(args):
     def dec(v):
         return str(email.header.make_header(email.header.decode_header(v or ""))).strip()
 
-    try:
-        box = imaplib.IMAP4_SSL(MAIL_HOST, 993, timeout=20)
-        box.login(MAIL_USER, MAIL_PASSWORD)
-        box.select("INBOX")
+    def mark(acc, box):
         uids = box.uid("search", None, "SEEN" if unread else "UNSEEN")[1][0].split()
         if unread:
             uids = uids[-200:]          # only look at the newest read mails
@@ -878,16 +978,15 @@ def _mail_mark(args):
             hit = hit[-5:]              # "wieder ungelesen" means the latest few, not the whole archive
         if hit:
             box.uid("STORE", b",".join(u for u, _ in hit).decode(), "-FLAGS" if unread else "+FLAGS", "(\\Seen)")
-        box.logout()
-        if not hit:
-            return "Keine passenden " + ("gelesenen" if unread else "ungelesenen") + " Mails gefunden."
-        what = "als ungelesen" if unread else "als gelesen"
-        return f"{len(hit)} Mails {what} markiert: " + "; ".join(s for _, s in hit[:10])[:1500]
-    except imaplib.IMAP4.error as e:
-        return f"IMAP-Fehler ({e})."
-    except Exception as e:  # noqa: BLE001
-        return f"Postfach nicht erreichbar: {e}"
+        return hit
 
+    results, errors = mailboxes.each(mark, readonly=False, timeout=20)
+    hit = [h for r in results for h in r]
+    note = f" Nicht erreichbar: {'; '.join(errors)}." if errors else ""
+    if not hit:
+        return "Keine passenden " + ("gelesenen" if unread else "ungelesenen") + " Mails gefunden." + note
+    what = "als ungelesen" if unread else "als gelesen"
+    return (f"{len(hit)} Mails {what} markiert: " + "; ".join(s for _, s in hit[:10]))[:1500] + note
 
 def _weather(args):
     import datetime as dt
@@ -937,8 +1036,8 @@ def _weather(args):
 
 HA_URL = os.environ.get("HA_URL", "http://homeassistant.local:8123").strip().rstrip("/")
 HA_TOKEN = os.environ.get("HA_TOKEN", "").strip()
-# Harmless to switch by voice. Locks, alarms, scripts, climate etc. stay out.
-HA_DOMAINS = {"light", "switch", "fan", "media_player", "scene"}
+# Climate control is limited below to room entities configured by the user.
+HA_DOMAINS = {"light", "switch", "fan", "media_player", "scene", "climate"}
 HA_SHOWN = HA_DOMAINS | {"sensor", "binary_sensor", "climate", "cover", "weather", "person"}
 
 
@@ -954,9 +1053,37 @@ def _ha(path, body=None):
 VERIFY_S = float(os.environ.get("JARVIS_VERIFY_SECONDS", "2.5"))
 
 
-def _verify(eid, domain, service, wait=None):
+def _verify(eid, domain, service, data=None, wait=None):
     """Reads the state back after switching: only a confirmed state counts as done."""
     want = {"turn_on": "on", "turn_off": "off"}.get(service)
+    if domain == "climate":
+        import time as _t
+        data = data or {}
+        if service == "set_temperature":
+            key, target = "temperature", data.get("temperature")
+        elif service == "set_hvac_mode":
+            key, target = "state", data.get("hvac_mode")
+        else:
+            return f"Abgelehnt: {service} ist für dieses Thermostat nicht freigegeben."
+        end = _t.time() + (VERIFY_S if wait is None else wait)
+        state = {}
+        while True:
+            try:
+                state = _ha(f"/api/states/{eid}") or {}
+                actual = state.get("state") if key == "state" else (state.get("attributes") or {}).get(key)
+                if key == "temperature" and actual is not None and abs(float(actual) - float(target)) <= 0.1:
+                    name = (state.get("attributes") or {}).get("friendly_name", eid)
+                    return f"Erledigt: {name} steht auf {target:g} °C."
+                if key == "state" and actual == target:
+                    name = (state.get("attributes") or {}).get("friendly_name", eid)
+                    return f"Erledigt: {name} ist auf {target}."
+            except Exception:  # noqa: BLE001
+                pass
+            if _t.time() >= end:
+                break
+            _t.sleep(0.3)
+        return (f"Gesendet, aber Home Assistant bestätigt {key}={target} für {eid} noch nicht. "
+                "Nicht als erledigt melden.")
     if domain not in ("light", "switch", "fan") or not want:
         return f"Erledigt: {domain}.{service} für {eid}."
     import time as _t
@@ -987,16 +1114,63 @@ def _home(name, args):
                 eid = s["entity_id"]
                 if eid.split(".")[0] not in HA_SHOWN or s["state"] in ("unavailable", "unknown"):
                     continue
-                label = s.get("attributes", {}).get("friendly_name", eid)
+                attrs = s.get("attributes", {})
+                label = attrs.get("friendly_name", eid)
                 if q and q not in eid.lower() and q not in label.lower():
                     continue
                 if not q and eid.split(".")[0] not in HA_DOMAINS:
                     continue   # unfiltered: switchable devices only — sensors via `search`
-                unit = s.get("attributes", {}).get("unit_of_measurement", "")
-                rows.append(f"{label} ({eid}): {s['state']} {unit}".rstrip())
+                unit = attrs.get("unit_of_measurement", "")
+                detail = f"{s['state']} {unit}".rstrip()
+                if eid.startswith("climate."):
+                    if attrs.get("current_temperature") is not None:
+                        detail += f", Raum {attrs['current_temperature']} °C"
+                    if attrs.get("temperature") is not None:
+                        detail += f", Soll {attrs['temperature']} °C"
+                rows.append(f"{label} ({eid}): {detail}".rstrip())
             return "\n".join(sorted(rows))[:6000] or "Nichts gefunden."
         eid = (args.get("entity_id") or "").strip()
         domain, service = eid.split(".")[0], (args.get("service") or "").strip()
+        if domain == "climate":
+            import jarvis_profile
+            home = jarvis_profile._load_home()
+            groups = home.get("climate_groups") or {}
+            allowed = {str(entity).strip() for entities in groups.values() if isinstance(entities, list)
+                       for entity in entities if str(entity).startswith("climate.")}
+            if not groups:
+                allowed = {str(row[0]).strip() for row in home.get("rooms", [])
+                           if isinstance(row, (list, tuple)) and len(row) >= 2
+                           and str(row[0]).startswith("climate.")}
+            if eid not in allowed:
+                return "Abgelehnt: Dieses Thermostat ist nicht in config/home.json unter climate_groups freigegeben."
+            state = _ha(f"/api/states/{eid}") or {}
+            attrs = state.get("attributes") or {}
+            data = dict(args.get("data") or {})
+            if service in {"turn_off", "turn_on"}:
+                if data:
+                    return "Abgelehnt: turn_on/turn_off für Thermostate darf keine Zusatzwerte enthalten."
+                service, data = "set_hvac_mode", {"hvac_mode": "off" if service == "turn_off" else "heat"}
+            if service == "set_temperature":
+                if set(data) != {"temperature"}:
+                    return "Abgelehnt: Für ein Thermostat ist nur eine einzelne Solltemperatur erlaubt."
+                try:
+                    target = float(data["temperature"])
+                    lo = max(5.0, float(attrs.get("min_temp", 5)))
+                    hi = min(30.0, float(attrs.get("max_temp", 30)))
+                except (TypeError, ValueError):
+                    return "Abgelehnt: Bitte eine gültige Solltemperatur in °C angeben."
+                if not lo <= target <= hi:
+                    return f"Abgelehnt: Die Solltemperatur muss zwischen {lo:g} und {hi:g} °C liegen."
+            elif service == "set_hvac_mode":
+                if set(data) != {"hvac_mode"} or data.get("hvac_mode") not in {"heat", "off", "auto"}:
+                    return "Abgelehnt: Erlaubt sind nur die Heizmodi heat, off oder auto."
+                modes = attrs.get("hvac_modes") or []
+                if modes and data["hvac_mode"] not in modes:
+                    return f"Abgelehnt: Home Assistant meldet diese Modi nicht als verfügbar ({', '.join(map(str, modes))})."
+            else:
+                return "Abgelehnt: Für Thermostate sind nur Solltemperatur und Heizmodus freigegeben."
+            _ha(f"/api/services/climate/{service}", dict(data, entity_id=eid))
+            return _verify(eid, domain, service, data)
         if domain not in HA_DOMAINS:
             return f"Abgelehnt: {domain} darf ich nicht schalten, nur {', '.join(sorted(HA_DOMAINS))}."
         if not service.replace("_", "").isalnum():
@@ -1143,14 +1317,14 @@ def _network_devices():
           "ForEach-Object { $n = try { [System.Net.Dns]::GetHostEntry($_.IPAddress).HostName } catch { '' }; "
           "'{0,-16} {1,-18} {2}' -f $_.IPAddress, $_.LinkLayerAddress, $n }")
     out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
-                         timeout=60, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                         timeout=60, **hostos.QUIET)
     return (out.stdout.strip() or out.stderr.strip() or "Keine Geräte gefunden.")[:4000]
 
 
 def _pi_status():
     out = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6", f"{PI_USER}@{PI_HOST}",
                           PI_STATUS_CMD], capture_output=True, text=True, timeout=40,
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                         **hostos.QUIET)
     if out.returncode != 0 and not out.stdout.strip():
         return f"Pi nicht erreichbar ({PI_USER}@{PI_HOST}): {out.stderr.strip()[:300]}"
     return out.stdout.strip()[:4000]
@@ -1168,6 +1342,11 @@ def _calendar(name, args):
             day = dt.datetime.strptime(start[:10], "%Y-%m-%d").date() if start else None
             names = ", ".join(n for n, _ in cal.calendars())
             return f"Kalender: {names}\n" + cal.describe(cal.events(day, args.get("days") or 1))
+        if _calendar_past(args):
+            return f"Nicht eingetragen — der Termin ({args.get('start')}) liegt in der Vergangenheit."
+        same = _calendar_clash(args).get("same")
+        if same:
+            return f"Nicht eingetragen — {cal.clash_text({'same': same})}."
         return cal.add_event(args.get("title", ""), args.get("start", ""), args.get("end"),
                              args.get("location", ""), args.get("notes", ""), args.get("calendar", ""))
     except Exception as e:  # noqa: BLE001
@@ -1186,6 +1365,51 @@ def _internal(op, args):
             return json.loads(r.read()).get("text") or "?"
     except (urllib.error.URLError, OSError, ValueError) as e:
         return f"Jarvis-Server nicht erreichbar ({e})."
+
+
+def _calendar_past(args):
+    """True when the new event starts before now (an all-day one: before today). An odd date is
+    left to the calendar to refuse."""
+    import datetime as dt
+    s = str(args.get("start") or "").strip().replace("T", " ")
+    try:
+        if len(s) <= 10:
+            return dt.date.fromisoformat(s) < dt.date.today()
+        return dt.datetime.strptime(s[:16], "%Y-%m-%d %H:%M") < dt.datetime.now()
+    except ValueError:
+        return False
+
+
+def _calendar_clash(args):
+    """What the calendar already holds around a new event ({} when it cannot be read)."""
+    import icloud_calendar as cal
+    if not cal.configured():
+        return {}
+    try:
+        return cal.check(args.get("title", ""), args.get("start", ""), args.get("end"))
+    except Exception:  # noqa: BLE001 — unreadable calendar or odd date: the card still comes
+        return {}
+
+
+def _approve(tool_name, tool_input):
+    """The card for a tool. A new calendar event is checked against the calendar first: one that
+    is already there is refused before any card, an overlap is named on the card."""
+    if tool_name.endswith("calendar_add"):
+        import icloud_calendar as cal
+        if _calendar_past(tool_input):   # a booking mail from last week is no reason to fill the past
+            return {"behavior": "deny", "message": f"Nicht vorgeschlagen — der Termin ({tool_input.get('start')}) liegt "
+                                                   "in der Vergangenheit. Dem User nur sagen, dass er schon vorbei ist."}
+        clash = _calendar_clash(tool_input)
+        if clash.get("same"):
+            return {"behavior": "deny", "message": f"Nicht vorgeschlagen — {cal.clash_text(dict(clash, overlap=[]))}. "
+                                                   "Dem User sagen, dass der Termin schon eingetragen ist."}
+        hint = cal.clash_text(clash) if clash else ""
+        if hint:
+            verdict = _ask(tool_name, dict(tool_input, _hinweis=hint))
+            if verdict.get("behavior") == "allow":
+                verdict["updatedInput"] = tool_input
+            return verdict
+    return _ask(tool_name, tool_input)
 
 
 def _ask(tool_name, tool_input):
@@ -1210,9 +1434,9 @@ def _open(url):
         return "Abgelehnt: nur http(s)-Adressen."
     if BROWSER and os.path.exists(BROWSER):
         subprocess.Popen([BROWSER, url], close_fds=True,
-                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+                         **hostos.DETACHED)
     else:
-        os.startfile(url)            # system default browser
+        hostos.open_target(url)      # system default browser
     return f"Geöffnet: {url}"
 
 
@@ -1230,7 +1454,7 @@ def call_tool(name, args):
     """Runs one tool and returns its text, or None for an unknown tool. No policy here — see handle_call."""
     text = None
     if name == "approve":
-        text = json.dumps(_ask(args.get("tool_name", "?"), args.get("input") or {}))
+        text = json.dumps(_approve(args.get("tool_name", "?"), args.get("input") or {}))
     elif name == "open_website":
         text = _open(args.get("url"))
     elif name in ("calendar_events", "calendar_add"):
@@ -1311,7 +1535,8 @@ def call_tool(name, args):
                   "plan_create", "plan_list", "plan_check"):
         try:
             import assistant as a
-            text = {"mail_draft": lambda: a.mail_draft(args.get("to"), args.get("subject"), args.get("body")),
+            text = {"mail_draft": lambda: a.mail_draft(args.get("to"), args.get("subject"), args.get("body"),
+                                                       args.get("account") or ""),
                     "day_prep": lambda: a.day_prep(args.get("day") or None),
                     "research_save": lambda: a.research_save(args.get("title"), args.get("summary"), args.get("sources")),
                     "watch_add": lambda: a.watch_add(args.get("topic"), args.get("every_days") or 7),
@@ -1329,6 +1554,38 @@ def call_tool(name, args):
                     else getattr(infra, name)())
         except Exception as e:  # noqa: BLE001
             text = f"Fehler: {e}"
+    elif name == "shipments_status":
+        try:
+            import shipments
+            text = shipments.status_text()
+        except Exception as e:  # noqa: BLE001
+            text = f"Fehler: {e}"
+    elif name in ("mail_events_scan", "mail_events_add", "mail_events_undo"):
+        try:
+            import mail_events
+            if name == "mail_events_scan":
+                text = mail_events.scan_text()
+            elif name == "mail_events_add":
+                text = mail_events.add(args.get("ids"))
+            else:
+                text = mail_events.undo(args.get("hours") or 24)
+        except Exception as e:  # noqa: BLE001
+            text = f"Fehler: {e}"
+    elif name in ("homelab_status", "metrics_query", "pihole_status"):
+        try:
+            import homelab
+            text = {"homelab_status": lambda: homelab.describe(args.get("topic") or "alles"),
+                    "metrics_query": lambda: homelab.query(args.get("expr"), args.get("hours") or 0),
+                    "pihole_status": homelab.pihole}[name]()
+        except Exception as e:  # noqa: BLE001
+            text = f"Homelab-Fehler: {e}"
+    elif name in ("updates_check", "update_install", "update_status"):
+        try:
+            import updates
+            text = {"updates_check": updates.check, "update_status": updates.install_status,
+                    "update_install": lambda: updates.install(args.get("target"))}[name]()
+        except Exception as e:  # noqa: BLE001
+            text = f"Update-Fehler: {e}"
     elif name == "screen_describe":
         try:
             import vision

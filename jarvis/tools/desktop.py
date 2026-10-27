@@ -29,6 +29,8 @@ import tempfile
 import time
 import zipfile
 
+import hostos
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 _HOME = pathlib.Path.home()
 FILE_ROOTS = [pathlib.Path(os.path.expandvars(os.path.expanduser(p.strip())))
@@ -332,7 +334,7 @@ def screen_text(whole=False):
                  "-Height", str(max(1, rect.bottom - rect.top))]
     try:
         p = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=40,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                           **hostos.QUIET)
     except subprocess.TimeoutExpired:
         return "Die Texterkennung hat zu lange gebraucht."
     text = (p.stdout or "").strip()
@@ -378,7 +380,7 @@ def script_run(name):
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=int(s.get("timeout") or 120), cwd=str(path.parent),
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                           **hostos.QUIET)
     except subprocess.TimeoutExpired:
         return f"Abgebrochen: {name} lief länger als {s.get('timeout') or 120} s."
     out = ((p.stdout or "") + ("\n" + p.stderr if p.stderr else "")).strip()

@@ -70,22 +70,23 @@ def build_draft(to, subject, body, sender):
     return msg
 
 
-def mail_draft(to, subject, body):
-    import jarvis_mcp as j
-    if not (j.MAIL_HOST and j.MAIL_USER and j.MAIL_PASSWORD):
+def mail_draft(to, subject, body, account=""):
+    import mailboxes
+    acc = mailboxes.find(account)
+    if not acc:
         return "Postfach nicht verbunden (MAIL_IMAP_HOST, MAIL_USER, MAIL_PASSWORD)."
     to, subject, body = (to or "").strip(), " ".join((subject or "").split()), (body or "").strip()
     if not (to and subject and body):
         return "Für einen Entwurf brauche ich Empfänger, Betreff und Text."
     if not re.fullmatch(r"[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+(\s*,\s*[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+)*", to):
         return f"„{to}“ ist keine gültige Mail-Adresse."
-    box = imaplib.IMAP4_SSL(j.MAIL_HOST, 993, timeout=20)
+    box = imaplib.IMAP4_SSL(acc["host"], acc["port"], timeout=20)
     try:
-        box.login(j.MAIL_USER, j.MAIL_PASSWORD)
+        box.login(acc["user"], acc["password"])
         folder = _drafts_folder(box)
         if not folder:
             return "Ich finde den Entwürfe-Ordner im Postfach nicht."
-        msg = build_draft(to, subject, body, j.MAIL_USER)
+        msg = build_draft(to, subject, body, acc["user"])
         quoted = '"' + folder.replace('"', '\\"') + '"'
         typ, _ = box.append(quoted, "(\\Draft \\Seen)", imaplib.Time2Internaldate(time.time()), msg.as_bytes())
         if typ != "OK":
@@ -95,7 +96,8 @@ def mail_draft(to, subject, body):
             box.logout()
         except Exception:  # noqa: BLE001
             pass
-    return f"Entwurf an {to} liegt im Ordner {folder}. Gesendet habe ich nichts."
+    where = f" von {acc['name']}" if len(mailboxes.accounts()) > 1 else ""
+    return f"Entwurf an {to} liegt im Ordner {folder}{where}. Gesendet habe ich nichts."
 
 
 # ── day preparation ──────────────────────────────────────────
@@ -274,7 +276,7 @@ def plan_create(title, steps, internal=None):
     folder = memory.MEMORY_DIR / "Projekte"
     folder.mkdir(parents=True, exist_ok=True)
     today = time.strftime("%Y-%m-%d")
-    path = folder / f"{title}.md"
+    path = memory.note_path(f"Projekte/{title}")
     path.write_text(f"---\ntype: projekt\nwichtigkeit: mittel\nupdated: {today}\nablauf: "
                     f"{(dt.date.fromisoformat(clean[-1][0]) + dt.timedelta(days=30)).isoformat()}\n---\n\n# {title}\n\n"
                     "Plan von Jarvis. Gehört zu [[Profil]].\n\n" +
@@ -300,7 +302,7 @@ def plan_list():
 
 
 def plan_check(title, step):
-    path = memory.MEMORY_DIR / "Projekte" / f"{_slug(title)}.md"
+    path = memory.note_path(f"Projekte/{_slug(title)}")
     if not path.exists():
         return "Diesen Plan gibt es nicht."
     body = path.read_text(encoding="utf-8")

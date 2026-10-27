@@ -16,6 +16,8 @@ import pathlib
 import re
 import threading
 
+import hostos
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 APPS_FILE = pathlib.Path(os.environ.get("JARVIS_APPS", ROOT / "config" / "apps.json"))
 DUCK = float(os.environ.get("JARVIS_DUCK", "0.3"))           # Spotify volume factor while Jarvis talks, 0 = off
@@ -130,7 +132,7 @@ def open_app(name):
     target = apps().get(name.lower().strip())
     if not target:
         return None
-    os.startfile(target)
+    hostos.open_target(target)
     return target
 
 
@@ -142,7 +144,9 @@ def lock():
 # ── the voice side ───────────────────────────────────────────
 _SYS = r"\b(pc|computer|rechner|system|windows|gesamt|lautsprecher)\b"
 _MUSIC = re.compile(r"\b(musik|spotify|song|lied|titel|track)\b")
-_SET = re.compile(r"\blautstärke\b.*?\bauf (\d{1,3})\s*(%|prozent)?")
+# "Lautstärke auf 80", but also "stell den PC auf 100 % (Lautstärke)" — there the
+# number comes first, and the bare "lautstärke" at the end used to read the volume out.
+_SET = re.compile(r"\blautstärke\b.*?\bauf (\d{1,3})\s*(%|prozent)?|\bauf (\d{1,3})\s*(%|prozent)")
 _OPEN = re.compile(r"^\W*(?:jarvis\W+)?(?:bitte\s+)?(?:öffne|starte?|mach)\s+(?:mir\s+)?(?:bitte\s+)?(?:mal\s+)?"
                    r"(?:den|die|das)?\s*(?P<app>[\wäöüß ]+?)(?:\s+auf)?(?:\s+bitte)?\W*$", re.I)
 _LOCKRX = re.compile(r"\b(sperr\w*|lock)\b.*\b(pc|computer|rechner|bildschirm|windows)\b|"
@@ -159,12 +163,13 @@ def handle(n, raw=""):
         return f"{m.group('app').strip().capitalize()} kommt, Sir."
     if _MUSIC.search(n):
         return None                                   # music volume stays with the music handler
-    systemish = re.search(_SYS, n) or re.search(r"\b(lautstärke|ton|stumm\w*|mute)\b", n)
+    # "Lautspecke", "Lautstärker": how Whisper hears "Lautstärke" now and then
+    systemish = re.search(_SYS, n) or re.search(r"\b(lautstärke|lauts[pt]\w*|ton|stumm\w*|mute)\b", n)
     if not systemish:
         return None
     s = _SET.search(n)
     if s:
-        pct = int(s.group(1))
+        pct = min(100, int(s.group(1) or s.group(3)))
         if set_volume(pct):
             return f"Lautstärke {pct} Prozent."
         return None

@@ -1,0 +1,297 @@
+/* Additional arrangements reuse the original controls, cards and live data. */
+body.tablet.layout-new{
+  --cy:var(--l-accent);--line-hot:var(--t-line);--ink:var(--t-ink);--ink-dim:var(--t-dim);
+  --s-cy:var(--l-accent);--s-ink:var(--t-ink);--s-dim:var(--t-dim);--s-red:var(--pink);--s-gold:var(--amber);
+  --t-faint:var(--t-dim);--l-radius:24px;--l-gap:24px;
+  color:var(--t-ink);background:var(--l-background,var(--t-bg));
+}
+body.layout-new .tab{
+  width:100%;max-width:1720px;margin:0 auto;height:auto;min-height:100vh;min-height:100dvh;gap:var(--l-gap);
+  padding:calc(20px + env(safe-area-inset-top)) calc(28px + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) calc(28px + env(safe-area-inset-left));
+}
+body.layout-new .tscreen{
+  flex:1 0 auto;min-height:580px;min-height:min(680px,calc(100dvh - 200px));
+  grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);
+  grid-template-rows:auto minmax(0,1fr);grid-template-areas:"bar bar" "day voice";gap:var(--l-gap);
+}
+body.layout-new .tbar{min-width:0;gap:14px;min-height:48px}
+body.layout-new .tbrand{min-width:0;flex-wrap:wrap;gap:10px;letter-spacing:.25em;color:var(--t-ink)}
+body.layout-new .layout-name{font:500 11px/1.2 var(--t-font);letter-spacing:.08em;color:var(--t-dim);
+  border-left:1px solid var(--t-line);padding-left:12px;text-transform:uppercase}
+body.layout-new .tday{display:flex;flex-direction:column;gap:8px;min-width:0;overflow:visible}
+body.layout-new .ttime{font-size:clamp(70px,8.5vw,128px);line-height:1;font-weight:300;letter-spacing:-.055em}
+body.layout-new .tdate{font-size:18px;margin:0;color:var(--t-dim)}
+body.layout-new .thello{display:block;font-size:15px;margin:2px 0 12px;color:var(--t-dim)}
+body.layout-new .tweather{border-radius:var(--l-radius);padding:20px;gap:14px;min-width:0}
+body.layout-new .tnowtext{flex:1}
+body.layout-new .tnowtext small{line-height:1.5}
+body.layout-new .tagenda{margin-top:14px;flex:1 0 auto}
+body.layout-new .tagenda h3{margin:0 0 12px;color:var(--l-accent)}
+body.layout-new .tagenda ol{max-height:220px;overflow-y:auto;overscroll-behavior:contain}
+body.layout-new .tagenda li{border-radius:calc(var(--l-radius) * .6);padding:14px;grid-template-columns:88px minmax(0,1fr)}
+body.layout-new .tagenda li span{font-size:15px}
+body.layout-new .tagenda li b{white-space:normal;line-height:1.5;overflow-wrap:anywhere}
+body.layout-new .tvoice{min-width:0;min-height:370px;overflow:visible;padding:24px 20px;gap:12px;
+  background:var(--t-card);border:1px solid var(--t-line);border-radius:var(--l-radius)}
+body.layout-new .torbwrap{width:min(320px,34vh);min-height:150px;flex:0 0 auto;max-width:100%;aspect-ratio:1;align-self:center}
+body.layout-new #tOrb{position:absolute;inset:0;width:100%;height:100%}
+body.layout-new .tstate{width:100%;font-size:18px;line-height:1.45;overflow-wrap:anywhere}
+body.layout-new .tcap{flex:0 1 auto;max-height:40vh;max-height:40dvh;overflow-y:auto;overscroll-behavior:contain}
+body.layout-new .tquick{gap:8px;width:100%}
+body.layout-new .tquick button{min-height:44px;padding:10px 14px;font-size:14px;color:var(--t-ink)}
+body.layout-new .tmenu,body.layout-new .tkeys,body.layout-new #btnStop,body.layout-new #btnSend{
+  min-width:44px;min-height:44px;color:var(--t-ink);background:var(--t-card-hi);border-color:var(--t-line)}
+body.layout-new #btnMic{border-color:var(--l-accent);color:var(--l-accent);background:var(--t-card-hi);
+  box-shadow:0 0 0 7px var(--t-card);width:72px;height:72px}
+body.layout-new .askbar{gap:12px;max-width:100%;min-width:0}
+body.layout-new .askbar.typing{flex-wrap:wrap}
+body.layout-new .askbar.typing #ask{flex:1 1 180px;font-size:16px;border-color:var(--t-line)}
+body.layout-new .ttiles{grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+body.layout-new .ttile{border-radius:var(--l-radius);min-height:112px;padding:18px;justify-content:center}
+body.layout-new .ttile b{font-size:30px;overflow:hidden;text-overflow:ellipsis}
+body.layout-new .ttile.rooms li{padding:4px 0;background:none;border:none}
+body.layout-new .ttile.rooms li b{font-size:16px}
+body.layout-new .ttile span{letter-spacing:.12em;line-height:1.4;padding-right:10px}
+body.layout-new .ttile.good b{color:var(--l-good,#7fe8b8)}
+body.layout-new .tsheetbox{color:var(--t-ink);background:var(--l-sheet,var(--t-bg));border-radius:var(--l-radius);
+  max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px - env(safe-area-inset-top));overflow-y:auto}
+body.layout-new .tsheetsel select{min-height:48px;width:100%;min-width:0;font-size:16px;color-scheme:dark}
+body.layout-new .tdday.focus{background:var(--t-card-hi)}
+body.layout-new .tdlist li.good b{color:var(--l-good,#7fe8b8)}
+body.layout-new .spanel{padding:16px;border:1px solid var(--t-line);background:var(--t-card);border-radius:var(--l-radius)}
+body.layout-new .spanel h4{font:600 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;margin-bottom:14px;color:var(--l-accent)}
+body.layout-new.layout-instruments .ssys{grid-area:sys;display:flex;flex-direction:column;gap:12px;min-width:0;max-height:680px;overflow-y:auto}
+body.layout-new .slines li{flex-wrap:wrap;font-size:12px;border-color:var(--t-line)}
+body.layout-new :is(button,select,input):focus-visible{outline:3px solid var(--l-accent);outline-offset:4px}
+
+/* 01 / Aurora: expansive voice panel, day in a glass sidebar. */
+body.tablet.layout-aurora{--l-accent:#73efd1;--t-bg:#10142b;--t-ink:#edf8ff;--t-dim:#a3b4ce;
+  --t-card:rgba(31,43,69,.65);--t-card-hi:#293951;--t-line:rgba(164,200,234,.2);--l-radius:30px;
+  --l-background:radial-gradient(ellipse at 10% 35%,#294861 0,transparent 55%),radial-gradient(ellipse at 85% 5%,#493264 0,transparent 50%),#10142b}
+body.layout-aurora .tscreen{grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);grid-template-areas:"bar bar" "voice day"}
+body.layout-aurora .tvoice{background:linear-gradient(145deg,rgba(117,228,214,.1),rgba(160,116,221,.12));box-shadow:inset 0 1px rgba(255,255,255,.1)}
+body.layout-aurora .torbwrap{width:min(370px,40vh)}
+body.layout-aurora .ttime{font-weight:200}
+body.layout-aurora .ttile{background:linear-gradient(145deg,rgba(112,168,197,.14),rgba(134,109,177,.12))}
+
+/* 02 / Daylight: light surfaces, readable day column and framed assistant. */
+body.tablet.layout-ivory{--l-accent:#28716b;--t-bg:#f4f2ec;--t-ink:#202e2c;--t-dim:#596c68;--t-card:#fffefa;
+  --t-card-hi:#e6ede7;--t-line:#d4ddd5;--l-good:#267151;--l-radius:18px;--amber:#98600c;--pink:#b73558;--violet:#7952a5;color-scheme:light}
+body.layout-ivory .tvoice{background:#e8eeea;border:none}
+body.layout-ivory .ttime{font-weight:400}
+body.layout-ivory .tweather,body.layout-ivory .ttile{box-shadow:0 4px 18px rgba(36,63,43,.035)}
+body.layout-ivory .ttiles{grid-template-columns:repeat(4,minmax(0,1fr))}
+body.layout-ivory .tagenda li.now{background:#e6f0e8;border-color:#89b59c}
+body.layout-ivory .tsheetsel select{color-scheme:light}
+
+/* 03 / Midnight: assistant panorama above a three-part day strip. */
+body.tablet.layout-midnight{--l-accent:#9bbcff;--t-bg:#090f20;--t-ink:#e7efff;--t-dim:#99aaca;--t-card:#121e36;
+  --t-card-hi:#1e3050;--t-line:#283c5e;--l-radius:22px}
+body.layout-midnight .tscreen{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;grid-template-areas:"bar" "voice" "day"}
+body.layout-midnight .tvoice{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);
+  grid-template-areas:"orb state" "orb cap" "orb dock" "orb quick";min-height:320px;padding:28px 5%;background:linear-gradient(115deg,#172a4c,#101a30)}
+body.layout-midnight .torbwrap{grid-area:orb;justify-self:center;width:min(300px,30vh)}
+body.layout-midnight .tstate{grid-area:state;align-self:end;font-size:23px}
+body.layout-midnight .tcap{grid-area:cap}
+body.layout-midnight .tdock{grid-area:dock}
+body.layout-midnight .tquick{grid-area:quick;align-self:start}
+body.layout-midnight .tday{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.1fr) minmax(0,1fr);
+  grid-template-areas:"time weather agenda" "date weather agenda" "hello weather agenda";gap:8px 24px;align-items:start}
+body.layout-midnight .ttime{grid-area:time;font-size:clamp(64px,7vw,110px)}
+body.layout-midnight .tdate{grid-area:date;font-size:16px}
+body.layout-midnight .thello{grid-area:hello}
+body.layout-midnight .tweather{grid-area:weather}
+body.layout-midnight .tagenda{grid-area:agenda;margin:0}
+
+/* 04 / Cockpit: three instrument columns, amber indicators, compact geometry. */
+body.tablet.layout-cockpit{--l-accent:#f4b85a;--t-bg:#10120f;--t-ink:#eeeedd;--t-dim:#acb3a2;--t-card:#191e18;
+  --t-card-hi:#293025;--t-line:#414a36;--l-radius:6px;--l-gap:18px;--t-font:var(--mono)}
+body.layout-cockpit .tscreen{grid-template-columns:minmax(0,.85fr) minmax(0,1.2fr) minmax(0,.75fr);grid-template-areas:"bar bar bar" "day voice sys"}
+body.layout-cockpit .tbar{border-bottom:1px solid var(--t-line);padding-bottom:12px}
+body.layout-cockpit .ttime{font-size:clamp(54px,6vw,90px);letter-spacing:-.07em}
+body.layout-cockpit .tvoice{background:repeating-linear-gradient(0deg,transparent 0 27px,rgba(244,184,90,.035) 28px),#151b16}
+body.layout-cockpit .tstate{text-transform:uppercase;font:600 13px/1.5 var(--mono);letter-spacing:.13em}
+body.layout-cockpit .torbwrap{width:min(310px,33vh)}
+body.layout-cockpit .ttile{border-top:2px solid var(--l-accent)}
+body.layout-cockpit .tquick button{font-size:12px;border-radius:4px}
+body.layout-cockpit .ttemp{font-size:38px}
+body.layout-cockpit .tagenda li{grid-template-columns:76px minmax(0,1fr);gap:6px}
+
+/* 05 / Bento: an asymmetric dashboard with an oversized first metric. */
+body.tablet.layout-bento{--l-accent:#b8a2ff;--t-bg:#141221;--t-ink:#f0ecff;--t-dim:#b4abc9;--t-card:#221e34;
+  --t-card-hi:#37304f;--t-line:#443957;--l-radius:28px;--l-gap:18px}
+body.layout-bento .tab{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);grid-template-areas:"bar bar" "day voice" "tiles tiles";align-content:start}
+body.layout-bento .tscreen{display:contents}
+body.layout-bento .tday{grid-area:day}
+body.layout-bento .tvoice{grid-area:voice;background:#302642}
+body.layout-bento .ttiles{grid-area:tiles;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(110px,auto)}
+body.layout-bento .ttile:first-child{grid-column:span 2;grid-row:span 2;background:#b8a2ff;color:#231b36;border-color:transparent;padding:28px}
+body.layout-bento .ttile:first-child :is(b,span,em,small){color:#302447}
+body.layout-bento .ttile:first-child b{font-size:64px}
+body.layout-bento .ttile:nth-child(3){background:#343040}
+body.layout-bento .tweather{background:#29273b}
+
+/* 06 / Horizon: clock-led planning board with voice docked on the right. */
+body.tablet.layout-horizon{--l-accent:#ffb48e;--t-bg:#211c23;--t-ink:#fff0e7;--t-dim:#c4aaae;--t-card:#332a31;
+  --t-card-hi:#49373e;--t-line:#63434c;--l-radius:20px;
+  --l-background:radial-gradient(ellipse at 0 0,rgba(218,119,77,.14),transparent 60%),#211c23}
+body.layout-horizon .tscreen{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr);
+  grid-template-rows:auto auto auto minmax(0,1fr);grid-template-areas:"bar bar bar" "time time voice" "date hello voice" "weather agenda voice"}
+body.layout-horizon .tday{display:contents}
+body.layout-horizon .ttime{grid-area:time;font-size:clamp(90px,12vw,180px);font-weight:200}
+body.layout-horizon .tdate{grid-area:date;align-self:center}
+body.layout-horizon .thello{grid-area:hello;align-self:center;margin:0}
+body.layout-horizon .tweather{grid-area:weather;align-self:start}
+body.layout-horizon .tagenda{grid-area:agenda;margin:0;align-self:start}
+body.layout-horizon .tvoice{grid-area:voice;background:linear-gradient(180deg,#503439,#332a31)}
+body.layout-horizon .torbwrap{width:min(280px,30vh)}
+body.layout-horizon .ttiles{grid-template-columns:repeat(5,minmax(0,1fr))}
+
+/* 07 / Journal: serif masthead and a newspaper-like information hierarchy. */
+body.tablet.layout-editorial{--l-accent:#9b4b32;--t-bg:#f1ece2;--t-ink:#302b25;--t-dim:#74685b;--t-card:#f8f5ee;
+  --t-card-hi:#e7dfd0;--t-line:#cbbdab;--l-good:#396b4d;--l-radius:2px;--amber:#99600d;--pink:#a73c51;--violet:#72507f;color-scheme:light}
+body.layout-editorial .tscreen{grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);
+  grid-template-rows:auto auto auto auto minmax(0,1fr);grid-template-areas:"bar bar" "time time" "date hello" "voice weather" "voice agenda"}
+body.layout-editorial .tday{display:contents}
+body.layout-editorial .tbar{padding-bottom:14px;border-bottom:2px solid var(--t-ink)}
+body.layout-editorial .ttime{grid-area:time;font:400 clamp(100px,15vw,210px)/.9 Georgia,"Times New Roman",serif;letter-spacing:-.06em}
+body.layout-editorial .tdate{grid-area:date}
+body.layout-editorial .thello{grid-area:hello;text-align:right;margin:0}
+body.layout-editorial .tweather{grid-area:weather}
+body.layout-editorial .tagenda{grid-area:agenda;margin-top:0}
+body.layout-editorial .tvoice{background:transparent;border:none;border-right:1px solid var(--t-line)}
+body.layout-editorial .tstate{font:400 27px/1.4 Georgia,"Times New Roman",serif}
+body.layout-editorial .ttiles{grid-template-columns:repeat(4,minmax(0,1fr));border-top:2px solid var(--t-ink);padding-top:18px}
+body.layout-editorial .ttile{background:transparent;border-width:0 1px 0 0}
+body.layout-editorial .ttile b{font-family:Georgia,"Times New Roman",serif;font-size:36px}
+body.layout-editorial .tagenda li{background:transparent;border-width:1px 0 0}
+body.layout-editorial .tsheetsel select{color-scheme:light}
+
+/* 08 / Neon: framed voice stage and sharply outlined status cards. */
+body.tablet.layout-neon{--l-accent:#f481df;--t-bg:#110c1d;--t-ink:#f9eaff;--t-dim:#c1a6d2;--t-card:#21142f;
+  --t-card-hi:#3a2349;--t-line:#69447a;--l-radius:12px;
+  --l-background:radial-gradient(ellipse at 85% 15%,rgba(115,51,165,.25),transparent 60%),#110c1d}
+body.layout-neon .tscreen{grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr)}
+body.layout-neon .tvoice{border-color:#b36cc0;box-shadow:inset 0 0 50px rgba(196,89,219,.08),0 0 35px rgba(147,67,179,.09)}
+body.layout-neon .torbwrap{width:min(360px,37vh);border:1px solid rgba(244,129,223,.24);border-radius:50%}
+body.layout-neon .ttime{font-family:var(--mono);font-size:clamp(60px,7vw,110px);font-weight:500}
+body.layout-neon .tbrand{color:var(--l-accent)}
+body.layout-neon .ttile{border-left:3px solid var(--l-accent)}
+body.layout-neon .tweather{border-top:3px solid #80d8ff}
+body.layout-neon .tquick button{border-radius:6px}
+
+/* 09 / Zen: generous negative space, muted green, quiet rows of metrics. */
+body.tablet.layout-zen{--l-accent:#9fcbb0;--t-bg:#15201d;--t-ink:#e7eee5;--t-dim:#a3b6a9;--t-card:#1b2a24;
+  --t-card-hi:#2b3c32;--t-line:#3d5145;--l-radius:20px;--l-gap:32px}
+body.layout-zen .tscreen{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:32px 6vw}
+body.layout-zen .tvoice{background:transparent;border:none;min-height:420px}
+body.layout-zen .torbwrap{width:min(240px,27vh)}
+body.layout-zen .ttime{font-weight:200}
+body.layout-zen .tweather{background:transparent;border-width:1px 0;border-radius:0;padding:20px 0}
+body.layout-zen .tagenda li{background:transparent;border:none;border-bottom:1px solid var(--t-line);border-radius:0;padding:14px 0}
+body.layout-zen .ttiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:0 28px}
+body.layout-zen .ttile{background:transparent;border:none;border-bottom:1px solid var(--t-line);border-radius:0;padding:20px 0;min-height:100px}
+body.layout-zen .tquick button{background:transparent;border:none;text-decoration:underline;text-decoration-color:var(--t-line);text-underline-offset:5px}
+
+/* 10 / Orbit: a central circular stage flanked by day and system instruments. */
+body.tablet.layout-orbit{--l-accent:#70c8ff;--t-bg:#070f1b;--t-ink:#e4f3ff;--t-dim:#95afc8;--t-card:#101f32;
+  --t-card-hi:#1b3550;--t-line:#2a4965;--l-radius:26px;
+  --l-background:radial-gradient(circle at 12% 20%,rgba(112,200,255,.16) 0 1px,transparent 2px),radial-gradient(ellipse at 50% 40%,#142e48,transparent 65%),#070f1b}
+body.layout-orbit .tscreen{grid-template-columns:minmax(0,.85fr) minmax(0,1.3fr) minmax(0,.85fr);grid-template-areas:"bar bar bar" "day voice sys";gap:22px}
+body.layout-orbit .tvoice{background:radial-gradient(circle at 50% 35%,rgba(79,155,203,.13),transparent 65%);border-radius:40px}
+body.layout-orbit .torbwrap{width:min(340px,36vh);border:1px solid var(--t-line);border-radius:50%;position:relative}
+body.layout-orbit .torbwrap::before{content:"";position:absolute;inset:12px;border:1px dashed #356184;border-radius:50%;pointer-events:none}
+body.layout-orbit .ttime{font-size:clamp(54px,6vw,90px)}
+body.layout-orbit .ttile{background:linear-gradient(130deg,#152b42,#101f32)}
+body.layout-orbit .ttile b{font-family:var(--mono)}
+body.layout-orbit .tstate{letter-spacing:.05em}
+
+/* Tablet widths keep the hierarchy and provide room for readable cards. */
+@media(max-width:1180px){
+  body.layout-new .ttiles{grid-template-columns:repeat(4,minmax(0,1fr))}
+  body.layout-cockpit .tscreen,body.layout-orbit .tscreen{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);
+    grid-template-rows:auto auto auto;grid-template-areas:"bar bar" "day voice" "sys sys"}
+  body.layout-new.layout-instruments .ssys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-height:none;overflow:visible}
+  body.layout-horizon .tscreen{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto auto auto;
+    grid-template-areas:"bar bar" "time voice" "date voice" "hello voice" "weather agenda"}
+  body.layout-horizon .ttime{font-size:clamp(72px,11vw,130px)}
+  body.layout-midnight .tday{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);
+    grid-template-areas:"time weather" "date weather" "hello weather" "agenda agenda"}
+}
+@media(max-width:900px){
+  body.layout-new .tab{padding:calc(16px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+    calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));--l-gap:18px}
+  body.layout-new .tscreen{gap:18px}
+  body.layout-new .ttime{font-size:clamp(62px,10vw,94px)}
+  body.layout-new .tweather{padding:15px;gap:10px}
+  body.layout-new .tnow{gap:8px;flex-wrap:wrap}
+  body.layout-new .tsky{width:36px;font-size:32px}
+  body.layout-new .ttemp{font-size:38px}
+  body.layout-new .tnowtext{min-width:130px}
+  body.layout-new .tnowtext em{font-size:15px}
+  body.layout-new .tdays{gap:2px}
+  body.layout-new .tdays em{font-size:12px}
+  body.layout-new .tdays em small{margin-left:2px}
+  body.layout-new .tvoice{padding:20px 14px}
+  body.layout-new .tquick button{font-size:13px;padding:10px}
+  body.layout-editorial .ttime{font-size:clamp(100px,20vw,170px)}
+  body.layout-bento .ttile:first-child b{font-size:52px}
+  body.layout-new.layout-instruments .ssys{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+/* Phones, including landscape: assistant first, then day and two tile columns. */
+@media(max-width:600px){
+  body.layout-new .tab,body.layout-bento .tab{display:flex;flex-direction:column;gap:16px;padding:
+    calc(12px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right))
+    calc(20px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left))}
+  body.layout-new .tscreen{display:grid;min-height:0;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;
+    grid-template-areas:"bar" "voice" "day";gap:18px}
+  body.layout-new .tbar{display:grid;grid-template-columns:minmax(0,1fr) 44px 44px 44px;
+    grid-template-areas:"brand bell monitor menu" "timer timer timer timer";gap:8px}
+  body.layout-new .tbrand{grid-area:brand}
+  body.layout-new .tbar .monitor-link{grid-area:monitor}
+  body.layout-new .tslots{display:contents}
+  body.layout-new #btnBell{grid-area:bell}
+  body.layout-new #chipTimer{grid-area:timer;width:100%;max-width:none}
+  body.layout-new .tmenu{grid-area:menu}
+  body.layout-new .tbrand{gap:7px;font-size:11px;letter-spacing:.2em}
+  body.layout-new .layout-name{font-size:10px;padding-left:8px;letter-spacing:.04em}
+  body.layout-new .tslots{gap:6px;min-width:0}
+  body.layout-new .tslots .chip-lg{padding:7px;max-width:110px;font-size:11px}
+  body.layout-new .tslots .chip-lg .ico{display:none}
+  body.layout-new .tvoice{display:flex;min-height:310px;padding:18px 12px;gap:10px;border-right-width:1px}
+  body.layout-new .torbwrap{width:min(210px,48vw);min-height:130px}
+  body.layout-new .tstate{font-size:17px}
+  body.layout-new .tquick{gap:6px}
+  body.layout-new .tquick button{flex:1 1 calc(50% - 6px);font-size:13px;min-height:44px}
+  body.layout-new .tday{display:grid;grid-area:day;grid-template-columns:minmax(0,1fr);gap:10px;
+    grid-template-areas:"time" "date" "hello" "weather" "agenda"}
+  body.layout-new .ttime{grid-area:time;font-size:clamp(68px,20vw,100px)}
+  body.layout-new .tdate{grid-area:date;font-size:17px}
+  body.layout-new .thello{grid-area:hello;text-align:left;margin:0 0 6px}
+  body.layout-new .tweather{grid-area:weather;padding:18px}
+  body.layout-new .tagenda{grid-area:agenda;margin-top:12px}
+  body.layout-new .tagenda li{grid-template-columns:82px minmax(0,1fr)}
+  body.layout-new .tagenda ol{max-height:none}
+  body.layout-new .ttiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  body.layout-new .ttile{padding:14px;min-height:108px}
+  body.layout-new .ttile b{font-size:28px}
+  body.layout-new .ttile.rooms{grid-column:span 2}
+  body.layout-bento .ttile:first-child{grid-column:span 2;grid-row:auto}
+  body.layout-bento .ttile:first-child b{font-size:48px}
+  body.layout-new.layout-instruments .tscreen{grid-template-areas:"bar" "voice" "day" "sys";grid-template-rows:auto auto auto auto}
+  body.layout-new.layout-instruments .ssys{grid-template-columns:minmax(0,1fr);gap:10px}
+  body.layout-new .tsheetbox{width:calc(100vw - 24px);padding:18px;margin-bottom:calc(12px + env(safe-area-inset-bottom))}
+  body.layout-new .tsheetsel select{padding:14px 10px}
+  body.layout-new .tdlist li{flex-wrap:wrap;gap:6px}
+  body.layout-new .tdlist li b{max-width:100%;overflow-wrap:anywhere}
+}
+@media(max-height:520px) and (orientation:landscape){
+  body.layout-new .tscreen{min-height:0}
+  body.layout-new .tvoice{min-height:300px}
+  body.layout-new .torbwrap{width:150px;min-height:120px}
+  body.layout-new .tsheetbox{max-height:calc(100dvh - 24px);margin-bottom:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  body.layout-new *,body.layout-new *::before,body.layout-new *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}

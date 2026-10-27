@@ -438,6 +438,24 @@ body.boot .corestate{opacity:0}
 
 /* ── devices (pairing on the PC) ── */
 body.remote #btnPair{display:none}
+/* Station: only for paired devices; the PC has its own mic and the desktop card. */
+body:not(.remote) #btnStation{display:none}
+body.station .stagetools #btnWall,body.station .stagetools #btnMini{display:none}
+/* After a reload iOS holds the audio back until one tap: the whole screen is the button. */
+body.station.mic-tap::after,body.autolive.mic-tap::after{content:'Tippen, damit Jarvis zuhört';position:fixed;inset:0;z-index:60;display:grid;
+  place-items:center;background:rgba(2,5,9,.78);color:#ffb340;font-size:26px;letter-spacing:.08em}
+/* Server gone: a banner above everything, the page reloads itself once he is back. */
+body.offline::before{content:'Verbindung zu Jarvis weg — verbinde neu …';position:fixed;left:0;right:0;top:0;z-index:70;
+  padding:10px 16px;text-align:center;background:rgba(255,107,166,.16);border-bottom:1px solid #ff6ba6;color:#ff6ba6;
+  font-size:14px;letter-spacing:.06em;backdrop-filter:blur(4px)}
+/* Night on the station: black, a clock you only see when you look for it. While
+   he listens or talks the HUD shows through dimmed; a tap shows it for 20 s. */
+.nightshade{display:none}
+body.station.night .nightshade{display:grid;position:fixed;inset:0;z-index:55;place-items:center;background:#000;
+  transition:opacity .8s ease}
+.nightshade b{font-size:72px;font-weight:300;letter-spacing:.06em;color:#18232b;font-variant-numeric:tabular-nums}
+body.station.night.night-active .nightshade,body.station.night.night-peek .nightshade{opacity:.55;pointer-events:none}
+body.station.night.night-active .nightshade b,body.station.night.night-peek .nightshade b{visibility:hidden}
 .pairbox{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(2,5,9,.72);backdrop-filter:blur(4px)}
 .pairbox[hidden]{display:none}
 .pairbox .panel{width:min(400px,calc(100vw - 32px));gap:10px;padding:18px}
@@ -522,6 +540,13 @@ body.remote .saytip{display:none}
   .grid{grid-template-columns:236px 1fr 248px}
   .chip-lg b{max-width:110px}
   .dial{width:88px;height:88px}
+  /* 810 px of height: the live strip in one row, and graph and conversation give way, so
+     the ask bar stays on screen once the conversation opens (it slid off the bottom).
+     body raises them over the later max-width:1280px rule that puts the strip in two rows. */
+  body .livebar{grid-template-columns:repeat(4,minmax(0,1fr));padding:6px 14px;gap:8px}
+  body .lv{height:46px}
+  body .canvaswrap{min-height:120px}
+  body .convo{flex:0 1 auto;min-height:96px}
 }
 
 /* portrait (768–1024 wide): talking and graph on top, both rails side by side below */
@@ -568,3 +593,36 @@ body.view-wall .chip-lg b{font-size:15px}
 body.view-mini .rail.left,body.view-mini .canvaswrap,body.view-mini .usage,body.view-mini #pLog,
 body.view-mini #pSystem,body.view-mini .pills .chip-lg{display:none}
 body.view-mini .grid{grid-template-columns:1fr 260px}
+/* Homelab tile (renderHomelab): four figures, the internet one with the share of the line in use. */
+.lab{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lab .mcell{padding:7px 9px;cursor:default}
+.lab .mcell.warn b{color:var(--amber)}
+.lab .mcell.bad b{color:var(--pink)}
+.lab .mcell.dim b{color:var(--ink-dim)}
+.labbar{display:block;height:3px;margin-top:5px;border-radius:2px;background:rgba(95,228,255,.12);overflow:hidden}
+.labbar i{display:block;height:100%;background:var(--cy);box-shadow:0 0 6px var(--cy)}
+/* Live strip (LiveBar): four cards of this PC under the top bar — ring, figure, area trace. */
+.livebar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:8px 20px;
+  border-bottom:1px solid var(--line);flex:0 0 auto}
+.lv{display:flex;align-items:center;gap:10px;min-width:0;height:54px;padding:6px 12px 6px 8px;border-radius:10px;
+  border:1px solid var(--line);background:linear-gradient(180deg,rgba(14,26,40,.75),rgba(8,15,24,.55));
+  box-shadow:inset 0 1px 0 rgba(95,228,255,.05)}
+.lv[hidden]{display:none}
+.lvring{width:40px;height:40px;flex:0 0 40px;transform:rotate(-90deg)}
+.lvring .gbase,.lvring .gval{stroke-width:3.5}
+.lvring .gval{transition:stroke-dashoffset .6s ease,stroke .4s}
+.lvtext{display:flex;flex-direction:column;min-width:0;flex:0 0 auto;line-height:1.15}
+.lvtext span{font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
+.lvtext b{font-size:18px;font-weight:500;color:var(--ink);letter-spacing:.02em;white-space:nowrap}
+.lvtext b small{font-size:10px;color:var(--ink-dim);margin-left:2px}
+.lvtext b i{font-style:normal;font-size:11px;margin:0 3px 0 0}
+.lvtext b i.dn{color:var(--cy)}
+.lvtext b i.up{color:var(--amber);margin-left:6px}
+.lvtext em{font-style:normal;font-size:9px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lv canvas{flex:1;min-width:40px;height:38px;display:block}
+body.view-wall .livebar{padding:8px 28px}
+@media (max-width:1280px){.livebar{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.livebar{padding:6px 12px;gap:6px}.lv{height:48px}.lvtext b{font-size:15px}}
+/* the way to the room display (tablet.js), next to the name so it is in reach on a phone too */
+.brand .viewswitch{margin-left:6px;padding:5px 8px;font:12px var(--mono);color:var(--ink-dim);background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;max-width:150px}

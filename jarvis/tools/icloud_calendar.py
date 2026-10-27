@@ -9,7 +9,9 @@ Optional:
     ICLOUD_DEFAULT_CALENDAR=Privat     (where new events go; default: first one)
 
 Reading is free for JARVIS; creating events goes through the HUD confirmation
-card (the add tool is deliberately not pre-allowed).
+card (the add tool is deliberately not pre-allowed). Before anything offers or
+enters an event, check() reads that day: what is already there is not offered
+again, an overlap is named on the card.
 """
 import base64
 import datetime as dt
@@ -214,8 +216,9 @@ def _refresh_agenda():
     return block
 
 
-def add_event(title, start, end=None, location="", notes="", calendar="", allday=False):
-    """Create an event. start/end: 'YYYY-MM-DD HH:MM' (local) or 'YYYY-MM-DD' for all-day."""
+def add_event(title, start, end=None, location="", notes="", calendar="", allday=False, return_url=False):
+    """Create an event. start/end: 'YYYY-MM-DD HH:MM' (local) or 'YYYY-MM-DD' for all-day.
+    return_url: -> (text, url) — the url is what delete_event() needs to take it out again."""
     if not configured():
         raise RuntimeError("iCloud-Kalender ist nicht eingerichtet.")
     cals = calendars()
@@ -248,4 +251,93 @@ def add_event(title, start, end=None, location="", notes="", calendar="", allday
     _request("PUT", url, ics, ctype="text/calendar; charset=utf-8", extra={"If-None-Match": "*"})
     _CACHE["agenda"] = None
     when = s.strftime("%d.%m.%Y") + ("" if allday else s.strftime(" %H:%M"))
-    return f"Eingetragen in '{target[0]}': {title} am {when}."
+    text = f"Eingetragen in '{target[0]}': {title} am {when}."
+    return (text, url) if return_url else text
+
+
+def delete_event(url):
+    """Remove one event Jarvis created (its url from add_event). Only urls of our own
+    entries ever get here — mail_events keeps them; nothing else is deleted."""
+    if not url or "@jarvis-hud" not in url:
+        raise ValueError("nur von Jarvis angelegte Termine")
+    try:
+        _request("DELETE", url)
+    except RuntimeError as e:
+        if "HTTP 404" not in str(e) and "HTTP 410" not in str(e):
+            raise                         # 404/410: already gone (taken out on the iPhone) — that is the goal
+    _CACHE["agenda"] = None
+
+
+# ── before offering an event: what is already there ─────────────
+# Words that say nothing about which appointment it is
+_FILLER = {"bei", "mit", "und", "der", "die", "das", "den", "dem", "des", "für", "von", "vom", "zum", "zur",
+           "aus", "auf", "termin", "buchung", "the", "and", "for"}
+
+
+def _words(title):
+    return {w for w in re.findall(r"\w{3,}", (title or "").lower()) if w not in _FILLER}
+
+
+def similar(a, b):
+    """True when two titles name the same appointment: one contains the other ("Zahnarzt" in
+    "Zahnarzt Dr. Krause") or at least half of the shorter one's words are in the other."""
+    a, b = " ".join((a or "").lower().split()), " ".join((b or "").lower().split())
+    if not a or not b:
+        return False
+    short, long_ = sorted((a, b), key=len)
+    if len(short) >= 4 and short in long_:
+        return True
+    wa, wb = _words(a), _words(b)
+    return bool(wa and wb) and len(wa & wb) * 2 >= min(len(wa), len(wb))
+
+
+def _moment(value):
+    """date, datetime or 'YYYY-MM-DD[ HH:MM]' -> (naive local datetime, all-day?)."""
+    if isinstance(value, dt.datetime):
+        return (value if value.tzinfo is None else value.astimezone().replace(tzinfo=None)), False
+    if isinstance(value, dt.date):
+        return dt.datetime.combine(value, dt.time()), True
+    text = str(value or "").strip().replace("T", " ")
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        return dt.datetime.strptime(text, "%Y-%m-%d"), True
+    return dt.datetime.strptime(text[:16], "%Y-%m-%d %H:%M"), False
+
+
+def check(title, start, end=None, allday=False, existing=None):
+    """Reads the calendar around a new event before it is offered -> {"same": [...], "overlap": [...]}.
+    same: an event that day with a similar title — it is in the calendar already, do not offer it.
+    overlap: timed events in the same time span — say so with the offer. `existing`: the calendar's
+    events if already read (a scan over many days reads once), else this reads the days itself."""
+    start, day_only = _moment(start)
+    allday = allday or day_only
+    end = _moment(end)[0] if end else None
+    if end is None or end <= start:
+        end = start + (dt.timedelta(days=1) if allday else dt.timedelta(hours=1))
+    if existing is None:
+        existing = events(start.date(), (end - dt.timedelta(seconds=1)).date().toordinal()
+                          - start.date().toordinal() + 1)
+    same, overlap = [], []
+    for e in existing:
+        if e["start"].date() == start.date() and similar(title, e.get("title", "")):
+            same.append(e)
+        elif not allday and not e.get("allday"):
+            e_end = e.get("end") or e["start"] + dt.timedelta(hours=1)
+            if e["start"] < end and e_end > start:
+                overlap.append(e)
+    return {"same": same, "overlap": overlap}
+
+
+def _short(e):
+    when = e["start"].strftime("%d.%m.") + ("" if e.get("allday") else e["start"].strftime(" %H:%M")
+                                           + (e["end"].strftime("–%H:%M") if e.get("end") else ""))
+    return f"{when} {e.get('title') or '(ohne Titel)'}"
+
+
+def clash_text(found):
+    """German, for the card and the model: '' when there is nothing to say."""
+    parts = []
+    if found.get("same"):
+        parts.append("Steht schon im Kalender: " + "; ".join(_short(e) for e in found["same"][:3]))
+    if found.get("overlap"):
+        parts.append("Überschneidet sich mit: " + "; ".join(_short(e) for e in found["overlap"][:3]))
+    return ". ".join(parts)

@@ -13,7 +13,7 @@ import tempfile
 
 _GUARDED = ("commands", "memory", "lists", "routines", "learning", "pronounce", "pc", "scheduler", "server",
             "proposals", "weekly_review", "homelab_watch", "suggestions", "reflection", "audit", "memory_tools",
-            "emergency", "personality", "desktop", "infra", "assistant")
+            "emergency", "personality", "desktop", "infra", "assistant", "mail_events", "shipments", "spotify")
 _early = [m for m in _GUARDED if m in sys.modules and "isolate" not in sys.modules]
 if _early:
     raise RuntimeError(f"tests/isolate.py must be imported before {', '.join(_early)} — real data at risk")
@@ -31,6 +31,18 @@ os.environ.update(JARVIS_STATE=str(TMP / "state.json"), JARVIS_VAULT=str(TMP / "
                   JARVIS_SCRIPTS=str(TMP / "scripts.json"), JARVIS_FILE_ROOTS=str(TMP / "files"),
                   JARVIS_PERM_URL="http://127.0.0.1:9/api/permission/request",
                   JARVIS_HOMELAB_HISTORY=str(TMP / "homelab_events.jsonl"), JARVIS_PHONE_NOTIFY="", JARVIS_TASKS=str(TMP / "tasks.json"), JARVIS_METRICS_DAILY=str(TMP / "metrics_daily.json"),
-                  JARVIS_DOC_INDEX=str(TMP / "docindex.sqlite"), JARVIS_DOC_ROOTS="")
+                  JARVIS_DOC_INDEX=str(TMP / "docindex.sqlite"), JARVIS_DOC_ROOTS="",
+                  JARVIS_MAIL_EVENTS=str(TMP / "mail_events.json"), JARVIS_MAIL_EVENTS_DAILY="0",
+                  JARVIS_SHIPMENTS_FILE=str(TMP / "shipments.json"), JARVIS_SHIPMENTS="0", DHL_API_KEY="", TRACK17_API_KEY="",
+                  JARVIS_WAKE_LOG=str(TMP / "wake_device.log"),
+                  JARVIS_SPOTIFY_CLIENT_ID="", JARVIS_SPOTIFY_TOKEN=str(TMP / "spotify_token.json"),
+                  JARVIS_SPOTIFY_HELD=str(TMP / "spotify_held.json"), JARVIS_SPOTIFY_LOG=str(TMP / "spotify.log"))
+# The user's logins never reach a test: server.py and jarvis_mcp.py load .env with setdefault,
+# so the empty values set here win. Before, the draft tests ran against the real mailboxes'
+# settings and a router test logged in to the real NAS. A test that needs one brings a fake.
+for _n in ("", *map(str, range(2, 10))):
+    for _k in ("IMAP_HOST", "USER", "PASSWORD"):
+        os.environ[f"MAIL{_n}_{_k}"] = ""
+os.environ.update(SYNO_USER="", SYNO_PASSWORD="")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 import paths  # noqa: E402,F401 — the jarvis/<group> folders

@@ -35,6 +35,7 @@ import urllib.request
 from xml.sax.saxutils import escape
 
 import commands
+import hostos
 
 CHAIN = [p.strip().lower() for p in os.environ.get(
     "TTS_CHAIN", "fish,elevenlabs,local,azure,google,edge").split(",") if p.strip()]
@@ -69,9 +70,19 @@ def _next_month():
 
 def _http(req, timeout=30):
     """Run a request; turn HTTP problems into Exhausted / Transient."""
+    r = _open(req, timeout)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read(), r.headers
+        return r.read(), r.headers
+    except (TimeoutError, OSError) as e:
+        raise Transient(f"Netzwerk: {e}")
+    finally:
+        r.close()
+
+
+def _open(req, timeout=30):
+    """Like _http, but hands back the open response for reading as it arrives."""
+    try:
+        return urllib.request.urlopen(req, timeout=timeout)
     except urllib.error.HTTPError as e:
         body = e.read(400).decode("utf-8", "replace")
         low = body.lower()
@@ -106,6 +117,38 @@ class Fish:
                                                              "content-type": "application/json", "model": self.model})
         data, _ = _http(req, timeout=40)
         return data, "audio/mpeg"
+
+    def stream(self, text):
+        """Like synth, but yields the audio as Fish produces it: the first bytes come
+        after ~0.7 s, the whole clip only after ~2.5 s. The first chunk is read here,
+        so a failing request still moves on to the next provider."""
+        payload = {"text": text[:2500], "format": "mp3", "latency": self.latency}
+        if self.voice:
+            payload["reference_id"] = self.voice
+        req = urllib.request.Request("https://api.fish.audio/v1/tts", data=json.dumps(payload).encode(),
+                                     method="POST", headers={"authorization": f"Bearer {self.key}",
+                                                             "content-type": "application/json", "model": self.model})
+        r = _open(req, timeout=40)
+        try:
+            first = r.read1(16384)
+        except (TimeoutError, OSError) as e:
+            r.close()
+            raise Transient(f"Netzwerk: {e}")
+        if not first:
+            r.close()
+            raise Transient("leere Antwort")
+
+        def chunks():
+            try:
+                yield first
+                while True:
+                    c = r.read1(16384)
+                    if not c:
+                        return
+                    yield c
+            finally:
+                r.close()
+        return chunks(), "audio/mpeg"
 
     def balance(self):
         h = {"authorization": f"Bearer {self.key}"}
@@ -232,7 +275,7 @@ def _gpu_start(root, py):
     log = open(os.path.join(root, "logs", "local_tts.log"), "a", encoding="utf-8")
     _GPU["proc"] = subprocess.Popen([py, os.path.join(root, "jarvis", "voice", "local_tts_server.py")], cwd=root,
                                     stdout=log, stderr=subprocess.STDOUT,
-                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                    **hostos.QUIET)
 
 
 def gpu_pause():
@@ -259,7 +302,7 @@ def _gpu_watch():
     track of whether the model is loaded (first start downloads ~3 GB)."""
     import subprocess
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    py = os.path.join(root, ".venv-tts", "Scripts", "python.exe")
+    py = hostos.venv_python(root, ".venv-tts")
     url = os.environ.get("LOCAL_TTS_URL", "").strip().rstrip("/")
     if not url or not os.path.exists(py):
         return
@@ -431,6 +474,16 @@ def _blocked(name):
 # ── the chain ─────────────────────────────────────────────────
 def speak(text):
     """-> (audio bytes, mime, provider name). Raises only if every provider failed."""
+    return _speak(text, False)
+
+
+def speak_stream(text):
+    """-> (iterator of audio chunks, mime, provider name). Providers that can stream
+    (Fish) start sending at once; the others deliver their clip as one chunk."""
+    return _speak(text, True)
+
+
+def _speak(text, stream):
     text = (text or "").strip()
     if not text:
         raise ValueError("empty text")
@@ -448,7 +501,12 @@ def speak(text):
         if switching and ANNOUNCE:
             say = f"Wechsle auf {LABELS.get(name, name)}. " + say
         try:
-            data, mime = a.synth(say)
+            if stream and hasattr(a, "stream"):
+                data, mime = a.stream(say)
+            else:
+                data, mime = a.synth(say)
+                if stream:
+                    data = iter([data])
         except Exhausted as e:
             _block(name, e.reason, e.until or time.time() + UNKNOWN_RESET_S)
             errors.append(f"{name}: leer ({e.reason[:60]})")

@@ -4,15 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="jarvis-token" content="__JARVIS_TOKEN__">
-<meta name="theme-color" content="#04070c">
+<meta name="jarvis-layout" content="__JARVIS_LAYOUT__">
+<meta name="theme-color" content="#08131f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Jarvis">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>JARVIS · Claude Code</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="tablet.css">
+<link rel="stylesheet" href="stark.css">
+<link rel="stylesheet" href="layouts.css">
+<link rel="stylesheet" href="layouts-plus.css">
 </head>
 <body class="boot">
 
@@ -23,6 +30,7 @@
       <div class="eyebrow">Claude Code Direct Channel</div>
       <h1>JARVIS</h1>
     </div>
+    <select class="viewswitch" id="layoutSel" title="Layout auf diesem Gerät" aria-label="Layout"><option value="tablet">Raum-Display</option><option value="stark">Stark-HUD</option><option value="classic">Klassisch mit Gedächtnis-Graph</option></select>
   </div>
   <div class="clock"><b id="clockTime">--:--</b><span id="clockDate"></span></div>
   <div class="pills">
@@ -36,8 +44,87 @@
       <span><i class="dot warn"></i><b id="pVoice">browser</b></span>
     </div>
     <button class="bell" id="btnBell" title="Meldungen, Ausfälle, offene Vorschläge">🔔<b id="bellCount" hidden>0</b></button>
+    <a class="monitor-link" href="http://Hier Key eintragen:8092" target="_blank" rel="noopener noreferrer" aria-label="Monitoring öffnen" title="Monitoring öffnen">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 13l3-3 2 2 4-5m0 0v3m0-3h-3"/></svg>
+    </a>
+    <a class="docs-link" href="http://Hier Key eintragen:8094" target="_blank" rel="noopener noreferrer" aria-label="Doku öffnen" title="Doku öffnen">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5c-2.2-1.8-5.3-2-8-.8V19c2.7-1.2 5.8-1 8 .8m0-13.3c2.2-1.8 5.3-2 8-.8V19c-2.7-1.2-5.8-1-8 .8m0-12.5v12.5"/></svg>
+    </a>
   </div>
 </header>
+
+<div class="livebar" id="liveBar" title="Dieser PC, live alle 2 Sekunden"></div>
+
+<!-- ── iPad home (tablet.js): a calm room display instead of the PC's command centre ── -->
+<main class="tab" id="tab" aria-label="Jarvis">
+  <!-- one screen: bar, day and voice always fit, the mic never below the fold; the tiles follow -->
+  <div class="tscreen">
+  <header class="tbar">
+    <div class="tbrand"><i class="torbdot" id="tDot"></i><span>JARVIS</span></div>
+    <ol class="sstrip" id="sStrip" aria-hidden="true"></ol>
+    <div class="tslots" id="tSlots"></div>
+    <a class="monitor-link" href="http://Hier Key eintragen:8092" target="_blank" rel="noopener noreferrer" aria-label="Monitoring öffnen" title="Monitoring öffnen">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 13l3-3 2 2 4-5m0 0v3m0-3h-3"/></svg>
+    </a>
+    <a class="docs-link" href="http://Hier Key eintragen:8094" target="_blank" rel="noopener noreferrer" aria-label="Doku öffnen" title="Doku öffnen">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5c-2.2-1.8-5.3-2-8-.8V19c2.7-1.2 5.8-1 8 .8m0-13.3c2.2-1.8 5.3-2 8-.8V19c-2.7-1.2-5.8-1-8 .8m0-12.5v12.5"/></svg>
+    </a>
+    <button class="tmenu" id="tMenuBtn" aria-label="Einstellungen">⋯</button>
+  </header>
+
+  <section class="tday">
+    <div class="ttime" id="tTime">--:--</div>
+    <div class="tdate" id="tDate"></div>
+    <div class="thello" id="tHello"></div>
+    <div class="tweather">
+      <div class="tnow">
+        <span class="tsky" id="tSky">·</span>
+        <b class="ttemp" id="tTemp">—</b>
+        <div class="tnowtext"><em id="tSkyText">Wetter lädt</em><small id="tRange"></small></div>
+      </div>
+      <ol class="tdays" id="tDays"></ol>
+    </div>
+    <div class="tagenda">
+      <h3>Termine</h3>
+      <ol id="tAgenda"><li class="tempty">lädt …</li></ol>
+    </div>
+  </section>
+
+  <section class="tvoice">
+    <div class="torbwrap"><canvas id="tOrb" aria-hidden="true"></canvas></div>
+    <div class="tstate" id="tState">—</div>
+    <div class="tcap" id="tCap">
+      <p class="tme" id="tMe"></p>
+      <p class="tjar" id="tJar"></p>
+    </div>
+    <div class="tdock" id="tDock"></div>
+    <div class="tquick" id="tQuick"></div>
+  </section>
+
+  <!-- Stark-HUD only (stark.js): the machine room — PC, network, house as instruments -->
+  <aside class="ssys" id="sSys" aria-label="Systeme"></aside>
+  </div>
+
+  <section class="ttiles" id="tTiles"></section>
+
+  <div class="tsheet tdetail" id="tDetail" hidden>
+    <div class="tsheetbox">
+      <h3 id="tDetailTitle"></h3>
+      <div class="tdbody" id="tDetailBody"></div>
+      <button class="tsheetbtn tclose" id="tDetailClose">Schließen</button>
+    </div>
+  </div>
+
+  <div class="tsheet" id="tSheet" hidden>
+    <div class="tsheetbox">
+      <h3>Einstellungen</h3>
+      <div class="tsheetrow" id="tSheetBtns"></div>
+      <label class="tsheetsel">Layout auf diesem Gerät
+        <select id="tLayout"><option value="tablet">Raum-Display</option><option value="stark">Stark-HUD</option><option value="classic">Klassisch mit Gedächtnis-Graph</option></select></label>
+      <button class="tsheetbtn tclose" id="tSheetClose">Schließen</button>
+    </div>
+  </div>
+</main>
 
 <main class="grid">
 
@@ -86,10 +173,13 @@
       <button class="tool" id="btnDim" title="Toggle contrast">◐</button>
       <button class="tool" id="btnPair" title="iPhone, iPad koppeln oder entfernen">📱 Geräte</button>
       <button class="tool" id="btnWall" title="Kommandozentrale: Vollbild, ohne Eingabe — z. B. für den Zweitmonitor">⛶ Zentrale</button>
+      <button class="tool" id="btnStation" title="Station: dieses Gerät bleibt an, zeigt die Zentrale und hört auf „Jarvis“">🎙 Station</button>
       <button class="tool" id="btnMini" title="Minimaler Modus: nur Stimme und Gespräch">▭ Mini</button>
+      <button class="tool" id="btnRestart" title="Jarvis-Server neu starten (liest auch die .env neu)">⟳ Neustart</button>
       <span class="stagecount" id="stageCount"></span>
     </div>
 
+    <div class="nightshade" id="nightShade"><b id="nightClock"></b></div>
     <div class="canvaswrap">
       <canvas id="graph"></canvas>
       <div class="corestate" id="coreState"><b>STANDBY</b><span>awaiting uplink</span></div>
@@ -138,6 +228,11 @@
     <section class="panel widget" id="pSystem">
       <h2>Systeme <em id="sysAge">ok</em></h2>
       <ul class="sys" id="sysList"></ul>
+    </section>
+
+    <section class="panel widget" id="pHomelab">
+      <h2>Homelab <em id="labAge">Prometheus · Pi-hole</em></h2>
+      <div class="lab" id="labGrid"></div>
     </section>
 
     <section class="panel usage">
@@ -191,5 +286,11 @@
 
 <script src="graph.js"></script>
 <script src="app.js"></script>
+<script src="pip.js"></script>
+<script src="stark.js"></script>
+<script src="celestial.js"></script>
+<script src="layouts-plus.js"></script>
+<script src="layouts.js"></script>
+<script src="tablet.js"></script>
 </body>
 </html>

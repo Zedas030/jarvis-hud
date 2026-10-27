@@ -12,6 +12,7 @@ Kinds and what accepting does:
   routine   a routine → config/routines.json (routines.py)
   reminder  a reminder → the scheduler in the HUD server
   idea      needs new code: only noted as wanted, Jarvis never changes his own code
+  calendar  bookings found in mail (mail_events.py) -> into the calendar
 
 Stored in its own file (JARVIS_PROPOSALS), not in state.json, because both the
 server and jarvis_mcp.py (a separate process) write it. Proposals expire after
@@ -27,7 +28,7 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 PATH = pathlib.Path(os.environ.get("JARVIS_PROPOSALS", ROOT / "logs" / "proposals.json"))
 DAYS = int(os.environ.get("JARVIS_PROPOSAL_DAYS", "7"))
-KINDS = ("rules", "routine", "reminder", "idea", "skill")
+KINDS = ("rules", "routine", "reminder", "idea", "skill", "calendar")
 _LOCK = threading.Lock()
 
 
@@ -102,6 +103,11 @@ def describe(p):
         return f"Routine „{pl.get('name', p['title'])}“ anlegen. Auslöser: {', '.join(pl.get('triggers') or [])}. Schritte: {steps}"
     if p["kind"] == "reminder":
         return f"Erinnerung anlegen: {pl.get('text', p['title'])} um {pl.get('at', '?')}"
+    if p["kind"] == "calendar":
+        import mail_events
+        listed = mail_events.card_lines(pl.get("ids"))
+        return "Diese Termine aus Ihren Mails eintragen:\n" + ("\n".join(f"• {t}" for t in listed)
+                                                               or "(nicht mehr gefunden)")
     if p["kind"] == "skill":
         import learning
         import skill_factory
@@ -145,6 +151,9 @@ def accept(pid, internal=None):
     elif p["kind"] == "skill":
         import skill_factory
         result = skill_factory.activate(pl.get("key"))
+    elif p["kind"] == "calendar":
+        import mail_events
+        result = mail_events.add(pl.get("ids"))
     else:
         result = "Vorgemerkt."
     resolve(pid, "accepted")

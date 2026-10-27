@@ -2,43 +2,41 @@
 
 # J.A.R.V.I.S.
 
-**Personal voice assistant with memory, smart home control and an HUD — powered by Claude Code**
+**Persönlicher Sprachassistent mit Gedächtnis, Smart-Home-Steuerung und HUD — angetrieben von Claude Code**
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Windows%2011-0078D6?logo=windows&logoColor=white)
-![Claude Code](https://img.shields.io/badge/Brain-Claude%20Code%20CLI-D97757)
+![Platform](https://img.shields.io/badge/Plattform-Windows%2011-0078D6?logo=windows&logoColor=white)
+![Claude Code](https://img.shields.io/badge/Gehirn-Claude%20Code%20CLI-D97757)
 ![Home Assistant](https://img.shields.io/badge/Smart%20Home-Home%20Assistant-41BDF5?logo=homeassistant&logoColor=white)
-![Local first](https://img.shields.io/badge/Voice-local%20(Whisper%20%2B%20GPU--TTS)-2ea44f)
+![Local first](https://img.shields.io/badge/Sprache-lokal%20(Whisper%20%2B%20GPU--TTS)-2ea44f)
 
 </div>
 
 ---
 
-JARVIS is a self-hosted voice assistant in the style of the Iron Man computer. You talk to it hands-free in the browser, it answers with a natural voice, controls the smart home, knows your calendar, inbox and home network, and builds up a **persistent memory** in an Obsidian vault.
+JARVIS ist ein selbst gehosteter Sprachassistent im Stil des Iron-Man-Computers. Man spricht frei im Browser, er antwortet mit natürlicher Stimme, steuert das Smart Home, kennt Kalender, Postfach und Heimnetz, und er baut sich ein **dauerhaftes Gedächtnis** in einem Obsidian-Vault auf.
 
-The language model is the **Claude Code CLI** on a subscription, so there is no per-token API billing. To make the quota last, a **local intent router** answers simple commands without any LLM at all. Everything else runs as a **lean, stateless call** with its own short prompt and only the tools the request actually needs.
+Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine API-Abrechnung pro Token. Damit das Kontingent lange reicht, beantwortet ein **lokaler Intent-Router** einfache Befehle komplett ohne LLM. Alles andere läuft als **schlanker, zustandsloser Aufruf** mit eigenem Kurz-Prompt und nur den Werkzeugen, die die Anfrage wirklich braucht.
 
-> **Language:** Jarvis listens and speaks **German**. The router patterns, time parsing and spoken replies are German, so the example commands below are German with an English translation. Code, comments and docs are English.
-
-## Contents
+## Inhalt
 
 - [Highlights](#highlights)
-- [What it can do](#what-it-can-do)
-- [Architecture](#architecture)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Speech output: provider chain](#speech-output-provider-chain)
-- [Fallback mode: stand-in chain](#fallback-mode-stand-in-chain)
-- [Resources, context, tasks and memory](#resources-context-tasks-and-memory)
-- [Control, personality and everyday](#control-personality-and-everyday)
-- [Learning modules](#learning-modules)
-- [Efficiency: router and lean mode](#efficiency-router-and-lean-mode)
-- [Memory](#memory)
-- [On the go: iPhone and iPad](#on-the-go-iphone-and-ipad)
-- [Security model](#security-model)
-- [Project structure](#project-structure)
-- [Development and diagnostics](#development-and-diagnostics)
+- [Was alles möglich ist](#was-alles-möglich-ist)
+- [Architektur](#architektur)
+- [Schnellstart](#schnellstart)
+- [Konfiguration](#konfiguration)
+- [Bedienung](#bedienung)
+- [Sprachausgabe: Anbieter-Kette](#sprachausgabe-anbieter-kette)
+- [Notbetrieb: Ersatz-Kette](#notbetrieb-ersatz-kette)
+- [Ressourcen, Kontext, Aufgaben und Gedächtnis](#ressourcen-kontext-aufgaben-und-gedächtnis)
+- [Kontrolle, Persönlichkeit und Alltag](#kontrolle-persönlichkeit-und-alltag)
+- [Lernfähige Module](#lernfähige-module)
+- [Effizienz: Router und schlanker Modus](#effizienz-router-und-schlanker-modus)
+- [Gedächtnis](#gedächtnis)
+- [Unterwegs: iPhone und iPad](#unterwegs-iphone-und-ipad)
+- [Sicherheitsmodell](#sicherheitsmodell)
+- [Projektstruktur](#projektstruktur)
+- [Entwicklung und Diagnose](#entwicklung-und-diagnose)
 - [Roadmap](#roadmap)
 
 ---
@@ -47,230 +45,242 @@ The language model is the **Claude Code CLI** on a subscription, so there is no 
 
 | | |
 |---|---|
-| 🎙️ **Hands-free** | Live microphone with pause and end-of-sentence detection, push-to-talk, barge-in. Optional wake word ("Jarvis …" or locally via openWakeWord) and follow-up questions without addressing it again. |
-| ⏰ **Timers, alarms, reminders** | "Timer 10 minutes for the pasta", "Wake me tomorrow at 6:30", "Remind me about the laundry in 20 minutes", "Turn the light off in an hour". Local, no tokens, survives restarts. |
-| 📣 **Speaks up on its own** | Washing machine done, appointment in 15 minutes or "time to leave" (with travel time), parcel arriving today, storage full, NAS problem, new device on the Wi-Fi. With quiet hours. |
-| 📦 **Commute and parcels** | "When do I have to leave?" (travel time to the next appointment via OpenStreetMap), "Is a parcel coming today?" (from shipping mails). Local, no tokens. |
-| 🖥️ **PC control** | "Volume to 30 percent", "Mute", "Open Spotify", "Lock the screen". Spotify ducks while Jarvis talks; at night it speaks more quietly. |
-| 📉 **Gets cheaper over time** | Remembers phrasings Claude had to resolve once ("reading lamp off") and handles them itself afterwards. Identical questions within 5 minutes come from a cache. A "usage report" says how much ran locally. |
-| 🗣️ **Pronunciation** | NAS, Pi, kWh & co. are spoken correctly; add your own words by voice ("pronounce Tuya as Tuja"). |
-| 🛒 **Lists and routines** | Shopping and to-do list by voice (Home Assistant or a vault note). Routines like "good night": one phrase, several actions, created by voice. |
-| 🛡️ **Controlled and honest** | Rules enforced in code, not in the prompt; protection against instructions hidden in mails and web pages; audit log; emergency stop; traceable source of every memory; honest feedback when switching. |
-| 🎭 **Personality** | Standard, professional, technical, casual by voice; typed questions in detail, spoken ones short. |
-| 🪟 **Windows** | Arrange windows, workspaces, files and clipboard, screen text via local OCR, allow-listed scripts. |
-| 🎓 **Learns** | Rates its own conversations, proposes fixed rules on Sundays, a weekly review with patterns from sleep, steps, stress and golf, reports homelab outages only when relevant, suggests a new ability twice a week. No work topics, changes only by card. |
-| 🛟 **Fallback mode** | If Claude is down or the limit is reached, a free chain takes over: Groq → Gemini → Ollama, with the same tools and confirmation cards. |
-| 🧠 **Real memory** | Notes by topic, automatic conversation log, remembers and forgets on its own (expiry dates, trash). |
-| ⚡ **Local intent router** | Lights, sockets, music, time, weather, energy and system status without an LLM, answered in milliseconds. |
-| 🪶 **Lean LLM calls** | Own prompt instead of the Claude Code default, tools on demand, automatic model choice (Haiku/Sonnet). Measured at **more than 25× fewer tokens** than a default call. |
-| 🔊 **Fail-safe voice** | A chain of cloud, local GPU and free voices. Exhausted providers are skipped until their reset, without an audible break. |
-| 🏠 **Smart home** | Home Assistant: switching, reading states, energy (solar/battery), room climate, air quality. Optionally the full HA MCP server for automations and history. |
-| 🛰️ **Home network** | Status of a Raspberry Pi and a Synology NAS, device list, watcher for new devices on the Wi-Fi. |
-| 📅 **Everyday** | Calendar (CalDAV/iCloud), inbox (IMAP, read-only), Garmin health data, Spotify, web search. |
-| 🖥️ **HUD** | Dashboard with weather and activity traffic light, home, health, systems, mail, 3D knowledge graph and usage meter. |
-| 🔐 **Under control** | `localhost` only, confirmation cards for system changes, protected devices, no self-modification at runtime. |
+| 🎙️ **Freihändig sprechen** | Live-Mikrofon mit Pausen- und Satzende-Erkennung, Push-to-Talk, Unterbrechen durch Reinreden mit „Jarvis“. Optional mit Aktivierungswort („Jarvis …“ oder lokal per openWakeWord); ohne „Jarvis“ wird nichts bearbeitet oder protokolliert. |
+| ⏰ **Timer, Wecker, Erinnerungen** | *„Timer 10 Minuten für die Nudeln“*, *„Weck mich morgen um halb sieben“*, *„Erinnere mich in 20 Minuten an die Wäsche“*, *„Mach das Licht in einer Stunde aus“*. Lokal, ohne Tokens, übersteht Neustarts. |
+| 📣 **Meldet sich selbst** | Waschmaschine fertig, Termin in 15 Minuten bzw. „Zeit loszufahren“ (mit Fahrzeit), Paket kommt heute, Speicher voll, NAS-Problem, neues Gerät im WLAN. Mit Ruhezeiten. |
+| 📦 **Unterwegs und Post** | *„Wann muss ich los?“* (Fahrzeit zum nächsten Termin über OpenStreetMap), *„Kommt heute ein Paket?“* (aus den Versandmails). Lokal, ohne Tokens. |
+| 🖥️ **PC-Steuerung** | *„Lautstärke auf 30 Prozent“*, *„Ton aus“*, *„Öffne Spotify“*, *„Sperr den Bildschirm“*. Spotify wird leiser, solange Jarvis spricht; nachts spricht er leiser. |
+| 📉 **Wird sparsamer** | Merkt sich Formulierungen, die Claude einmal auflösen musste („Leselampe aus“), und schaltet sie danach selbst. Gleiche Fragen innerhalb von 5 Minuten kommen aus dem Zwischenspeicher. *„Verbrauchsbericht“* sagt, wie viel lokal lief. |
+| 🗣️ **Aussprache** | NAS, Pi, kWh & Co. werden richtig gesprochen; eigene Wörter per *„Sprich Tuya als Tuja aus“*. |
+| 🛒 **Listen und Routinen** | Einkaufs- und To-do-Liste per Sprache (Home Assistant oder Vault-Notiz). Routinen wie „Gute Nacht“: ein Satz, mehrere Aktionen, per Sprache angelegt. |
+| 🛡️ **Kontrolliert und ehrlich** | Feste Regeln im Code statt im Prompt, Schutz vor fremden Anweisungen in Mails und Webseiten, Audit-Log, Not-Aus, prüfbare Herkunft jeder Erinnerung, ehrliche Rückmeldung beim Schalten. |
+| 🎭 **Persönlichkeit** | Standard, Profi, Technisch, Locker per Zuruf; getippte Fragen ausführlich, gesprochene kurz. |
+| 🪟 **Windows** | Fenster anordnen, Arbeitsbereiche, Dateien und Zwischenablage, Bildschirmtext per lokaler OCR, freigegebene Skripte. |
+| 🎓 **Lernt dazu** | Bewertet seine Gespräche selbst, schlägt sonntags feste Regeln vor, macht einen Wochenrückblick mit Mustern aus Schlaf, Schritten, Stress und Golf, meldet Homelab-Ausfälle nur bei Relevanz und schlägt zweimal pro Woche eine neue Fähigkeit vor. Ohne Arbeitsthemen, Änderungen nur per Karte. |
+| 🛟 **Notbetrieb** | Fällt Claude aus oder ist das Limit erreicht, übernimmt eine kostenlose Kette: Groq → Gemini → Ollama, mit denselben Werkzeugen und Bestätigungskarten. |
+| 🧠 **Echtes Gedächtnis** | Notizen nach Themen, automatisches Gesprächsprotokoll, selbstständiges Merken und Vergessen (Ablaufdaten, Papierkorb). |
+| ⚡ **Lokaler Intent-Router** | Licht, Steckdosen, Musik, Uhrzeit, Wetter, Energie- und Systemstatus ohne LLM, mit Antwort in Millisekunden. |
+| 🪶 **Schlanke LLM-Aufrufe** | Eigener Prompt statt Claude-Code-Standard, Werkzeuge nach Bedarf, automatische Modellwahl (Haiku/Sonnet). In Messungen **über 25× weniger Tokens** als ein Standard-Aufruf. |
+| 🔊 **Ausfallsichere Stimme** | Kette aus Cloud-, lokalen GPU- und Gratis-Stimmen. Erschöpfte Anbieter werden bis zum Reset übersprungen, ohne hörbaren Abbruch. |
+| 🏠 **Smart Home** | Home Assistant: schalten, Zustände abfragen, Energie (Solar/Speicher), Raumklima, Luftqualität. Optional der volle HA-MCP-Server für Automationen und Verlauf. |
+| 🛰️ **Heimnetz** | Status von Raspberry Pi und Synology-NAS, Geräteliste, Wächter für neue Geräte im WLAN. |
+| 📅 **Alltag** | Kalender (CalDAV/iCloud), Postfach (IMAP, nur lesen), Garmin-Gesundheitsdaten, Spotify, Websuche. |
+| 🖥️ **HUD** | Dashboard mit Wetter- und Aktivitäts-Ampel, Haus, Gesundheit, Systeme, Post, 3D-Wissensgraph und Verbrauchsanzeige. |
+| 🔐 **Kontrolliert** | Nur `localhost`, Bestätigungskarten für Systemeingriffe, geschützte Geräte, kein Selbstumbau zur Laufzeit. |
 
 ---
 
-## What it can do
+## Was alles möglich ist
 
-The architecture separates the **router** (rules), **tools** (MCP server) and **memory** (Markdown), so new abilities usually take only a few lines.
+Die Architektur trennt **Router** (Regeln), **Werkzeuge** (MCP-Server) und **Gedächtnis** (Markdown). Neue Fähigkeiten lassen sich deshalb meist mit wenigen Zeilen ergänzen.
 
-**Everyday**
-- *„Guten Morgen“* (good morning) gives a daily briefing with weather, appointments, energy, nearly empty batteries and new mail.
-- *„Kann ich heute noch eine Runde laufen?“* (can I still go for a run today?) gives a traffic light from weather, wind, daylight and working hours.
-- *„Was steht morgen an?“* (what's on tomorrow?) or *„Trag mir Freitag um zehn den Zahnarzt ein“* (add the dentist on Friday at ten — with confirmation).
-- *„Hab ich wichtige Mails?“* (any important mail?) gives a summary without newsletters.
-- *„Merk dir, dass Anna am 3. Mai Geburtstag hat“* (remember that Anna's birthday is on May 3rd) creates a note under `Personen/Anna`.
-- *„Timer 8 Minuten für die Pizza“*, *„Wie lange noch?“*, *„Weck mich um 6:45“*, *„Schlummern“* (snooze), *„Wecker aus“* (alarm off)
-- *„Erinnere mich morgen um 9 daran, Anna anzurufen“* (remind me to call Anna tomorrow at 9), *„Welche Erinnerungen habe ich?“*
-- *„Setz Milch und Eier auf die Einkaufsliste“* (put milk and eggs on the shopping list), *„Was steht auf der Einkaufsliste?“*
-- *„Wenn ich Gute Nacht sage, mach alle Lichter aus und sag mir, wann der Wecker klingelt“* (when I say good night, turn off all lights and tell me when the alarm rings) creates a routine. After that, *„Gute Nacht“* runs without an LLM.
+**Im Alltag**
+- *„Guten Morgen“* liefert ein Tagesbriefing mit Wetter, Terminen, Energie, fast leeren Batterien und neuen Mails.
+- *„Kann ich heute noch eine Runde laufen / golfen?“* ergibt eine Ampel aus Wetter, Wind, Tageslicht und Arbeitszeit.
+- *„Was steht morgen an?“* bzw. *„Trag mir Freitag um zehn den Zahnarzt ein“* (mit Bestätigung).
+- *„Hab ich wichtige Mails?“* bringt eine Zusammenfassung ohne Newsletter.
+- *„Merk dir, dass Anna am 3. Mai Geburtstag hat“* legt eine Notiz unter `Personen/Anna` an.
+- *„Timer 8 Minuten für die Pizza“*, *„Wie lange noch?“*, *„Weck mich um 6:45“*, *„Schlummern“*, *„Wecker aus“*
+- *„Erinnere mich morgen um 9 daran, Anna anzurufen“*, *„Welche Erinnerungen habe ich?“*
+- *„Setz Milch und Eier auf die Einkaufsliste“*, *„Was steht auf der Einkaufsliste?“*, *„Streich die Milch“ … „von der Einkaufsliste“*
+- *„Wenn ich Gute Nacht sage, mach alle Lichter aus und sag mir, wann der Wecker klingelt“* legt eine Routine an. Danach läuft *„Gute Nacht“* ohne LLM.
 
-**Home**
-- *„Mach das Licht im Wohnzimmer auf 40 Prozent“* (living room light to 40 percent), *„Ist die Waschmaschine noch an?“*, *„Szene Kino“* (cinema scene)
-- *„Wie viel liefert die Solaranlage, und wie voll ist der Speicher?“* (solar output and battery level)
-- *„Welche Batterien muss ich tauschen?“* (which batteries need replacing?)
-- With the HA MCP server: *„Warum ist es im Schlafzimmer so kalt? Zeig mir den Verlauf.“* (why is the bedroom so cold? show me the history)
+**Zuhause**
+- *„Mach das Licht im Wohnzimmer auf 40 Prozent“*, *„Ist die Waschmaschine noch an?“*, *„Szene Kino“*
+- *„Wie viel liefert die Solaranlage, und wie voll ist der Speicher?“*
+- *„Welche Batterien muss ich tauschen?“*
+- Mit dem HA-MCP-Server: *„Warum ist es im Schlafzimmer so kalt? Zeig mir den Verlauf.“*
 
-**Tech and network**
-- *„Wie geht es dem Pi / dem NAS?“* (how is the Pi / the NAS?) reports temperature, storage and uptime, plus disk health with a warning from 85 %.
-- *„Ist ein unbekanntes Gerät im WLAN?“* (unknown device on the Wi-Fi?) The watcher also reports new devices on its own.
-- *„Starte die Container auf dem Pi neu“* (restart the containers on the Pi — SSH, with confirmation).
+**Technik und Netzwerk**
+- *„Wie geht es dem Pi / dem NAS?“* liefert Temperatur, Speicher und Laufzeit, außerdem den Plattenstatus mit Warnung ab 85 %.
+- *„Ist ein unbekanntes Gerät im WLAN?“* Neue Geräte meldet der Wächter von selbst.
+- *„Starte die Container auf dem Pi neu“* (SSH, mit Bestätigung).
 
-**Ideas for extensions** (see [Roadmap](#roadmap))
-- Focus sessions with distraction hints, camera or screen context
-- Room microphones (ESP32/satellites), several user profiles via speaker recognition
-- More tool groups: Paperless, Jellyfin/Plex, Proxmox, UniFi, vehicle APIs, fitness platforms
-- Your own voice from a voice sample (local), more languages
+**Erweiterungsideen** (siehe [Roadmap](#roadmap))
+- Fokus-Sitzungen mit Ablenkungs-Hinweisen, Kamera- oder Bildschirm-Kontext
+- Raum-Mikrofone (ESP32/Satelliten), mehrere Nutzerprofile per Sprecher-Erkennung
+- Weitere Werkzeuggruppen: Paperless, Jellyfin/Plex, Proxmox, Unifi, Fahrzeug-APIs, Fitness-Plattformen
+- Eigene Stimme per Sprachprobe (lokal), Mehrsprachigkeit
 
 ---
 
-## Architecture
+## Architektur
 
 ```mermaid
 flowchart LR
     subgraph Browser["Browser (HUD)"]
-        MIC[Microphone + VAD] --> STT
-        SPK[Playback sentence by sentence]
+        MIC[Mikrofon + VAD] --> STT
+        SPK[Wiedergabe Satz für Satz]
     end
     subgraph Server["server.py (127.0.0.1)"]
-        STT["/api/listen<br/>local Whisper"] --> RUN["/api/run"]
-        RUN --> R{"Intent router<br/>router.py"}
-        R -->|simple command| LOCAL[Code handler<br/>0 tokens]
-        R -->|real question| LEAN["Lean Claude call<br/>runtime.py"]
-        LEAN <--> MCP["Tools<br/>jarvis_mcp.py"]
+        STT["/api/listen<br/>Whisper lokal"] --> RUN["/api/run"]
+        RUN --> R{"Intent-Router<br/>router.py"}
+        R -->|einfacher Befehl| LOCAL[Code-Handler<br/>0 Tokens]
+        R -->|echte Frage| LEAN["Schlanker Claude-Aufruf<br/>runtime.py"]
+        LEAN <--> MCP["Werkzeuge<br/>jarvis_mcp.py"]
         SPEAK["/api/speak<br/>tts_chain.py"]
     end
     MCP --> HA[(Home Assistant)]
-    MCP --> NET[(Pi · NAS · network)]
-    MCP --> PIM[(Calendar · Mail · Garmin)]
-    MCP --> VAULT[(Obsidian vault)]
+    MCP --> NET[(Pi · NAS · Netzwerk)]
+    MCP --> PIM[(Kalender · Mail · Garmin)]
+    MCP --> VAULT[(Obsidian-Vault)]
     LOCAL --> SPEAK
     LEAN --> SPEAK
     SPEAK --> SPK
 ```
 
-| Component | Role |
+| Komponente | Aufgabe |
 |---|---|
-| `server.py` | HTTP server (`127.0.0.1` only), HUD, API endpoints, confirmation cards, usage log, self-restart on code changes |
-| `router.py` | Intent router: local handlers, choice of tool groups and model |
-| `runtime.py` | Starts `claude -p` lean (`--system-prompt`, `--tools`, `--strict-mcp-config`, `--setting-sources ""`, `--no-session-persistence`, `--effort`) with a pre-warmed process pool |
-| `commands.py` | Prompts, conversation window, state file, slash commands |
-| `jarvis_mcp.py` | MCP server with all tools in groups, confirmation gate, result size cap |
-| `memory.py` | Vault → knowledge graph, core memories, log, cleanup |
-| `voice.py` · `tts_chain.py` | Speech recognition and the speech output chain with adapters |
-| `local_tts_server.py` | Local GPU voice (Chatterbox Multilingual) in its own environment |
-| `briefing.py` · `dashboard.py` | Daily briefing, network watcher, HUD data |
-| `icloud_calendar.py` · `billing.py` | CalDAV calendar, API credit (Cost API) |
-| `jarvis_profile.py` | Profile and device mapping from `.env` and `config/home.json` |
-| `scheduler.py` | Timers, alarms, reminders and scheduled commands: parses German time expressions, rings |
-| `lists.py` · `routines.py` | Shopping/to-do list (HA to-do or vault note), routines from `config/routines.json` |
-| `events.py` · `watchers.py` | Push channel to the HUD (server-sent events, quiet hours) and the rules for proactive messages |
-| `wakeword.py` | Wake word: text detection or openWakeWord on the PC microphone |
-| `fallback_llm.py` | Fallback mode: stand-in chain Groq → Gemini → Ollama with the Jarvis tools |
-| `learning.py` · `answer_cache.py` | Learned phrasings (`config/learned.json`), usage report, answer cache |
-| `commute.py` · `parcels.py` | Travel time to appointments (Nominatim + OSRM), parcel status from shipping mails |
-| `pc.py` · `pronounce.py` | Volume, apps, screen lock, Spotify ducking (pycaw); pronunciation lexicon |
-| `ui/` | HUD (vanilla JS, dependency-free 3D knowledge graph) |
+| `server.py` | HTTP-Server (nur `127.0.0.1`), HUD, API-Endpunkte, Bestätigungskarten, Verbrauchsprotokoll, Selbst-Neustart bei Codeänderungen |
+| `router.py` | Intent-Router: lokale Handler, Wahl der Werkzeuggruppen und des Modells |
+| `runtime.py` | Startet `claude -p` schlank (`--system-prompt`, `--tools`, `--strict-mcp-config`, `--setting-sources ""`, `--no-session-persistence`, `--effort`) mit vorgewärmtem Prozess-Pool |
+| `commands.py` | Prompts, Gesprächsfenster, Zustandsdatei, Slash-Befehle |
+| `jarvis_mcp.py` | MCP-Server mit allen Werkzeugen in Gruppen, Bestätigungs-Schranke, Ergebnis-Obergrenze |
+| `memory.py` | Vault → Wissensgraph, Kern-Erinnerungen, Protokoll, Aufräumen |
+| `voice.py` · `tts_chain.py` | Spracherkennung und Sprachausgabe-Kette mit Adaptern |
+| `local_tts_server.py` | Lokale GPU-Stimme (Chatterbox Multilingual) in eigener Umgebung |
+| `briefing.py` · `dashboard.py` | Tagesbriefing, Netzwerk-Wächter, HUD-Daten |
+| `icloud_calendar.py` · `billing.py` | CalDAV-Kalender, API-Guthaben (Cost API) |
+| `jarvis_profile.py` | Profil und Geräte-Zuordnung aus `.env` und `config/home.json` |
+| `scheduler.py` | Timer, Wecker, Erinnerungen und geplante Befehle: deutsche Zeitangaben lesen, klingeln lassen |
+| `lists.py` · `routines.py` | Einkaufs-/To-do-Liste (HA-To-do oder Vault-Notiz), Routinen aus `config/routines.json` |
+| `events.py` · `watchers.py` | Push-Kanal zum HUD (Server-Sent Events, Ruhezeiten) und die Regeln für Meldungen von selbst |
+| `wakeword.py` | Aktivierungswort: Text-Erkennung oder openWakeWord am Mikrofon des PCs |
+| `fallback_llm.py` | Notbetrieb: Ersatz-Kette Groq → Gemini → Ollama mit Jarvis-Werkzeugen |
+| `learning.py` · `answer_cache.py` | Gelernte Formulierungen (`config/learned.json`), Verbrauchsbericht, Antwort-Zwischenspeicher |
+| `commute.py` · `parcels.py` | Fahrzeit zu Terminen (Nominatim + OSRM), Paketstatus aus Versandmails |
+| `pc.py` · `pronounce.py` | Lautstärke, Apps, Bildschirmsperre, Spotify-Ducking (pycaw); Aussprache-Lexikon |
+| `spotify.py` | Spotify-Web-API: Pause beim Aktivierungswort, danach weiter; play/pause/next auf jedem Gerät |
+| `ui/` | HUD (Vanilla JS, 3D-Wissensgraph ohne Abhängigkeiten) |
 
 ---
 
-## Quick start
+## Schnellstart
 
-**Requirements:** Windows 11 · Python 3.12 · Node.js · a Claude subscription. Optional: NVIDIA GPU (CUDA 12.8) for Whisper `large-v3-turbo` and the local voice.
+**Voraussetzungen:** Windows 11 · Python 3.12 · Node.js · ein Claude-Abo. Optional: NVIDIA-GPU (CUDA 12.8) für Whisper `large-v3-turbo` und die lokale Stimme.
 
 ```powershell
-# 1  Install Claude Code and sign in (subscription, no API key)
+# 1  Claude Code installieren und anmelden (Abo, kein API-Key)
 npm.cmd install -g @anthropic-ai/claude-code
 claude auth login
 
-# 2  Python environment
+# 2  Python-Umgebung
 py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 
-# 3  Configuration
-copy .env.example .env                           # fill in your values
-copy config\home.example.json config\home.json   # HA entity IDs (optional)
+# 3  Konfiguration
+copy .env.example .env                      # Werte eintragen
+copy config\home.example.json config\home.json   # HA-Entity-IDs eintragen (optional)
 mkdir vault\Erinnerungen
 
 # 4  Start
 start-jarvis.bat
 ```
 
-**Local voices (optional)**
+**Lokale Stimmen (optional)**
 
 ```powershell
-# Piper (CPU, works right away)
+# Piper (CPU, sofort einsatzbereit)
 mkdir models\piper
 curl -L -o models\piper\de_DE-thorsten-high.onnx      https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/de_DE-thorsten-high.onnx
 curl -L -o models\piper\de_DE-thorsten-high.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/de_DE-thorsten-high.onnx.json
 
-# Chatterbox Multilingual (GPU, ~5 GB) — details in requirements-tts.txt
+# Chatterbox Multilingual (GPU, ~5 GB) — Details in requirements-tts.txt
 py -3.12 -m venv .venv-tts
 .venv-tts\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 .venv-tts\Scripts\python.exe -m pip install --no-deps chatterbox-tts
 .venv-tts\Scripts\python.exe -m pip install -r requirements-tts.txt
-# Voice sample (~10 s, one you have the rights to): models\voice\reference.wav
+# Sprachprobe (~10 s, eigene Rechte): models\voice\reference.wav
 ```
 
-The server starts the GPU voice automatically as soon as `.venv-tts` exists.
+Der Server startet die GPU-Stimme automatisch, sobald `.venv-tts` existiert.
 
 ---
 
-## Configuration
+## Konfiguration
 
-Every setting is documented in [`.env.example`](.env.example). Personal data belongs only in `.env` and `config/home.json`; both are in `.gitignore`.
+Alle Einstellungen stehen kommentiert in [`.env.example`](.env.example). Persönliche Daten gehören ausschließlich in `.env` und `config/home.json`, beide sind in `.gitignore`.
 
-| Area | Variables | Purpose |
+| Bereich | Variablen | Zweck |
 |---|---|---|
-| Profile | `JARVIS_USER_NAME`, `JARVIS_PLACE`, `JARVIS_WEATHER_LAT/LON`, `JARVIS_TIMEZONE`, `JARVIS_BROWSER` | Form of address, location, browser |
-| Brain | `JARVIS_LEAN`, `JARVIS_LOCAL_ROUTER`, `JARVIS_MODEL_SIMPLE/SMART`, `JARVIS_EFFORT`, `JARVIS_MAX_OUTPUT_TOKENS`, `JARVIS_HISTORY_TURNS` | Router, model choice, context size |
-| Voice | `TTS_CHAIN`, `TTS_ANNOUNCE_SWITCH`, `FISH_AUDIO_*`, `ELEVENLABS_*`, `AZURE_*`, `GOOGLE_TTS_*`, `EDGE_*`, `LOCAL_TTS_URL` | Provider order and credentials |
-| Listening | `JARVIS_STT`, `WHISPER_LOCAL_*` | Speech recognition |
-| Wake word | `JARVIS_WAKE` (`off`/`text`/`oww`), `JARVIS_WAKE_*`, `JARVIS_FOLLOWUP_S` | "Jarvis …" instead of an always-open mic, follow-up window |
-| Proactive | `JARVIS_PROACTIVE`, `JARVIS_QUIET_HOURS`, `JARVIS_EVENT_LEAD_MIN`, `JARVIS_STORAGE_FULL` | Messages and quiet hours (alarms always ring) |
-| Lists | `JARVIS_SHOPPING_LIST`, `JARVIS_TODO_LIST` | HA to-do entity; empty = a note under `vault/Erinnerungen/Listen/` |
-| Fallback | `JARVIS_FALLBACK` (`groq,gemini,ollama`), `GROQ_API_KEY`, `GROQ_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `OLLAMA_URL`, `OLLAMA_MODEL`, `JARVIS_FALLBACK_PRIVATE` | Stand-in chain when Claude is unavailable; see [Fallback mode](#fallback-mode-stand-in-chain) |
-| Saving | `JARVIS_CACHE_S` (default 300, 0 = off) | Repeated read-only questions come from the cache for this long |
-| Commute | `JARVIS_HOME_LAT/LON` (else the weather coordinates), `JARVIS_TRAFFIC_FACTOR` (1.25), `JARVIS_COMMUTE_BUFFER_MIN` (5), `JARVIS_LEAVE_WARN_MIN` (5) | Starting point, traffic surcharge, buffer, advance warning |
-| PC and volume | `JARVIS_DUCK` (0.3, 0 = off), `JARVIS_DUCK_APPS` (spotify.exe), `JARVIS_NIGHT_VOLUME` (0.5) | Music quieter while speaking, voice volume in quiet hours; your own apps in `config/apps.json` |
-| Pronunciation | `config/aussprache.json` | Your own entries, created by voice |
-| Services | `ICLOUD_*`, `MAIL_*`, `HA_*`, `SYNOLOGY_*`, `JARVIS_PI_*`, `GARMIN_*` | Integrations; each one is optional |
-| Devices | `config/home.json` | Maps dashboard fields (solar, battery, rooms, router, air) to Home Assistant entities, plus `appliances` (power meters for "… is done") and `device_aliases` (extra words per device, e.g. "Wohnzimmer" and "Lampe" for a light Home Assistant only calls "LED"; picked up without a restart within 5 minutes) |
-| Routines | `config/routines.json` | Created by voice; format in `config/routines.example.json` |
+| Profil | `JARVIS_USER_NAME`, `JARVIS_PLACE`, `JARVIS_WEATHER_LAT/LON`, `JARVIS_TIMEZONE`, `JARVIS_BROWSER` | Anrede, Ort, Browser |
+| Gehirn | `JARVIS_LEAN`, `JARVIS_LOCAL_ROUTER`, `JARVIS_MODEL_SIMPLE/SMART`, `JARVIS_EFFORT`, `JARVIS_MAX_OUTPUT_TOKENS`, `JARVIS_HISTORY_TURNS` | Router, Modellwahl, Kontextgröße |
+| Stimme | `TTS_CHAIN`, `TTS_ANNOUNCE_SWITCH`, `FISH_AUDIO_*`, `ELEVENLABS_*`, `AZURE_*`, `GOOGLE_TTS_*`, `EDGE_*`, `LOCAL_TTS_URL` | Anbieter-Reihenfolge und Zugänge |
+| Hören | `JARVIS_STT`, `WHISPER_LOCAL_*` | Spracherkennung |
+| Aktivierungswort | `JARVIS_WAKE` (`off`/`text`/`oww`), `JARVIS_WAKE_*`, `JARVIS_FOLLOWUP_S` | „Jarvis …“ statt Dauer-Mikrofon. Ohne „Jarvis“ wird nichts bearbeitet oder protokolliert; `JARVIS_FOLLOWUP_S` > 0 erlaubt kurz Folgefragen ohne „Jarvis“ (Standard: aus) |
+| Von selbst melden | `JARVIS_PROACTIVE`, `JARVIS_QUIET_HOURS`, `JARVIS_EVENT_LEAD_MIN`, `JARVIS_STORAGE_FULL` | Meldungen und Ruhezeiten (Wecker klingeln immer) |
+| Listen | `JARVIS_SHOPPING_LIST`, `JARVIS_TODO_LIST` | HA-To-do-Entity, leer = Notiz unter `vault/Erinnerungen/Listen/` |
+| Notbetrieb | `JARVIS_FALLBACK` (`groq,gemini,ollama`), `GROQ_API_KEY`, `GROQ_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `OLLAMA_URL`, `OLLAMA_MODEL`, `JARVIS_FALLBACK_PRIVATE` | Ersatz-Kette, wenn Claude ausfällt; siehe [Notbetrieb](#notbetrieb-ersatz-kette) |
+| Sparen | `JARVIS_CACHE_S` (Standard 300, 0 = aus) | Gleiche Lese-Fragen so lange aus dem Zwischenspeicher |
+| Pendeln | `JARVIS_HOME_LAT/LON` (sonst Wetter-Koordinaten), `JARVIS_TRAFFIC_FACTOR` (1.25), `JARVIS_COMMUTE_BUFFER_MIN` (5), `JARVIS_LEAVE_WARN_MIN` (5) | Startpunkt, Verkehrszuschlag, Puffer, Vorwarnung |
+| PC und Lautstärke | `JARVIS_DUCK` (0.3, 0 = aus), `JARVIS_DUCK_APPS` (spotify.exe), `JARVIS_NIGHT_VOLUME` (0.5) | Musik leiser beim Sprechen, Stimme in den Ruhezeiten; eigene Apps in `config/apps.json` |
+| Spotify | `JARVIS_SPOTIFY_CLIENT_ID`, `JARVIS_SPOTIFY_HOLD` (1), `JARVIS_SPOTIFY_HOLD_MAX_S` (120), `JARVIS_SPOTIFY_HOLD_MODE` (leise), `JARVIS_SPOTIFY_QUIET_PCT` (1) | Bei „Jarvis“ wird die Musik auf jedem Gerät des Kontos (auch Handy an der Anlage) ganz leise und kommt danach auf die alte Lautstärke zurück; hat man sie zwischendurch von Hand verstellt, bleibt sie so. Mit `JARVIS_SPOTIFY_HOLD_MODE=pause` hält sie stattdessen an, ebenso auf Geräten, deren Lautstärke Spotify nicht setzen kann; Musikbefehle gehen übers Konto. Einmalig App auf developer.spotify.com (Redirect URI `http://127.0.0.1:8722/callback`), dann `scripts\spotify_login.py` |
+| Aussprache | `config/aussprache.json` | Eigene Einträge, entsteht per Sprache |
+| Dienste | `ICLOUD_*`, `MAIL_*`, `HA_*`, `SYNOLOGY_*`, `JARVIS_PI_*`, `GARMIN_*` | Integrationen; jede ist optional |
+| Geräte | `config/home.json` | Zuordnung der Dashboard-Felder (Solar, Speicher, Räume, Router, Luft) zu Home-Assistant-Entities, dazu `appliances` (Leistungsmesser für „… ist fertig“) und `device_aliases` (weitere Wörter je Gerät, z. B. „Wohnzimmer“ und „Lampe“ für ein Licht, das in Home Assistant nur „LED“ heißt; greift ohne Neustart nach spätestens 5 Minuten) |
+| Routinen | `config/routines.json` | Entsteht per Sprache; Format in `config/routines.example.json` |
 
-> **Important:** never set `ANTHROPIC_API_KEY`. Claude Code would then bill through the API instead of the subscription. The server removes the variable from the child processes' environment as a precaution.
+> **Wichtig:** `ANTHROPIC_API_KEY` nie setzen. Claude Code würde sonst per API statt über das Abo abrechnen. Der Server entfernt die Variable vorsorglich aus der Umgebung der Kindprozesse.
 
 ---
 
-## Usage
+## Bedienung
 
-| Action | How |
+| Aktion | So geht’s |
 |---|---|
-| Live mode | Click **Live**. The button shows the state: listening, hearing you, thinking, speaking, microphone blocked. With a wake word it waits for "Jarvis" and listens briefly after "Jarvis" and after each answer. |
-| Timers and alarms | Countdown in the top bar. It rings, then speaks. Talking, `Esc` or **Stop** ends the ringing; *„Schlummern“* snoozes for 9 minutes. |
-| Messages | Appear with a yellow border in the conversation and are read aloud; during quiet hours they are only shown. |
-| Push-to-talk | Hold the Live button, speak, release. |
-| Interrupt | Talk over it, or `Esc` / space bar |
-| Confirm | Click the card or say *„bestätigt“* (confirmed) / *„nein“*. A plain *„ja“* deliberately does not count. |
-| Typing | Input field, `Enter` |
-| Commands | `/new`, `/status`, `/recall <term>`, `/graph`, `/help` |
-| API credit | ✎ in the usage panel: enter your balance; spending is deducted via the Cost API |
+| Live-Modus | Klick auf **Live**. Der Button zeigt den Zustand: *Hört zu*, *Höre dich*, *Denkt*, *Spricht*, *Mikrofon blockiert*. Mit Aktivierungswort: *Sag „Jarvis“*, nach „Jarvis“ bzw. nach jeder Antwort kurz *Ich höre …*. |
+| Timer und Wecker | Countdown oben in der Leiste. Es klingelt, dann spricht er. Reinreden, `Esc` oder **Stop** beendet das Klingeln, *„Schlummern“* gibt 9 Minuten. |
+| Meldungen | Erscheinen mit gelbem Rand im Gespräch und werden vorgelesen; in den Ruhezeiten nur angezeigt. |
+| Push-to-Talk | Live-Button halten, sprechen, loslassen. |
+| Unterbrechen | „Jarvis“ in seine Antwort reinsagen (gern gleich mit der neuen Frage), oder `Esc` bzw. Leertaste. Ohne „Jarvis“ redet er beim Dazwischenreden einfach weiter |
+| Mini-Fenster | Verlässt du den Jarvis-Tab, steht unten rechts auf dem Desktop ein kleiner Roboter-Panda über allen Fenstern, darunter eine Leiste mit „Spricht / Hört zu / Denkt nach“, der letzten Zeile, **■ Stopp** und **🎙 Mikro**. Der Panda spielt den Zustand vor (Mund beim Sprechen, Ohren hoch beim Zuhören, schräger Kopf beim Nachdenken, schläft bei Pause) und zieht ein Gesicht passend zur Antwort: aus dem Ton-Tag (`[dry]` → kritisch, `[amused]` → fröhlich, `[sighs]` → besorgt …) oder aus Wörtern wie „leider“, „Fehler“, „erledigt“. Er folgt der Maus mit den Augen, freut sich über einen Klick (fünf schnelle Klicks: Pirouette) und lässt sich per Ziehen verschieben. Zurück im Tab verschwindet er. Ein eigenes Fenster des Servers, kein Browser-Bild-im-Bild; `JARVIS_OVERLAY=0` schaltet es ab, `JARVIS_OVERLAY_STYLE=karte` bringt die alte Karte mit Orb zurück |
+| 3D-Drucker | *„Wie weit ist der Drucker?“*, *„Welches Filament ist im AMS?“*, *„Wie heiß ist die Düse?“* — lokal aus Home Assistant (Integration [ha-bambulab](https://github.com/greghesp/ha-bambulab)), 0 Tokens. Jarvis sagt von selbst Bescheid, wenn ein Druck fertig ist, fehlschlägt, aus einem Grund anhält (Filament leer, erste Schicht, Filamentsalat …) oder der Drucker einen Fehler meldet. Er liest nur, steuern tut er den Drucker nie. `JARVIS_PRINTER=0` schaltet es ab |
+| Updates | *„Gibt es Updates?“* prüft FRITZ!Box und andere Home-Assistant-Geräte, NAS (DSM und Pakete) und Pi (Pakete, Pi-hole). *„Installier das Pi-hole-Update“* — jedes Gerät nur mit Freigabe-Karte, nie automatisch. DSM selbst und Docker bleiben Handarbeit, der Fire TV aktualisiert sich im Standby selbst |
+| Homelab | *„Wie schnell ist das Internet?“*, *„Wie viel hat der Pi-hole blockiert?“*, *„Wann war die CPU heute am höchsten?“* — Live-Werte und Verläufe aus Prometheus (FRITZ!Box, Pi, PC, Home Assistant; dieselben Daten wie in Grafana) und aus Pi-hole. Kachel „Homelab“ im HUD. Pi-hole braucht ein App-Passwort in `PIHOLE_PASSWORD`; `PROMETHEUS_URL` und `PIHOLE_URL` nur, wenn nicht auf dem Pi |
+| Live-Leiste | Unter der Kopfzeile: CPU, GPU, VRAM, GPU-Temperatur, RAM und Netzwerk ↓/↑ **dieses PCs**, alle 2 Sekunden, mit Verlauf der letzten 2 Minuten. Ohne NVIDIA-Karte fallen die GPU-Felder weg |
+| Neustart | **⟳ Neustart** oben im HUD startet den Server neu (mit Rückfrage, nur am PC) und liest dabei die `.env` neu — z. B. nach einem neuen Passwort |
+| Nachschlagen | Weiß Jarvis etwas nicht und steht es weder in den Notizen noch in seinen Werkzeugen, sucht er im Web, statt „weiß ich nicht“ zu sagen. Private Daten kommen nie in die Suche. `JARVIS_WEB_ALWAYS=0` beschränkt das auf Sätze mit „such“, „google“, „finde heraus“ … |
+| Pakete | Versandmails aller Konten (Shop, Paketdienst, Sendungsnummer) werden zu einem **ganztägigen Termin** „📦 Shop · DHL“ am erwarteten Liefertag. Den Tag liefern am besten die **Ankündigungsmails der Paketdienste** — kostenlos, ohne Fremddienst: Mailadresse einmal bei DHL (Post & DHL App, Paketankündigung), DPD (myDPD/Predict), Hermes, GLS (FlexDelivery) und UPS (My Choice) hinterlegen. Jarvis versteht „morgen“, „Montag, 26. Oktober“, „am Mittwoch“ und Zeitfenster („zwischen 10:15 und 11:15 Uhr“) und ordnet die Ankündigung über die Sendungsnummer der Bestellung zu. **Amazon** geht ohne Anmeldung bei Amazon: die Mails „Bestellt“ (mit Liefertag), „In Zustellung“ (mit Zeitfenster), „Versuchte Zustellung“ und „Geliefert“ werden über die Bestellnummer zu einer Sendung „📦 Amazon: Artikel“; Prime Video und Konto-Mails bleiben draußen. Optional: `TRACK17_API_KEY` (17TRACK, alle Dienste) oder `DHL_API_KEY`. Steht am Liefertag schon ein ähnlicher Eintrag im Kalender (etwa selbst eingetragen), legt er keinen zweiten an. Verschiebt sich der Tag, wandert der Termin mit; nach der Zustellung heißt er „✓ zugestellt“. Morgens am Liefertag und bei „abholbereit“ sagt Jarvis Bescheid. *„Wo bleibt mein Paket?“* · *„Termine rückgängig“*. Sofortlieferdienste (Uber Eats, Flink, …) bleiben draußen |
+| Mehrere Postfächer | Weitere Konten als `MAIL2_IMAP_HOST`, `MAIL2_USER`, `MAIL2_PASSWORD`, `MAIL2_NAME` (bis `MAIL9_`). Posteingang, Zähler, Briefing, Termine und Pakete gelten für alle; ein Konto, das gerade nicht antwortet, hält die anderen nicht auf. Gelesen werden nur Mails der letzten **24 Stunden** (`JARVIS_MAIL_LOOKBACK_HOURS`) — Posteingang, Termine und Pakete schauen nie weiter zurück |
+| Termine aus Mails | *„Trag mir die Buchungen aus meinen Mails ein“* — Jarvis liest die Kalenderanhänge der Bestätigungen der letzten 24 Stunden (PC CADDIE, golftimer, Golf House …), lässt Vergangenes, Storniertes und schon Eingetragenes weg (gleicher Tag, ähnlicher Titel — auch wenn Sie es selbst eingetragen haben), nennt Überschneidungen mit anderen Terminen und trägt die künftigen nach **einer** Sammelkarte in `ICLOUD_DEFAULT_CALENDAR` ein. Alle 30 Minuten (7–22 Uhr) schaut er von selbst nach: Buchungen **vertrauter Absender** (`JARVIS_MAIL_EVENTS_TRUSTED`, Standard PC CADDIE, golftimer, Golf House) trägt er sofort ein und sagt Bescheid — *„Termine rückgängig“* nimmt sie wieder heraus; bei allen anderen nennt er ausdrücklich Absender und Termin und dass der Absender nicht auf der Vertrauensliste steht, und schlägt sie nur vor. `JARVIS_MAIL_EVENTS_DAILY=0` schaltet das ab |
+| Bestätigen | Karte anklicken oder „bestätigt“ / „nein“ sagen. Ein bloßes „ja“ zählt bewusst nicht. |
+| Tippen | Eingabefeld, `Enter` |
+| Befehle | `/new`, `/status`, `/recall <Begriff>`, `/graph`, `/help` |
+| API-Guthaben | ✎ im Verbrauchsfeld: Stand eintragen, Ausgaben werden über die Cost API abgezogen |
 
 ---
 
-## Speech output: provider chain
+## Sprachausgabe: Anbieter-Kette
 
 ```
-Fish Audio ─▶ ElevenLabs ─▶ Local (Chatterbox GPU · Piper CPU) ─▶ Azure ─▶ Google ─▶ Edge
+Fish Audio ─▶ ElevenLabs ─▶ Lokal (Chatterbox GPU · Piper CPU) ─▶ Azure ─▶ Google ─▶ Edge
 ```
 
-- **One interface:** every provider is an adapter with `configured()`, `synth()` and `balance()`. The order is set in `TTS_CHAIN`.
-- **Exhausted** (402, quota/credit errors, invalid key, balance API reports 0): the provider is blocked until its reset, and that survives restarts. The reset is the date the API reports, the start of the month for free tiers, 6 h for an invalid key, otherwise 24 h. After that it is back in its place automatically.
-- **Temporary** (network, timeout, 5xx): only the current sentence switches provider and is regenerated in full. There is no audible break.
-- **Transparency:** the dashboard shows the active provider with remaining credit and the blocked providers with their dates. An optional short announcement marks a switch.
-- **Tone tags** like `[dry]` are applied by providers that support them and stripped for all others.
-- The chain is plain code; it uses no LLM tokens.
+- **Einheitliches Interface:** Jeder Anbieter ist ein Adapter mit `configured()`, `synth()` und `balance()`. Die Reihenfolge steht in `TTS_CHAIN`.
+- **Erschöpft** (402, Quota-/Credit-Fehler, ungültiger Key, Guthaben-API meldet 0): Der Anbieter ist bis zum Reset gesperrt, und das übersteht auch Neustarts. Als Reset gilt das Datum laut API, bei Free Tiers der Monatsanfang, bei ungültigem Key 6 h, sonst 24 h. Danach steht er automatisch wieder an seinem Platz.
+- **Vorübergehend** (Netzwerk, Timeout, 5xx): Nur der aktuelle Satz wechselt den Anbieter und wird vollständig neu erzeugt. Es entsteht kein hörbarer Abbruch.
+- **Transparenz:** Das Dashboard zeigt den aktiven Anbieter mit Restguthaben und die gesperrten Anbieter samt Datum. Beim Wechsel gibt es optional eine kurze Ansage.
+- **Ton-Tags** wie `[dry]` werden von Anbietern umgesetzt, die sie beherrschen, und für alle anderen entfernt.
+- Die Kette ist reiner Code, sie verbraucht keine LLM-Tokens.
 
 ---
 
-## Fallback mode: stand-in chain
+## Notbetrieb: Ersatz-Kette
 
-If the Claude quota is exhausted, the CLI does not start, or a call fails before a single word was said, the first available stage of this chain answers:
+Ist das Claude-Kontingent erschöpft, startet die CLI nicht oder bricht ein Aufruf ab, bevor ein Wort gesagt ist, antwortet die erste verfügbare Stufe dieser Kette:
 
-| Stage | Model | Cost | Note |
+| Stufe | Modell | Kosten | Hinweis |
 |---|---|---|---|
-| **Groq** | gpt-oss-120b (`GROQ_MODEL`) | free tier, key at console.groq.com | very fast, data not used for training |
-| **Gemini** | Gemini 3.5 Flash (`GEMINI_MODEL`) | free tier, key at aistudio.google.com | Google may use free-tier requests for training, so it **never** gets mail, calendar, health or the daily briefing |
-| **Ollama** | `qwen2.5:7b-instruct`, local | free, offline | last resort |
+| **Groq** | gpt-oss-120b (`GROQ_MODEL`) | Gratis-Tarif, Key auf console.groq.com | sehr schnell, keine Nutzung der Daten fürs Training |
+| **Gemini** | Gemini 3.5 Flash (`GEMINI_MODEL`) | Gratis-Tarif, Key auf aistudio.google.com | Google darf Gratis-Anfragen fürs Training nutzen, deshalb **nie** bei Mail, Kalender, Gesundheit oder dem Tagesbriefing |
+| **Ollama** | `qwen2.5:7b-instruct` lokal | kostenlos, offline | letzter Rettungsanker |
 
-- The stand-ins get **the same Jarvis tools** as Claude (the groups the router picks). `jarvis_mcp.py` runs as a child process for this, and whatever needs a confirmation card with Claude (e.g. `calendar_add`) needs one here too. Only `pc` (PowerShell) and the full HA MCP server are not available.
-- If a provider reports its own limit (HTTP 429), it is skipped until the retry time it gives; an invalid key or a model that is no longer offered blocks it for six hours (reason shown in the tooltip).
-- After read-only tools the next provider may take over; once a provider has **changed** something (switching, saving, calendar), no second one takes over, so nothing happens twice.
-- Providers without a key are simply skipped. `JARVIS_FALLBACK=ollama` restores the old local-only behaviour, `off` disables fallback mode.
-- `JARVIS_FALLBACK_PRIVATE` (default `groq,ollama`) sets which providers may see private requests.
-- The usage log records the answers as `fallback:groq`, `fallback:gemini` or `fallback:ollama`.
+- Die Ersatz-Modelle bekommen **dieselben Jarvis-Werkzeuge** wie Claude (die Gruppen, die der Router wählt). `jarvis_mcp.py` läuft dafür als Kindprozess, und was bei Claude eine Bestätigungskarte braucht (z. B. `calendar_add`), braucht sie auch hier. Nicht verfügbar sind nur `pc` (PowerShell) und der volle HA-MCP-Server.
+- Meldet ein Anbieter sein eigenes Limit (HTTP 429), wird er bis zur genannten Wartezeit übersprungen; ein ungültiger Key oder ein nicht mehr angebotenes Modell für sechs Stunden (Grund im Tooltip).
+- Hat ein Anbieter schon ein Werkzeug benutzt und fällt dann aus, übernimmt **kein** zweiter, damit nichts doppelt geschaltet wird.
+- Anbieter ohne Key werden einfach übersprungen. `JARVIS_FALLBACK=ollama` stellt das alte Verhalten wieder her, `off` schaltet den Notbetrieb ab.
+- `JARVIS_FALLBACK_PRIVATE` (Standard `groq,ollama`) legt fest, wer private Anfragen sehen darf.
+- Im Verbrauchsprotokoll stehen die Antworten als `fallback:groq`, `fallback:gemini` bzw. `fallback:ollama`.
 
 ```
 GROQ_API_KEY=...
@@ -279,225 +289,248 @@ GEMINI_API_KEY=...
 
 ---
 
-## Resources, context, tasks and memory
+## Ressourcen, Kontext, Aufgaben und Gedächtnis
 
-More layers on the existing architecture. All run without an LLM unless noted, and each can be switched off.
+Weitere Ausbaustufen auf der bestehenden Architektur. Alle laufen ohne LLM, außer wo vermerkt, und lassen sich einzeln abschalten.
 
-| Module | File | What it does | Say |
+| Modul | Datei | Was es tut | Befehle |
 |---|---|---|---|
-| **Resource manager** | `resources.py` | Measures VRAM, RAM, Ollama, the GPU voice and Whisper from real data and keeps a reserve free (`JARVIS_VRAM_RESERVE_MB`). Under pressure it gives memory back, only when idle: unload Ollama, then pause the GPU voice (Piper speaks), then move Whisper to the CPU — and takes it back later. Never interrupts a conversation. | "How full is the GPU?" · HUD row "GPU-Budget" |
-| **Skill factory** | `skill_factory.py` | Learned wordings are **drafts**; from the 2nd repetition they become a proposal, activated only after checks (device exists and is switchable, no clash with routines) and a confirmation card. Every version is kept and can be undone. | „Was hast du gelernt?“, „Nimm die Regel … zurück“ |
-| **Context engine** | `context.py` | Asks time, calendar, weather, timers, due plan steps, warnings, PC and home in parallel with time limits and a cache; stale or missing sources are marked. Every LLM request gets a short "situation". | „Wie sieht mein Tag aus?“ (local) |
-| **Task engine** | `tasks.py` | Checks in steps (NAS, Pi, network, PC, smart home, everything), each with time limit, retry and its own result check; cancel any time; report with a recovery plan. Never repairs anything itself. | „Prüf mein NAS“, „Systemcheck“ |
-| **Memory intelligence** | `memory_intel.py` | Duplicates are not saved; a contradiction (another home town, another date) is **never** overwritten — Jarvis asks. Names of people, projects and devices become graph links. Source "vermutet" (assumption) and an expiry date per entry. | „Prüf mein Gedächtnis“ |
-| **Monitoring** | `monitoring.py` | Storage forecast for NAS, system disk and Pi SD card with data basis and confidence; recurring outages named; the same notice from several sources merged; at most 6 spoken notices per hour. | „Wann ist das NAS voll?“ |
-| **Document search** | `docsearch.py` | Local full-text index (SQLite FTS5) of the shared folders and `JARVIS_DOC_ROOTS`, with file and position (page for PDF, via `pypdf`). | "What does the manual say about …?" |
-| **Vision** | `vision.py` | Describes the screen with Claude when local text recognition is not enough (layout, where a button is). Only on request, a **card for every picture**, blocked for password, banking and chat windows; the picture goes to Claude without any tools and is deleted afterwards. Off without Claude. | "Where is the setting in this window?" |
+| **Resource Manager** | `resources.py` | Misst VRAM, RAM, Ollama, GPU-Stimme und Whisper mit echten Werten. Hält eine Reserve frei (`JARVIS_VRAM_RESERVE_MB`). Wird es knapp, gibt er nur im Leerlauf Speicher ab: erst Ollama entladen, dann die GPU-Stimme pausieren (Piper spricht), dann Whisper auf die CPU. Später holt er alles wieder zurück. Ein Gespräch unterbricht er nie. | *„Wie voll ist die Grafikkarte?“* · HUD: Zeile „GPU-Budget“ |
+| **Skill Factory** | `skill_factory.py` | Gelernte Formulierungen sind zuerst ein **Entwurf**. Ab der 2. Wiederholung kommt ein Vorschlag, aktiviert wird erst nach Prüfung (Gerät vorhanden und schaltbar, keine Kollision mit Routinen) und Bestätigungskarte. Jede Version wird gespeichert und lässt sich zurücknehmen. | *„Was hast du gelernt?“*, *„Nimm die Regel Leselampe zurück“* |
+| **Context Engine** | `context.py` | Fragt Zeit, Kalender, Wetter, Timer, fällige Pläne, Warnungen, PC und Haus parallel ab, mit Zeitlimit und Cache. Veraltete oder fehlende Quellen werden markiert. Jede LLM-Anfrage bekommt eine kurze „Lage“. | *„Wie sieht mein Tag aus?“* (lokal) |
+| **Task Engine** | `tasks.py` | Prüfungen in Schritten (NAS, Pi, Netzwerk, PC, Smart Home, alles). Jeder Schritt hat Zeitlimit, Wiederholung und eigene Ergebnisprüfung, Abbruch ist jederzeit möglich. Am Ende gibt es einen Bericht mit Wiederherstellungsplan. Repariert wird **nie** automatisch. | *„Prüf mein NAS“*, *„Systemcheck“*, *„Brich die Prüfung ab“* |
+| **Memory Intelligence** | `memory_intel.py` | Doppeltes wird nicht gespeichert. Ein Widerspruch (z. B. ein anderer Wohnort, ein anderes Datum) wird **nie** überschrieben, Jarvis fragt nach. Namen von Personen, Projekten und Geräten werden zu Links im Graphen. Herkunft „vermutet“ und ein Ablaufdatum pro Eintrag sind möglich. | *„Prüf mein Gedächtnis“* |
+| **Monitoring** | `monitoring.py` | Speicherprognose für NAS, Systemplatte und Pi-Karte mit Datenbasis und Sicherheit. Wiederkehrende Ausfälle werden benannt. Gleiche Meldungen aus mehreren Quellen werden zusammengefasst, höchstens 6 gesprochene Hinweise pro Stunde. | *„Wann ist das NAS voll?“* |
+| **Dokumentensuche** | `docsearch.py` | Lokaler Volltext-Index (SQLite FTS5) über die freigegebenen Ordner und `JARVIS_DOC_ROOTS`, mit Fundstelle und Position (bei PDF die Seite). | *„Was steht im Handbuch zum Flusensieb?“* |
+| **Vision** | `vision.py` | Beschreibt den Bildschirm mit Claude, wenn die lokale Texterkennung nicht reicht (Aufbau, wo ein Knopf ist). Nur auf Nachfrage, mit **Karte je Bild**. Gesperrt bei Passwort-, Bank- und Chat-Fenstern. Das Bild geht ohne Werkzeuge an Claude und wird danach gelöscht. Ohne Claude bleibt Vision aus. | *„Wo finde ich in diesem Fenster die Einstellung?“* |
 
-| Variable | Default | Purpose |
+| Variable | Standard | Zweck |
 |---|---|---|
-| `JARVIS_RESOURCES`, `JARVIS_VRAM_RESERVE_MB`, `JARVIS_VRAM_HYSTERESIS_MB` | `1`, `1500`, `1000` | Resource manager, free reserve, margin before taking back |
-| `JARVIS_TTS_VRAM_MB`, `JARVIS_WHISPER_VRAM_MB` | `4000`, `1800` | Needs of the GPU voice and Whisper (settings, not measurements) |
-| `JARVIS_OLLAMA_IDLE_S`, `JARVIS_OLLAMA_SMALL_MODEL` | `180`, empty | Unload Ollama when idle; smaller model when memory is short |
-| `JARVIS_SKILL_MIN_SEEN` | `2` | Repetitions before a draft is proposed |
-| `JARVIS_CONTEXT_TIMEOUT` | `4` | Time limit per context source in seconds |
-| `JARVIS_TASK_STEP_TIMEOUT`, `JARVIS_TASK_MAX_RUNNING` | `45`, `2` | Time limit per check step, parallel checks |
-| `JARVIS_FORECAST_WINDOW`, `JARVIS_FORECAST_WARN_DAYS` | `30`, `60` | Forecast window, warning threshold in days |
-| `JARVIS_DEDUP_SECONDS`, `JARVIS_SAY_PER_HOUR` | `1800`, `6` | Merge identical notices, spoken notices per hour |
-| `JARVIS_HOME_IGNORE` | inverters, internet-access switches | Entities the smart-home check skips (regex) |
-| `JARVIS_DOCSEARCH`, `JARVIS_DOC_ROOTS`, `JARVIS_DOC_MAX_FILES`, `JARVIS_DOC_MAX_MB` | `1`, empty, `5000`, `20` | Document search, extra folders, limits |
-| `JARVIS_VISION`, `JARVIS_VISION_MODEL`, `JARVIS_VISION_MAX_WIDTH` | `1`, `sonnet`, `1600` | Screen description on/off, model, max picture width |
+| `JARVIS_RESOURCES`, `JARVIS_VRAM_RESERVE_MB`, `JARVIS_VRAM_HYSTERESIS_MB` | `1`, `1500`, `1000` | Resource Manager, freie Reserve, Abstand fürs Zurückholen |
+| `JARVIS_TTS_VRAM_MB`, `JARVIS_WHISPER_VRAM_MB` | `4000`, `1800` | Bedarf der GPU-Stimme und von Whisper (Einstellung, keine Messung) |
+| `JARVIS_OLLAMA_IDLE_S`, `JARVIS_OLLAMA_SMALL_MODEL` | `180`, leer | Ollama nach Leerlauf entladen; kleineres Modell bei knappem Speicher |
+| `JARVIS_SKILL_MIN_SEEN` | `2` | Ab so vielen Wiederholungen wird ein Entwurf vorgeschlagen |
+| `JARVIS_CONTEXT_TIMEOUT` | `4` | Zeitlimit je Kontextquelle in Sekunden |
+| `JARVIS_TASK_STEP_TIMEOUT`, `JARVIS_TASK_MAX_RUNNING` | `45`, `2` | Zeitlimit je Prüfschritt, gleichzeitige Prüfungen |
+| `JARVIS_FORECAST_WINDOW`, `JARVIS_FORECAST_WARN_DAYS` | `30`, `60` | Prognosezeitraum, Warnschwelle in Tagen |
+| `JARVIS_DEDUP_SECONDS`, `JARVIS_SAY_PER_HOUR` | `1800`, `6` | Gleiche Meldung zusammenfassen, gesprochene Hinweise pro Stunde |
+| `JARVIS_HOME_IGNORE` | Wechselrichter, Internet-Zugriffsschalter | Entities, die der Smart-Home-Check übergeht (Regex) |
+| `JARVIS_DOCSEARCH`, `JARVIS_DOC_ROOTS`, `JARVIS_DOC_MAX_FILES`, `JARVIS_DOC_MAX_MB` | `1`, leer, `5000`, `20` | Dokumentensuche, weitere Ordner, Grenzen |
+| `JARVIS_VISION`, `JARVIS_VISION_MODEL`, `JARVIS_VISION_MAX_WIDTH` | `1`, `sonnet`, `1600` | Bildbeschreibung an/aus, Modell, maximale Bildbreite |
 
-The stand-in providers that may train on prompts (Gemini free tier) no longer see the user profile, name or memory notes at all.
+Lokale Daten (in `.gitignore`): `logs/tasks.json`, `logs/metrics_daily.json`, `logs/docindex.sqlite`, `config/learned.history.jsonl`.
 
 ---
 
-## Control, personality and everyday
+## Kontrolle, Persönlichkeit und Alltag
 
-Six expansion packages, each with its own tests. The rules behind them are in [SECURITY.md](SECURITY.md), the structure in [ARCHITECTURE.md](ARCHITECTURE.md). Spoken commands are German; translations in brackets.
+Sechs Ausbaustufen, jede mit eigenen Tests. Die Regeln dahinter stehen in [SECURITY.md](SECURITY.md), der Aufbau in [ARCHITECTURE.md](ARCHITECTURE.md).
 
-**Trust and safety**
-- Every tool has a fixed class in code (`policy.py`): read, small change, card required, blocked. Locks, alarm systems and cameras are never switched.
-- Mails, web pages, calendar entries, files, clipboard and screen text are **untrusted data**: wrapped as such, and afterwards every change in the same request needs a card.
-- *„Was hast du heute gemacht?“* (what did you do today?) reads the audit log (`logs/audit.jsonl`).
-- *„Jarvis, stopp alles“* / *„Not-Aus“* (emergency stop): open cards are denied, Claude is stopped, messages and planned commands pause for two hours; alarms still ring. *„Weitermachen“* resumes.
-- Memory: every new entry carries its source and date (*gesagt* = said, *abgeleitet* = inferred). Plus "what do you know about me?", "why did you save that?", "correct …", "forget …" (with a card, goes to the trash) and "export my memory". A daily backup goes to `backups/`.
-- After switching, Jarvis reads the state back and says honestly when a device did not react.
+**Vertrauen und Sicherheit**
+- Jedes Werkzeug hat eine feste Klasse im Code (`policy.py`): Lesen, kleine Änderung, nur mit Karte, gesperrt. Schlösser, Alarmanlagen und Kameras schaltet Jarvis nie.
+- Mails, Webseiten, Kalender, Dateien, Zwischenablage und Bildschirm gelten als **fremde Daten**: Sie werden markiert, und danach braucht jede Änderung im selben Auftrag eine Karte.
+- *„Was hast du heute gemacht?“* liest das Audit-Log (`logs/audit.jsonl`).
+- *„Jarvis, stopp alles“* / *„Not-Aus“*: Offene Karten werden abgelehnt, Claude gestoppt, Meldungen und Geplantes pausieren zwei Stunden. Wecker klingeln weiter. *„Weitermachen“* hebt es auf.
+- Gedächtnis: Jeder neue Eintrag trägt Herkunft und Datum (*gesagt* oder *abgeleitet*). Dazu *„Was weißt du über mich?“*, *„Warum hast du das gespeichert?“*, *„Korrigiere: …“*, *„Vergiss das mit …“* (mit Karte, landet im Papierkorb) und *„Exportier mein Gedächtnis“*. Ein tägliches Backup liegt in `backups/`.
+- Beim Schalten liest Jarvis den Zustand zurück und sagt ehrlich, wenn ein Gerät nicht reagiert.
 
-**Personality**
-- *„Profi-Modus“* (professional), *„sei mal locker“* (casual), *„technischer Modus für zwei Stunden“* (technical, for two hours), *„zurück zum Normalen“* (back to standard), *„welcher Modus?“* — local, 0 tokens. Own profiles in `config/profiles.json`.
-- In every profile: no jokes about outages or bad news, uncertainty is said openly.
-- **Typed** questions get detailed, structured answers; only the first paragraph is read aloud.
+**Persönlichkeit**
+- *„Profi-Modus“*, *„sei mal locker“*, *„technischer Modus für zwei Stunden“*, *„zurück zum Normalen“*, *„welcher Modus?“*: lokal, ohne Tokens. Eigene Profile in `config/profiles.json`.
+- In jedem Profil gilt: kein Witz bei Ausfällen und schlechten Nachrichten, Unsicherheit wird offen gesagt.
+- **Getippte** Fragen bekommen ausführliche Antworten mit Listen, vorgelesen wird nur der erste Absatz.
 
-**Windows and screen**
-- *„Spotify nach rechts“*, *„Browser links und Code rechts auf Monitor 2“* — local. A workspace is a routine with steps like „Öffne Discord“ (open Discord) and „Discord nach rechts“.
-- Search and read files only in Desktop, Documents and Downloads (`JARVIS_FILE_ROOTS`): text, code and Word, no work files.
-- Clipboard and screen only on request; the screen text is recognised by the Windows OCR on the PC, the image never leaves it. Refused while a password manager, banking or messenger window is visible.
-- Scripts only from `config/scripts.json`, always with a card.
+**Windows und Bildschirm**
+- *„Spotify nach rechts“*, *„Browser links und Code rechts auf Monitor 2“*: lokal. Ein Arbeitsbereich ist eine Routine mit Schritten wie *„Öffne Discord“* und *„Discord nach rechts“*.
+- *„Such die Packliste“*, *„Lies mir die Datei vor“*: nur in Desktop, Dokumente und Downloads (`JARVIS_FILE_ROOTS`). Text, Code und Word, keine Arbeitsdateien.
+- *„Was habe ich kopiert?“*, *„Was steht in der Fehlermeldung auf meinem Bildschirm?“*: Die Texterkennung ist lokal, das Bild verlässt den PC nicht. Bei sichtbarem Passwortmanager, Banking oder Messenger lehnt Jarvis ab.
+- Skripte nur aus `config/scripts.json`, immer mit Karte.
 
-**Infrastructure and smart home**
-- PC status: CPU, RAM, GPU, VRAM (with the programs behind it), disks. Network diagnosis: router, internet, DNS, web — with a verdict where the problem is.
-- Hyper Backup status from the Synology (the Jarvis DSM user needs the rights to see the tasks).
-- "Are all sensors online?": unavailable devices, low batteries, silent sensors.
-- The homelab observer also watches GPU temperature and the system disk, checks backups daily, keeps an incident history and pushes critical events to the phone (`JARVIS_PHONE_NOTIFY`).
+**Infrastruktur und Smart Home**
+- *„Wie geht's dem PC?“* zeigt CPU, RAM, GPU, VRAM (mit den Programmen dahinter) und Platten. *„Warum ist das Internet langsam?“* prüft Router, Internet, DNS und Webseiten und sagt, wo das Problem liegt.
+- *„Laufen die Backups?“* fragt Hyper Backup auf dem NAS ab. Der Jarvis-Benutzer braucht dafür Leserechte auf die Aufgaben.
+- *„Sind alle Sensoren online?“* meldet nicht erreichbare Geräte, schwache Batterien und stille Sensoren.
+- Der Homelab-Beobachter überwacht jetzt auch GPU-Temperatur und Systemplatte, prüft täglich die Backups, führt eine Ereignis-Historie und schickt Kritisches aufs Handy (`JARVIS_PHONE_NOTIFY`).
 
-**Organisation and research**
-- Mail **drafts** in the mailbox's Drafts folder, with a card — nothing is ever sent.
-- "What do I need to know for tomorrow?": appointments with travel and leave time and matching notes; work appointments only counted.
-- Research mode with dated sources, contradictions named, assumptions marked; saved under `Recherchen/`.
-- Watched topics: up to 5, at most 2 checks a day, Jarvis only speaks up when something is new.
-- Plans over several days: `Projekte/<title>` with a checklist and a reminder per step.
+**Organisation und Recherche**
+- *„Schreib Anna eine Mail, ob es bei Samstag bleibt“* legt einen **Entwurf** im Postfach an, mit Karte. Gesendet wird nie.
+- *„Was muss ich für morgen wissen?“* liefert Termine mit Fahrzeit, Losfahrzeit und passenden Notizen. Arbeitstermine werden nur gezählt.
+- *„Recherchier gründlich …“* liefert Quellen mit Datum, nennt Widersprüche, kennzeichnet Vermutungen und speichert das Ergebnis unter `Recherchen/`.
+- *„Sag Bescheid, wenn es Neues zu … gibt“*: höchstens 5 Themen und höchstens 2 Prüfungen am Tag. Jarvis meldet sich nur, wenn es wirklich Neues gibt.
+- *„Plan mir den Umzug über zwei Wochen“* legt `Projekte/Umzug` an, mit Checkliste und einer Erinnerung pro Schritt.
 
 **HUD**
-- Shows who answered last and why (e.g. *Haiku · home · simple* or *lokal · Router, 0 Tokens*).
-- A waveform of the real microphone or voice signal — no fake animation.
-- 🔔 opens the notification centre: messages, homelab incidents, open proposals, emergency stop.
-- **⛶ Zentrale**: full-screen command centre without input (second monitor, `?view=wall`); **▭ Mini**: conversation and voice only (`?view=mini`).
-- A row for this PC under "Systeme".
+- Unter „CLI“ steht, wer zuletzt geantwortet hat und warum (z. B. *Haiku · home · simple* oder *lokal · Router, 0 Tokens*).
+- Eine Wellenform zeigt das echte Mikrofon- bzw. Stimmsignal, ohne Fake-Animation.
+- 🔔 oben rechts öffnet die Meldungszentrale: Meldungen, Homelab-Ausfälle, offene Vorschläge, Not-Aus.
+- **⛶ Zentrale** ist eine Vollbild-Kommandozentrale ohne Eingabe (z. B. für den Zweitmonitor, auch per `?view=wall`). **▭ Mini** zeigt nur Gespräch und Stimme (`?view=mini`).
+- Bei „Systeme“ gibt es eine Zeile für diesen PC.
 
-| Variable | Default | Purpose |
+| Variable | Standard | Zweck |
 |---|---|---|
-| `JARVIS_PAUSE_HOURS` | `2` | Length of the emergency stop |
-| `JARVIS_AUDIT_DAYS`, `JARVIS_BACKUP_KEEP` | `90`, `14` | Keep audit log and vault backups |
-| `JARVIS_VERIFY_SECONDS` | `2.5` | How long Jarvis waits for the new device state |
-| `JARVIS_FILE_ROOTS` | Desktop, Documents, Downloads | Shared folders, comma-separated |
-| `JARVIS_SCREEN_BLOCK` | empty | More window titles that block screen reading |
-| `JARVIS_PHONE_NOTIFY`, `JARVIS_PHONE_PUSH` | empty, `critical` | HA notify service for the phone; what is pushed (`critical`, `all`, `off`) |
-| `JARVIS_WATCH_MAX`, `JARVIS_WATCH_PER_DAY` | `5`, `2` | Watched topics and checks per day |
-| `JARVIS_PLAN_REMIND` | `09:00` | Time of plan reminders |
+| `JARVIS_PAUSE_HOURS` | `2` | Dauer des Not-Aus |
+| `JARVIS_AUDIT_DAYS`, `JARVIS_BACKUP_KEEP` | `90`, `14` | Audit-Log und Vault-Backups aufheben |
+| `JARVIS_VERIFY_SECONDS` | `2.5` | So lange wartet Jarvis auf den neuen Gerätezustand |
+| `JARVIS_FILE_ROOTS` | Desktop, Dokumente, Downloads | Freigegebene Ordner, kommagetrennt |
+| `JARVIS_SCREEN_BLOCK` | leer | Weitere Fenstertitel, bei denen der Bildschirm nicht gelesen wird |
+| `JARVIS_PHONE_NOTIFY`, `JARVIS_PHONE_PUSH` | leer, `critical` | HA-Notify-Dienst fürs Handy, was gepusht wird (`critical`, `all`, `off`) |
+| `JARVIS_WATCH_MAX`, `JARVIS_WATCH_PER_DAY` | `5`, `2` | Beobachtete Themen und Prüfungen pro Tag |
+| `JARVIS_PLAN_REMIND` | `09:00` | Uhrzeit der Erinnerungen in Plänen |
+| `config/profiles.json`, `config/scripts.json`, `config/homelab.json` | — | Eigene Profile, freigegebene Skripte, wichtige Geräte (Vorlagen `*.example.json`) |
 
 ---
 
-## Learning modules
+## Lernfähige Module
 
-Four background modules, each in its own file. For all of them:
-- **No work topics:** anything that looks like work is not logged, evaluated or saved (`privacy.py`, own terms in `JARVIS_WORK_TERMS`) — this also covers the conversation log and `memory_save`.
-- **Changes only with a card:** background jobs never change anything themselves. They store a proposal (`proposals.py`); in the next conversation Jarvis explains it in German, and only the confirmation card (`proposal_accept`) carries it out.
+Vier Module laufen im Hintergrund, jedes in einer eigenen Datei. Für alle gilt:
+- **Keine Arbeitsthemen:** Was nach Arbeit aussieht, wird weder protokolliert noch ausgewertet oder gespeichert (`privacy.py`, eigene Begriffe in `JARVIS_WORK_TERMS`). Das gilt auch für das Gesprächsprotokoll und für `memory_save`.
+- **Änderungen nur mit Karte:** Hintergrundjobs ändern nichts selbst. Sie legen einen Vorschlag ab (`proposals.py`), Jarvis erwähnt ihn im nächsten Gespräch, erklärt auf Deutsch, was passiert und warum, und erst die Bestätigungskarte (`proposal_accept`) führt ihn aus. Die Erklärung steht auch auf der Karte.
+- **Erst der Kalender, dann der Vorschlag:** Bevor Jarvis einen Termin zum Eintragen vorschlägt oder selbst einträgt (`calendar_add`, Termine aus Mails, Lieferungen), liest der Code den Kalender für diesen Tag (`icloud_calendar.check`). Steht dort schon ein Termin mit ähnlichem Titel, kommt kein Vorschlag und keine Karte; überschneidet er sich mit einem anderen, steht das auf der Karte und in der Ansage.
 
-| Module | File | What it does | When |
+| Modul | Datei | Was es tut | Wann |
 |---|---|---|---|
-| **Learning loop** | `reflection.py` | After each conversation rates what went well and what was corrected, in the note **Lernprotokoll**. Condenses the week into rules; confirmed rules live in **Vorlieben** under "Gelernte Regeln" and apply to every turn. "Streich die Regel …" removes one. | 30 min after the last exchange; rules Sundays from 19:00 |
-| **Weekly review** | `weekly_review.py` | Fetches sleep, steps, stress, Body Battery and golf rounds from Garmin daily; Sunday review with last-week comparison and patterns computed in code (with day counts). Meal times, alcohol and coffee are noted when you say them. Note **Gesundheit/Wochenrückblick YYYY-KWnn**. | fetch from 9:00; review Sundays from 18:00 |
-| **Homelab observer** | `homelab_watch.py` | Home Assistant, Pi (services, containers, temperature, SD card, load), NAS and important devices from `config/homelab.json`. Outages only after two checks, one message per incident plus recovery, only critical ones at night, fixed limits and — after a learning week — outliers from the normal range. 0 tokens. | every 5 minutes |
-| **Suggestions** | `suggestions.py` | Suggests one new ability that fits the habits of the last two weeks, with a reason. Routines and reminders are set up after the card; anything needing code is only noted. List with status in the note **Vorschläge**. | Tuesday and Friday 18:30 |
+| **Lernschleife** | `reflection.py` | Bewertet nach jedem Gespräch, was gut lief und was korrigiert wurde, und schreibt das in die Notiz **Lernprotokoll**. Verdichtet die Woche zu Regeln; bestätigte Regeln stehen in **Vorlieben** unter „Gelernte Regeln“ und gelten ab dann in jedem Gespräch. *„Streich die Regel …“* entfernt eine wieder. | 30 min nach dem letzten Wortwechsel; Regeln sonntags ab 19 Uhr |
+| **Wochenrückblick** | `weekly_review.py` | Holt täglich Schlaf, Schritte, Stress, Body Battery und Golfrunden von Garmin, sonntags Rückblick mit Vergleich zur Vorwoche und Mustern (im Code berechnet, mit Anzahl der Tage). Essenszeiten, Alkohol und Kaffee notiert Jarvis, wenn man sie sagt (*„Hab um 22 Uhr gegessen“*). Notiz: **Gesundheit/Wochenrückblick JJJJ-KWnn** | Abruf ab 9 Uhr; Rückblick sonntags ab 18 Uhr |
+| **Homelab-Beobachter** | `homelab_watch.py` | Home Assistant, Pi (Dienste, Container, Temperatur, Speicherkarte, Last), NAS und wichtige Geräte aus `config/homelab.json`. Meldet Ausfälle erst nach zwei Prüfungen, einmal pro Vorfall plus Entwarnung, nachts nur Kritisches, auffällige Werte nach festen Grenzen und nach einer Lernwoche auch gegen die eigenen Normalwerte. Neue WLAN-Geräte meldet weiterhin der bestehende Wächter. 0 Tokens. | alle 5 Minuten |
+| **Vorschläge** | `suggestions.py` | Schlägt eine neue Fähigkeit vor, die zu den Gewohnheiten der letzten zwei Wochen passt, mit Begründung. Routinen und Erinnerungen richtet er nach der Karte selbst ein; was neuen Code bräuchte, wird nur notiert. Liste mit Status in der Notiz **Vorschläge**. | dienstags und freitags 18:30 |
 
-Background jobs use Claude Haiku (`JARVIS_BACKGROUND_MODEL`) as their own short call without tools, outside the conversation lock; when Claude is at its limit only Groq or Ollama (never Gemini). Usage is logged as `background:…`, about 30–60k tokens a week.
+Hintergrundjobs nutzen Claude Haiku (`JARVIS_BACKGROUND_MODEL`) als eigenen kurzen Aufruf, ohne Werkzeuge und ohne den Gesprächsablauf zu blockieren; ist Claude am Limit, nur Groq oder Ollama (nie Gemini). Verbrauch steht in `logs/usage.jsonl` als `background:…`, geschätzt 30–60k Tokens pro Woche.
 
-| Variable | Default | Purpose |
+| Variable | Standard | Zweck |
 |---|---|---|
-| `JARVIS_WORK_TERMS` | empty | Your own work terms (employer, colleagues, customers, projects), comma-separated |
-| `JARVIS_REFLECT`, `JARVIS_REVIEW`, `JARVIS_HOMELAB`, `JARVIS_SUGGEST` | `1` | Module on/off |
-| `JARVIS_REFLECT_IDLE_MIN`, `JARVIS_REFLECT_WEEK_HOUR`, `JARVIS_MAX_RULES` | `30`, `19`, `20` | Learning loop |
-| `JARVIS_REVIEW_HOUR`, `JARVIS_LATE_MEAL`, `JARVIS_PATTERN_DAYS` | `18`, `21:00`, `42` | Weekly review |
-| `JARVIS_HOMELAB_SECONDS`, `JARVIS_HOMELAB_CONFIRM`, `JARVIS_HOMELAB_MAX_PER_DAY` | `300`, `2`, `2` | Observer; devices and limits in `config/homelab.json` |
-| `JARVIS_SUGGEST_DAYS`, `JARVIS_SUGGEST_TIME` | `1,4`, `18:30` | Suggestions (Monday = 0) |
-| `JARVIS_BACKGROUND_MODEL`, `JARVIS_PROPOSAL_DAYS` | `haiku`, `7` | Model of the background jobs, expiry of open proposals |
+| `JARVIS_WORK_TERMS` | leer | Eigene Arbeitsbegriffe (Firma, Kollegen, Kunden, Projekte), kommagetrennt |
+| `JARVIS_REFLECT`, `JARVIS_REVIEW`, `JARVIS_HOMELAB`, `JARVIS_SUGGEST` | `1` | Modul an/aus |
+| `JARVIS_REFLECT_IDLE_MIN`, `JARVIS_REFLECT_WEEK_HOUR`, `JARVIS_MAX_RULES` | `30`, `19`, `20` | Lernschleife |
+| `JARVIS_REVIEW_HOUR`, `JARVIS_LATE_MEAL`, `JARVIS_PATTERN_DAYS` | `18`, `21:00`, `42` | Wochenrückblick |
+| `JARVIS_HOMELAB_SECONDS`, `JARVIS_HOMELAB_CONFIRM`, `JARVIS_HOMELAB_MAX_PER_DAY` | `300`, `2`, `2` | Beobachter; Geräte und Grenzen in `config/homelab.json` (Vorlage `config/homelab.example.json`) |
+| `JARVIS_SUGGEST_DAYS`, `JARVIS_SUGGEST_TIME` | `1,4`, `18:30` | Vorschläge (Montag = 0) |
+| `JARVIS_BACKGROUND_MODEL`, `JARVIS_PROPOSAL_DAYS` | `haiku`, `7` | Modell der Hintergrundjobs, Verfall offener Vorschläge |
+
+Lokale Daten (alle in `.gitignore`): `logs/health_daily.json`, `logs/proposals.json`, `logs/homelab_baseline.json`, `config/homelab.json`.
 
 ---
 
-## Efficiency: router and lean mode
+## Effizienz: Router und schlanker Modus
 
-A default Claude Code call sends ~35,000 tokens of baseline with every request:
+Ein Standard-Aufruf von Claude Code schickt bei jeder Anfrage ~35.000 Tokens Grundlast mit:
 
-| Part | Tokens |
+| Bestandteil | Tokens |
 |---|---|
-| Built-in tools | ~19,700 |
-| Default prompt | ~3,400 |
-| Connectors | ~2,000 |
-| Project prompt | (varies) |
+| Eingebaute Werkzeuge | ~19.700 |
+| Standard-Prompt | ~3.400 |
+| Konnektoren | ~2.000 |
+| Projekt-Prompt | (variabel) |
 
-On top of that, every tool use adds an extra round trip.
+Dazu kommt bei jedem Werkzeug ein zusätzlicher Zwischenschritt.
 
-**Measurement** (input tokens per request, `scripts/measure_tokens.py`):
+**Messung** (Input-Tokens pro Anfrage, `scripts/measure_tokens.py`):
 
-| Request | Default | JARVIS | Path |
+| Anfrage | Standard | JARVIS | Weg |
 |---|---:|---:|---|
-| Time | 34,575 | **0** | local |
-| Energy status | 110,515 | **0** | local |
-| Weather | 194,243 | **0** | local |
-| Memory question | 34,999 | **3,981** | Haiku |
-| Inbox | 110,851 | **9,591** | Haiku |
-| Web research | 151,973 | **10,827** | Sonnet |
+| Uhrzeit | 34.575 | **0** | lokal |
+| Energiestatus | 110.515 | **0** | lokal |
+| Wetter | 194.243 | **0** | lokal |
+| Frage ans Gedächtnis | 34.999 | **3.981** | Haiku |
+| Postfach | 110.851 | **9.591** | Haiku |
+| Web-Recherche | 151.973 | **10.827** | Sonnet |
 
-**Building blocks:**
-- **Intent router** with rules instead of an LLM. Questions and commands are told apart; protected devices are never switched off automatically.
-- **Own prompt** (~1,300 tokens): stable parts first so the prompt cache hits. Dynamic parts (time, last exchanges, matching notes) go into the message.
-- **Tool groups** (`memory`, `web`, `home`, `mail`, `calendar`, `systems`, `health`, `music`, `pc`): only the matching ones are loaded per request, directly and without tool search.
-- **Stateless:** no growing session history, just a sliding window of the last exchanges.
-- **Result cap** per tool, Haiku/Sonnet selection, `--effort low`, capped answer length.
-- **Background jobs without an LLM:** dashboard, network watcher, briefing facts.
+**Bausteine:**
+- **Intent-Router** mit Regeln statt LLM. Fragen und Befehle werden getrennt, geschützte Geräte nie automatisch ausgeschaltet.
+- **Eigener Prompt** (~1.300 Tokens): Stabiles steht vorn, damit der Prompt-Cache greift. Dynamisches (Uhrzeit, letzte Wortwechsel, passende Notizen) wandert in die Nachricht.
+- **Werkzeuggruppen** (`memory`, `web`, `home`, `mail`, `calendar`, `systems`, `health`, `music`, `pc`): Pro Anfrage werden nur die passenden geladen, direkt und ohne Tool-Search.
+- **Zustandslos:** kein wachsender Sitzungsverlauf, sondern ein gleitendes Fenster der letzten Wortwechsel.
+- **Ergebnis-Obergrenze** pro Werkzeug, Haiku/Sonnet-Auswahl, `--effort low`, gedeckelte Antwortlänge.
+- **Hintergrundjobs ohne LLM:** Dashboard, Netzwerk-Wächter, Briefing-Fakten.
 
-Every request is logged in `logs/usage.jsonl` (route, model, groups, input/cache/output, API calls).
+Jede Anfrage landet in `logs/usage.jsonl` (Route, Modell, Gruppen, Input/Cache/Output, API-Aufrufe).
 
 ---
 
-## Memory
+## Gedächtnis
 
 ```
 vault/
-├─ Erinnerungen/     profile · commands · preferences · websites · knowledge · network · smart home
-│  ├─ Personen/      one note per person
-│  ├─ Projekte/      one note per project
-│  └─ Netzwerk-Geräte/   created automatically by the network watcher
-├─ Gespraeche/       daily conversation logs (automatic)
-└─ Papierkorb/       expired notes, deleted after 30 days
+├─ Erinnerungen/     Profil · Befehle · Vorlieben · Websites · Wissen · Netzwerk · Smart Home
+│  ├─ Personen/      eine Notiz pro Person
+│  ├─ Projekte/      eine Notiz pro Vorhaben
+│  └─ Netzwerk-Geräte/   automatisch vom Netzwerk-Wächter angelegt
+├─ Gespraeche/       Tagesprotokolle (automatisch)
+└─ Papierkorb/       abgelaufene Notizen, nach 30 Tagen gelöscht
 ```
 
-- **Obsidian-compatible:** front matter with `type`, `wichtigkeit` (importance) and optionally `ablauf` (expiry), links via `[[Wikilink]]`. This becomes the 3D graph in the HUD.
-- **Targeted recall instead of full context:** only the profile and commands are in the prompt. Everything else Jarvis fetches with `memory_search` (weighted full text) and `memory_read`.
-- **Remembers on its own** via `memory_save`, without you having to say "remember".
-- **Forgets systematically:** expiry dates, then the trash, then deletion.
+- **Obsidian-kompatibel:** Frontmatter mit `type`, `wichtigkeit` und optional `ablauf`, Verknüpfungen per `[[Wikilink]]`. Daraus entsteht der 3D-Graph im HUD.
+- **Gezielter Abruf statt Komplett-Kontext:** Im Prompt stehen nur Profil und Befehle. Alles andere holt Jarvis über `memory_search` (Volltext, gewichtet) und `memory_read`.
+- **Selbstständiges Merken** über `memory_save`, ohne dass man „merk dir“ sagen muss.
+- **Vergessen mit System:** Ablaufdaten, dann der Papierkorb, dann die Löschung.
 
 ---
 
-## On the go: iPhone and iPad
+## Unterwegs: iPhone und iPad
 
-The PC stays the brain. iPhone and iPad connect over [Tailscale](https://tailscale.com) (private VPN, free for personal use) via HTTPS, from anywhere and without an open port on the router.
+Der PC bleibt das Gehirn. iPhone und iPad greifen über [Tailscale](https://tailscale.com) (privates VPN, kostenlos für den Privatgebrauch) per HTTPS zu, von überall und ohne offenen Port im Router.
 
-**One-time setup**
+**Einmalig einrichten**
 
-1. Install Tailscale on the PC and sign in, then the Tailscale app on the iPhone/iPad with the same account.
-2. In the Tailscale admin console under *DNS*, enable "MagicDNS" and "HTTPS Certificates".
-3. In `.env`: `JARVIS_REMOTE=1`, then restart Jarvis. Device access then runs on `127.0.0.1:8721` (`JARVIS_REMOTE_PORT`).
-4. Once on the PC: `tailscale serve --bg 8721`. Tailscale shows the address, e.g. `https://my-pc.tailXXXX.ts.net`.
+1. Tailscale auf dem PC installieren und anmelden, dann die Tailscale-App auf iPhone/iPad mit demselben Konto.
+2. In der Tailscale-Verwaltung unter *DNS* „MagicDNS“ und „HTTPS Certificates“ einschalten.
+3. In `.env`: `JARVIS_REMOTE=1` und Jarvis neu starten. Der Zugang für Geräte läuft dann auf `127.0.0.1:8721` (`JARVIS_REMOTE_PORT`).
+4. Auf dem PC einmal: `tailscale serve --bg 8721`. Tailscale zeigt die Adresse, z. B. `https://mein-pc.tailXXXX.ts.net`.
 
-**Pair a device**
+**Gerät koppeln**
 
-1. On the iPhone or iPad, open the address in Safari, then *Share → Add to Home Screen* (iPhone: share at the bottom, iPad: top right).
-2. Open Jarvis from the home screen (the web app has its own sign-in, separate from Safari).
-3. On the PC, in the HUD click **📱 Devices → New code** and enter the six-digit code on the device. It is valid for five minutes and only once.
+1. Auf dem iPhone oder iPad die Adresse in Safari öffnen, *Teilen → Zum Home-Bildschirm* (iPhone: Teilen unten, iPad: oben rechts).
+2. Jarvis vom Home-Bildschirm öffnen (die App hat eine eigene Anmeldung, getrennt von Safari).
+3. Am PC im HUD auf **📱 Geräte → Neuen Code**, den sechsstelligen Code auf dem Gerät eingeben. Er gilt fünf Minuten und nur einmal.
 
-**📱 Devices** lists all paired devices; ✕ locks one out immediately.
+Unter **📱 Geräte** stehen alle gekoppelten Geräte, ✕ sperrt eines sofort aus.
 
-**On the phone:** tapping the mic button toggles Live, holding it is push-to-talk. The microphone never starts on its own, there is no daily briefing, and messages appear silently (the PC reads them out). The wake word only listens on the PC.
+**Auf dem Handy:** Tippen auf den Mikrofon-Knopf schaltet Live an und aus, Gedrückthalten ist Push-to-Talk. Das Mikrofon startet nie von selbst, es gibt kein Tagesbriefing, und Meldungen erscheinen still (der PC liest sie vor). Das Aktivierungswort hört nur am PC.
 
-**On the iPad:** the full HUD with the memory graph, just with bigger buttons. Landscape uses three columns like the PC; portrait shows graph and conversation on top and the widgets in two columns below. One finger rotates the graph, two fingers zoom and pan, a tap selects a node. Usage and action log stay on the PC. Microphone, briefing and messages behave like on the phone.
+**Auf dem iPad:** Eine eigene Ansicht statt der Kommandozentrale, wie ein ruhiges Raum-Display. Links stehen eine große Uhr mit Begrüßung, das Wetter jetzt und für fünf Tage und die nächsten Termine der Woche. Rechts leuchtet eine Kugel, die zeigt, was Jarvis gerade tut: wartet auf „Jarvis“, hört zu, denkt, spricht. Alles passt auf einen Bildschirm, ohne Scrollen: Mikro-Knopf, Schnellbefehle und eine Reihe Kacheln sind immer sichtbar, weitere Termine scrollen in ihrem Kasten. Jarvis' Antworten stehen hier nicht als Text, er spricht sie; nur eine Freigabe-Karte erscheint unter der Kugel, damit man sie antippen kann. Darunter stehen groß deine Frage und seine Antwort, dazu der Mikro-Knopf, ⌨ zum Tippen und ein paar Schnellbefehle. Unten zeigen Kacheln Solar, Speicher, Räume, Luft, Post, Schlaf und Technik (NAS, Pi, Internet). Antippen einer Kachel oder des Wetters öffnet ein Blatt mit allen Details: einzelne Batterien, Soll-Temperaturen, die neuesten Mails, Garmin-Werte, Zustand der Geräte. Beim Wetter steht für jeden Tag gleich, wann es regnet, wie wahrscheinlich und wie viel (z. B. „Regen 6–12 Uhr (30–100 %), 23–24 Uhr (18 %) · ~1,8 mm“). Als Regenstunde zählt jede Stunde ab 30 %, mit vorhergesagter Menge schon ab 10 %, in der Vorschau unter jedem Tag die Uhrzeiten. Das Blatt zeigt für heute und die nächsten vier Tage dieselbe Zeile und darunter die 24 Stunden als Balken. Passt nicht alles auf den Bildschirm, lässt sich die Seite scrollen. Im ⋯-Menü liegen Station, Neustart und der Weg zurück zur klassischen Ansicht mit Gedächtnis-Graph. **Layout pro Gerät:** In der klassischen Ansicht neben dem Namen JARVIS, im Raum-Display unter ⋯, wählt ein Auswahlfeld das Layout für genau dieses Gerät: *Raum-Display*, *Stark-HUD* oder *Klassisch mit Gedächtnis-Graph*. So bekommt das iPad am Bett ein ruhiges Display, ein Wandmonitor die Werkstatt-Optik, der Schreibtisch-PC die Kommandozentrale. Zum Ansehen geht auch `?view=tablet`, `?view=stark` oder `?view=classic`.
+
+**Stark-HUD:** Dieselben Teile wie das Raum-Display (Mikro, Antworten, Freigabe-Karten, Kacheln, Detailblätter) im Iron-Man-Stil: schwarzes Glas, Cyan, abgeschrägte Ecken, Raster und Wabenfeld. Oben eine Tagesleiste des Monats, links Uhr mit Sekunden, Wetter und Termine, in der Mitte ein Arc Reactor als Avatar, rechts der Maschinenraum als Instrumente: CPU, RAM, VRAM und Platte des PCs als Ringe, Netzwerk, Pi-hole, Energie und der Zustand von NAS, Containern und Internet. Der Reaktor glüht mit seiner Stimme, beim Zuhören wird er gold und Klammern schließen sich, beim Denken läuft ein Licht durch die Spulen, bei Problemen wird er rot. Im Hochformat steht der Reaktor oben, Tag und Systeme nebeneinander darunter. Im Hochformat stehen die Bereiche untereinander. Am PC lässt sich die Ansicht mit `?view=tablet` ansehen. Anders als am Handy ist das Mikrofon bei jedem Start an und hört auf „Jarvis“, auch nach einem Neustart. Ausschalten gilt nur bis zum nächsten Laden. Kommst du nach mehr als zwei Sekunden in die App zurück, lädt sie neu, weil iOS ihr im Hintergrund das Mikrofon wegnimmt. Will iOS einmal getippt werden, zeigt der ganze Bildschirm „Tippen, damit Jarvis zuhört“. Briefing und Meldungen verhalten sich wie auf dem Handy.
+
+**iPad als Station (Bildschirm und Mikrofon):** Für ein iPad, das fest an einem Platz steht. **🎙 Station** antippen: Das iPad zeigt die Kommandozentrale, der Bildschirm bleibt an, und das Mikrofon hört ab sofort auf „Jarvis …“. Die Antwort kommt aus dem iPad. Die Einstellung gilt nur für dieses Gerät und bleibt nach dem Neustart erhalten. Lädt die Seite neu (z. B. nach einem Jarvis-Neustart), will iOS manchmal einmal getippt werden. Dann zeigt der Bildschirm „Tippen, damit Jarvis zuhört“. Meldungen bleiben still, die liest der PC vor. Stehen PC-Mikrofon und iPad im selben Raum, antworten beide.
+
+Damit der Bildschirm anbleibt, braucht es iPadOS 18.4 oder neuer. Bei älteren Versionen *Einstellungen → Anzeige & Helligkeit → Automatische Sperre → Nie* setzen.
+
+**Aktivierungswort auf dem Gerät:** Einmal am PC `.venv\Scripts\python.exe scripts\fetch_wakeword.py` ausführen. Das Skript lädt onnxruntime-web (MIT) und die openWakeWord-Modelle (Apache 2.0), zusammen etwa 14 MB, prüft ihre Prüfsummen und legt sie in `ui/vendor/` ab (nicht im Repo). iPad und iPhone erkennen „Jarvis“ dann selbst. Ein Clip geht nur noch an den PC, wenn das Gerät etwas wie „Jarvis“ gehört hat. Gespräche im Raum, Telefonate und der Fernseher bleiben auf dem Gerät. Das Modell ist auf das englische „Hey Jarvis“ trainiert und erkennt das am sichersten. Ein deutsches „Jarvis“ allein liegt knapp über der Schwelle `JARVIS_WAKE_LOCAL_THRESHOLD` (Standard 0,02). Ein Clip bis 8 Sekunden, also eine normale Bitte, muss nur über 0,004 liegen, weil das Modell ein deutsches „Jarvis“ schlecht erkennt (gemessen 0,005 bis 0,07; Geräusche ohne „Jarvis“ liegen bei 0). Ist sich das iPad sicher (ab 0,06 bei kurzen Clips), zählt das auch dann, wenn Whisper den Namen falsch schreibt. Der PC prüft danach weiter den Text. Was die Erkennung auf iPad und iPhone tut (bereit, verworfen oder an den PC, mit Wert, Schwelle und Länge, nie Worte), steht am PC in `logs/wake_device.log`. Daran lässt sich die Schwelle einstellen. Das iPad lädt die Dateien einmal und behält sie. Fehlen sie, prüft der PC wie bisher alles.
+
+**Nur „Jarvis“ statt „Hey Jarvis“:** Das Skript lädt außerdem zwei Community-Modelle, die auf ein bloßes „Jarvis“ trainiert sind ([fwartner/home-assistant-wakewords-collection](https://github.com/fwartner/home-assistant-wakewords-collection), MIT): `jarvis_v1` hört mehr und irrt öfter, `jarvis_v2` umgekehrt. Welches Modell entscheidet, steht in `JARVIS_WAKE_LOCAL_MODEL` (Standard `hey_jarvis`). Die anderen laufen auf dem Gerät mit und stehen nur im Log: Jede Zeile in `logs/wake_device.log` zeigt dann den Wert jedes Modells, z. B. `hey_jarvis 0.012 · jarvis_v1 0.640 · jarvis_v2 0.210`. Einen Abend normal reden, dann das Modell mit den klarsten Werten bei „Jarvis“ eintragen und die Schwelle danach setzen. Die Werte oben gelten für `hey_jarvis`.
+
+**Musik, Sport, Fernseher im Hintergrund:** Jarvis merkt es auf zwei Wegen. Home Assistant meldet laufende Mediaplayer (alle 20 Sekunden, Sport erkennt er an Titel, Sender oder App wie DAZN oder Sky Sport). Und das Mikrofon hört, wenn es etwa zehn Sekunden lang fast ohne Pause laut ist, denn Menschen machen Pausen. Dann wird die Erkennung strenger: „Jarvis“ zählt nur noch am Satzanfang oder -ende, nicht mitten im Satz eines Kommentators, und die niedrige Hürde für ein kurzes „Jarvis“ entfällt. Das Display zeigt zum Beispiel „Sport läuft · sag „Hey Jarvis““, denn „Hey Jarvis“ kommt immer sicher durch. `JARVIS_AMBIENCE=0` schaltet die Home-Assistant-Abfrage ab, `JARVIS_AMBIENCE_IGNORE` nimmt Player aus, die nie im Raum zu hören sind.
+
+**Ton ohne Antippen:** iOS lässt eine Webseite erst nach einer Berührung Töne abspielen. Läuft das Mikrofon schon, spielt Jarvis seine Stimme stattdessen über dessen Audio-Kanal ab, dafür muss niemand tippen. Der erste Satz kommt dann etwa eine Sekunde später, weil er erst ganz geladen wird.
+
+Gesperrt hört das iPad nicht zu, denn iOS schaltet das Mikrofon einer gesperrten Web-App ab. Für den Dauerbetrieb also *Automatische Sperre → Nie*, am besten zusätzlich mit *Geführtem Zugriff* (Bedienungshilfen).
+
+**Nachtbild:** Solange der Sensor `station_night` in `config/home.json` an ist, wird die Station schwarz und zeigt nur noch eine kaum sichtbare Uhr. Standard ist `binary_sensor.ipad_focus` aus der Home-Assistant-App: Er ist an, solange auf dem iPad ein Fokus läuft, also auch der Schlaf-Fokus aus dem Schlafplan. Das Mikrofon hört weiter. Während eines Gesprächs scheint das HUD gedimmt durch, und Antippen zeigt es für 20 Sekunden. Die Hintergrundbeleuchtung kann eine Webseite nicht steuern. Dafür zwei Kurzbefehl-Automationen auf dem iPad anlegen: *Fokus Schlafen aktiviert → Helligkeit 0 %* und *deaktiviert → Helligkeit 60 %*. Im Schlaf-Fokus den *Ruhebildschirm* ausschalten, sonst sperrt iOS das iPad. Der Sensor kommt über die Abfrage der Dashboard-Werte, das Umschalten dauert also bis zu einer Minute.
+
+**Akku schonen mit einer smarten Steckdose:** Das Ladegerät hängt an einer Tapo-Steckdose (`switch.steckdose_ipad`). Die Home-Assistant-Automation *iPad-Station: Laden zwischen 30 und 95 %* schaltet sie ab 95 % aus und unter 30 % wieder an. Den Akkustand melden zwei Kurzbefehl-Automationen auf dem iPad (*Kurzbefehle → Automation → Batteriestand*: „steigt über 95 %“ bzw. „fällt unter 30 %“, *Sofort ausführen*, Aktion *Inhalte von URL abrufen*, Methode POST). Sie rufen die beiden Webhooks der Automation auf, die URLs stehen in Home Assistant in der Automation. Alternativ genügt die Home-Assistant-App auf dem iPad (`sensor.ipad_battery_level`). Bleibt die Steckdose zehn Stunden aus, schaltet sie zur Sicherheit wieder ein.
 
 ---
 
-## Security model
+## Sicherheitsmodell
 
-- **Local only:** the server binds to `127.0.0.1`. Every request needs a per-launch token; host and origin are checked.
-- **Remote access only when paired:** the device port (`JARVIS_REMOTE=1`) also binds only to `127.0.0.1` and is reachable only via `tailscale serve`. Without a paired device it serves only the pairing page. A code is discarded after five failed attempts. `config/devices.json` stores only hashes of the device keys. Pairing, device list and the confirmation endpoint are reachable only on the PC. `JARVIS_REMOTE_HOSTS` optionally restricts the allowed host names (default: `*.ts.net`).
-- **Confirmation cards:** system changes go through Claude Code's `--permission-prompt-tool` to a card in the HUD. That covers shell commands, calendar entries and writing outside the vault. No answer within 75 s means deny.
-- **Protected devices:** the router never switches off the router, PC, server or fridge by itself. Home Assistant only switches `light`, `switch`, `fan`, `media_player` and `scene`.
-- **Questions never switch:** "Is … on?" is read, never executed.
-- **No self-modification:** at runtime there are no tools for editing code.
-- **Action classes, untrusted content, audit log, emergency stop:** see [SECURITY.md](SECURITY.md).
-- **Data stays local:** `.env`, `config/home.json`, `vault/`, `logs/`, `state.json` and models are in `.gitignore`. Speech recognition and the GPU voice run offline.
+- **Nur lokal:** Der Server bindet an `127.0.0.1`. Jede Anfrage braucht ein pro Start erzeugtes Token, Host und Origin werden geprüft.
+- **Fernzugriff nur gekoppelt:** Der Geräte-Port (`JARVIS_REMOTE=1`) bindet ebenfalls nur an `127.0.0.1` und ist nur über `tailscale serve` erreichbar. Ohne gekoppeltes Gerät gibt es dort nur die Kopplungsseite. Ein Code wird nach fünf Fehlversuchen verworfen. In `config/devices.json` liegen nur Hashes der Geräte-Schlüssel. Kopplung, Geräteliste und Bestätigungs-Schnittstelle sind nur am PC erreichbar. Optional beschränkt `JARVIS_REMOTE_HOSTS` die erlaubten Hostnamen (Standard: `*.ts.net`).
+- **Bestätigungskarten:** Systemeingriffe laufen über Claude Codes `--permission-prompt-tool` zu einer Karte im HUD. Dazu gehören Shell-Befehle, Kalender-Einträge und Schreiben außerhalb des Vaults. Ohne Antwort wird nach 75 s abgelehnt.
+- **Geschützte Geräte:** Router, PC, Server und Kühlschrank schaltet der Router nie selbst aus. Home Assistant schaltet `light`, `switch`, `fan`, `media_player` und `scene`; Thermostate nur für die in `config/home.json` unter `climate_groups` eingetragenen `climate.*`-Entities, mit Solltemperatur von 5–30 °C oder einem unterstützten Heizmodus `heat`, `off` oder `auto`.
+- **Fragen schalten nie:** „Ist … an?“ wird gelesen, nie ausgeführt.
+- **Kein Selbstumbau:** Zur Laufzeit gibt es keine Werkzeuge zum Bearbeiten von Code.
+- **Daten bleiben lokal:** `.env`, `config/home.json`, `vault/`, `logs/`, `state.json` und Modelle stehen in `.gitignore`. Spracherkennung und GPU-Stimme laufen offline.
 
 ---
 
-## Project structure
+## Projektstruktur
 
 ```
-├─ server.py           entry point (supervisor + HTTP server), loads paths.py
-├─ paths.py            makes the folders under jarvis/ importable (short import names stay)
+├─ server.py           Start (Supervisor + HTTP-Server), lädt paths.py
+├─ paths.py            macht die Ordner unter jarvis/ importierbar (Importnamen bleiben kurz)
 ├─ jarvis/
 │  ├─ core/            router · runtime · commands · events · scheduler · background · jarvis_profile ·
 │  │                   personality · context · tasks
 │  ├─ safety/          policy · privacy · audit · emergency · proposals
-│  ├─ tools/           jarvis_mcp (tool server) · desktop · infra · assistant · pc · lists · routines ·
+│  ├─ tools/           jarvis_mcp (Werkzeug-Server) · desktop · infra · assistant · pc · lists · routines ·
 │  │                   devices · dashboard · commute · parcels · icloud_calendar · billing
 │  ├─ memory/          memory · memory_tools · memory_intel · learning · skill_factory · answer_cache ·
 │  │                   reflection · docsearch
@@ -507,8 +540,8 @@ The PC stays the brain. iPhone and iPad connect over [Tailscale](https://tailsca
 ├─ ui/                 index.html · app.js · graph.js · styles.css · pair.html
 ├─ scripts/            measure_tokens.py · lean_probe.py · mail_to_trash.py · router_report.py ·
 │                      install-autostart.ps1 · ocr_screen.ps1
-├─ tests/              one test module per area, isolate.py first (no house, Claude, network or sound needed)
-├─ config/             *.example.json (your own files stay local)
+├─ tests/              ein Testmodul pro Bereich, isolate.py zuerst (ohne Haus, Claude, Netz und Ton)
+├─ config/             *.example.json (eigene Dateien bleiben lokal)
 ├─ CLAUDE.md · ARCHITECTURE.md · SECURITY.md
 ├─ requirements.txt · requirements-tts.txt
 └─ start-jarvis.bat
@@ -516,72 +549,71 @@ The PC stays the brain. iPhone and iPad connect over [Tailscale](https://tailsca
 
 ---
 
-## Development and diagnostics
+## Entwicklung und Diagnose
 
 ```powershell
-# Tests: router, timers, lists, routines, fallback (Home Assistant is simulated, nothing is switched)
+# Tests: Router, Timer, Listen, Routinen (Home Assistant wird simuliert, nichts wird geschaltet)
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 
-# Token measurement: components, default requests, lean path
+# Token-Messung: Bestandteile, Standard-Anfragen, schlanker Weg
 .venv\Scripts\python.exe scripts\measure_tokens.py components
 .venv\Scripts\python.exe scripts\measure_tokens.py new
 
-# What still goes to the LLM, what has the router learned?
+# Was geht noch ans LLM, was hat der Router gelernt?
 .venv\Scripts\python.exe scripts\router_report.py 30
 
-# Autostart at sign-in (Task Scheduler, no admin rights); -Remove removes it
+# Autostart bei der Anmeldung (Aufgabenplanung, ohne Adminrechte); -Remove entfernt ihn
 powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1
 
-# Test router + lean call without the server
+# Router + schlanken Aufruf ohne Server testen
 .venv\Scripts\python.exe scripts\lean_probe.py "Wie geht es dem NAS?"
 
-# Test instance next to the running one (own port, own state file)
+# Testinstanz neben der laufenden (eigener Port, eigene Zustandsdatei)
 set JARVIS_PORT=8721& set JARVIS_STATE=%TEMP%\state_test.json& .venv\Scripts\python.exe server.py
 ```
 
-| Symptom | Cause / fix |
+| Symptom | Ursache / Lösung |
 |---|---|
-| Live button does nothing | `F5`. If "microphone blocked", allow the microphone in the address bar. |
-| Cut off mid-sentence | Increase `SILENCE_MS` / `UNFINISHED_HOLD_MS` in `ui/app.js` |
-| Interrupts itself | Increase `BARGE_FACTOR` or use headphones |
-| No voice | The **VOICE** field on the dashboard shows blocked providers and why |
-| GPU voice does not start | `logs/local_tts.log`; the first start downloads ~3 GB |
-| High usage | Analyse `logs/usage.jsonl` by route, model and groups |
-| Does not react to "Jarvis" | Check `JARVIS_WAKE`. With `oww` the startup banner shows whether openWakeWord is running; otherwise text detection applies. Lower `JARVIS_WAKE_THRESHOLD`. |
-| Messages shown but not spoken | Quiet hours (`JARVIS_QUIET_HOURS`) |
-| Fallback mode never answers | The tooltip on "Brain" in the header shows each provider's reason (no key, limit until …, Ollama off). Ollama: `ollama pull qwen2.5:7b-instruct` |
-| Jarvis keeps restarting | `logs/crash.log`; after five crashes in ten minutes the supervisor gives up |
-| Wrong travel time | Set `JARVIS_HOME_LAT/LON` to your home address (default is the weather coordinates) |
-| Wrong learned phrasing | Delete the entry in `config/learned.json` |
+| Live-Button tut nichts | `F5`. Bei „Mikrofon blockiert“ in der Adressleiste das Mikrofon freigeben. |
+| Wird mitten im Satz abgeschnitten | `SILENCE_MS` / `UNFINISHED_HOLD_MS` in `ui/app.js` erhöhen |
+| Stockt beim Sprechen, ohne dass jemand reinredet | `BARGE_FACTOR` in `ui/app.js` erhöhen oder Kopfhörer verwenden |
+| Keine Stimme | Feld **STIMME** im Dashboard zeigt gesperrte Anbieter und den Grund |
+| GPU-Stimme startet nicht | `logs/local_tts.log`; der erste Start lädt ~3 GB |
+| Hoher Verbrauch | `logs/usage.jsonl` nach Route, Modell und Gruppen auswerten |
+| Reagiert nicht auf „Jarvis“ | `JARVIS_WAKE` prüfen. Bei `oww` zeigt das Startbanner, ob openWakeWord läuft; sonst gilt die Text-Erkennung. `JARVIS_WAKE_THRESHOLD` senken. |
+| Meldungen nur angezeigt, nicht gesprochen | Ruhezeit (`JARVIS_QUIET_HOURS`) |
+| Notbetrieb meldet sich nicht | Tooltip auf „Brain“ in der Kopfzeile zeigt je Anbieter den Grund (Key fehlt, Limit bis …, Ollama aus). Ollama: `ollama pull qwen2.5:7b-instruct` |
+| Jarvis startet ständig neu | `logs/crash.log`; nach fünf Abstürzen in zehn Minuten hört der Supervisor auf |
+| Falsche Fahrzeit | `JARVIS_HOME_LAT/LON` auf die Wohnadresse setzen (Standard sind die Wetter-Koordinaten) |
+| Gelernte Formulierung falsch | Eintrag in `config/learned.json` löschen |
 
 ---
 
 ## Roadmap
 
-- [x] Wake word ("Jarvis …") as an alternative to the always-open mic, follow-ups without the wake word
-- [x] Timers, alarms, reminders and scheduled commands
-- [x] Proactive messages (appliances done, appointments, storage, NAS, new devices) with quiet hours
-- [x] Shopping and to-do list, routines by voice
-- [x] Fallback mode with a free stand-in chain (Groq, Gemini, Ollama) including tools
-- [x] Automated tests for the router
-- [x] Commute times, parcel status, PC control, ducking, pronunciation, learning router, answer cache
-- [x] Autostart and restart after a crash
-- [x] Access from iPhone and iPad (Tailscale, device pairing)
-- [x] Automated tests for the voice chain
-- [x] Learning loop, weekly review, homelab observer, suggestion module
-- [x] Action classes, audit log, emergency stop, memory control, protection against injected instructions
-- [x] Personality profiles, windows/files/screen, PC and network diagnosis, mail drafts, research, plans, notification centre
-- [x] Resource manager, skill factory with approval, context and task engines, memory intelligence, forecasts
-- [x] Document search incl. PDF, screen description on request with a card per picture
-- [ ] Mouse and keyboard control (deliberately not built; only as a separate, strictly controlled extension)
-- [ ] Central control: screen, room microphones, speaker recognition
-- [ ] Focus sessions with distraction hints
-- [ ] Screen and camera context on request
-- [ ] Several user profiles and room satellites (ESP32)
-- [ ] Linux/macOS start scripts
-- [ ] More tool groups (media server, documents, hypervisor, network controller)
-- [ ] English speech (router patterns and replies)
+- [x] Aktivierungswort („Jarvis …“) als Alternative zum Dauer-Mikrofon, Folgefragen ohne Aktivierungswort
+- [x] Timer, Wecker, Erinnerungen und geplante Befehle
+- [x] Meldungen von selbst (Geräte fertig, Termine, Speicher, NAS, neue Geräte) mit Ruhezeiten
+- [x] Einkaufs- und To-do-Liste, Routinen per Sprache
+- [x] Notbetrieb mit kostenloser Ersatz-Kette (Groq, Gemini, Ollama) inklusive Werkzeugen
+- [x] Automatisierte Tests für den Router
+- [x] Pendelzeiten, Paketstatus, PC-Steuerung, Ducking, Aussprache, lernender Router, Antwort-Cache
+- [x] Autostart und Neustart nach Absturz
+- [x] Lernschleife, Wochenrückblick, Homelab-Beobachter, Vorschlagsmodul
+- [x] Aktionsklassen, Audit-Log, Not-Aus, Gedächtnis-Kontrolle, Schutz vor fremden Anweisungen
+- [x] Persönlichkeitsprofile, Fenster/Dateien/Bildschirm, PC- und Netzwerk-Diagnose, Mail-Entwürfe, Recherche, Pläne, Meldungszentrale
+- [x] Resource Manager, Skill Factory mit Freigabe, Context Engine, Task Engine, Memory Intelligence, Prognosen, Dokumentensuche
+- [x] PDF in der Dokumentensuche (pypdf), Bildbeschreibung auf Nachfrage mit Karte je Bild
+- [ ] Maus- und Tastatursteuerung (bewusst nicht gebaut; nur als eigene, streng kontrollierte Erweiterung)
+- [ ] Größeres lokales Modell nur im Notbetrieb (VRAM teilen mit der GPU-Stimme)
+- [ ] Zentrale Bedienung: Bildschirm, Raum-Mikrofone, Sprecher-Erkennung, Zugriff vom Handy
+- [ ] Fokus-Sitzungen mit Ablenkungs-Hinweisen
+- [ ] Bildschirm- und Kamera-Kontext auf Anfrage
+- [ ] Mehrere Nutzerprofile und Raum-Satelliten (ESP32)
+- [ ] Linux/macOS-Startskripte
+- [ ] Weitere Werkzeuggruppen (Medienserver, Dokumente, Hypervisor, Netzwerk-Controller)
+- [x] Automatisierte Tests für die Stimmen-Kette
 
 ---
 
-<sub>Originally inspired by <a href="https://github.com/Itsme23476/jarvis-claude-code">jarvis-claude-code</a>. Check the template's licence before redistributing this project on its own.</sub>
+<sub>Ursprünglich inspiriert von <a href="https://github.com/Itsme23476/jarvis-claude-code">jarvis-claude-code</a>. Für eine eigenständige Weitergabe vorher die Lizenzlage der Vorlage klären.</sub>

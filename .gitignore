@@ -36,9 +36,13 @@ config/aussprache.json
 config/apps.json
 config/devices.json
 config/homelab.json
+config/spotify_token.json
 
 # vault backups and exports (memory_tools.py)
 backups/
 config/profiles.json
 config/scripts.json
 config/learned.history.jsonl
+
+# wake word runtime and models for the iPad (scripts/fetch_wakeword.py)
+ui/vendor/

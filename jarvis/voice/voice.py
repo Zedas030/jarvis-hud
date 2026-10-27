@@ -249,6 +249,17 @@ def speak_full(text):
     return speak(text), "audio/mpeg", tts_kind()
 
 
+def speak_stream(text):
+    """Like speak_full, but -> (iterator of audio chunks, mime, provider), so the
+    browser can start playing before the provider has finished the sentence."""
+    import pronounce
+    text = pronounce.apply(text)
+    if os.environ.get("TTS_CHAIN", "").strip():
+        import tts_chain
+        return tts_chain.speak_stream(text)
+    return iter([speak(text)]), "audio/mpeg", tts_kind()
+
+
 def speak(text):
     """Returns mp3 bytes, or raises. The caller decides what to do on failure."""
     if os.environ.get("TTS_CHAIN", "").strip():
@@ -327,9 +338,9 @@ def transcribe(audio, mime="audio/webm"):
 
 
 # ── free providers: Microsoft neural voices + local Whisper ─────
-# Speaking via edge-tts (the read-aloud voices of Microsoft Edge): free, no
-# account, ~1 s. Listening via faster-whisper locally on the CPU: free,
-# offline, ~1 s for a short sentence, no audio leaves the machine.
+# Sprechen über edge-tts (die Vorlese-Stimmen von Microsoft Edge): kostenlos,
+# kein Konto, ~1 s. Hören über faster-whisper lokal auf der CPU: kostenlos,
+# offline, ~1 s für einen kurzen Satz, kein Ton verlässt den Rechner.
 TTS_CHOICE = os.environ.get("JARVIS_TTS", "auto").strip().lower()      # auto|edge|elevenlabs|fish
 EDGE_VOICE = os.environ.get("EDGE_VOICE", "de-DE-ConradNeural").strip()
 EDGE_RATE = os.environ.get("EDGE_RATE", "+5%").strip()
@@ -346,6 +357,10 @@ LOCAL_STT_PROMPT = os.environ.get(
     "WHISPER_LOCAL_PROMPT",
     "Jarvis, Sir, Spotify, Home Assistant, Raspberry Pi, Pi-hole, NAS, ElevenLabs, "
     "Claude, Briefing, Solaranlage.").strip()
+
+# Boosted on every clip, not only primed: with the prompt alone a German "Jarvis" still came
+# out as another word now and then, and the request was dropped as not meant for him.
+LOCAL_STT_HOTWORDS = os.environ.get("WHISPER_LOCAL_HOTWORDS", "Jarvis").strip()
 
 _WHISPER = {"model": None, "busy": 0, "last_use": 0.0}
 _WHISPER_LOCK = __import__("threading").Lock()
@@ -461,7 +476,8 @@ def transcribe_whisper_local(audio):
     try:
         segs, _ = _fw_model().transcribe(pcm, language=LOCAL_STT_LANG, beam_size=LOCAL_STT_BEAM,
                                               vad_filter=True, condition_on_previous_text=False,
-                                              initial_prompt=LOCAL_STT_PROMPT or None)
+                                              initial_prompt=LOCAL_STT_PROMPT or None,
+                                              hotwords=LOCAL_STT_HOTWORDS or None)
         text = " ".join(s.text.strip() for s in segs).strip()
     finally:
         _WHISPER["busy"] -= 1

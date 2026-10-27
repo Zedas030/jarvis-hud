@@ -48,21 +48,33 @@ def _say(*options):
 
 # ── tool groups + model choice for the LLM path ──────────────
 GROUP_RULES = [
-    ("home", r"\b(licht|lampe|led\b|steckdose|schalt|kühlschrank|spülmaschine|waschmaschine|drucker|zelt|bett\b|heizung|thermostat|temperatur im|grad im|luftreiniger|"
+    ("home", r"\b(licht|lampe|led\b|steckdose|schalt|kühlschrank|spülmaschine|waschmaschine|drucker|3d|filament|ams\b|bambu|zelt|bett\b|heizung|thermostat|temperatur im|grad im|luftreiniger|"
              r"ventilator|szene|wohnzimmer|schlafzimmer|gaming|küche|boiler|smart ?home|home ?assistant|"
              r"solar|akku|speicher|strom|watt|sensor|luft|feucht|echo|fire ?tv|fernseher|tv\b)"),
     ("mail", r"\b(mail|e-mail|postfach|posteingang|newsletter|nachricht von|geschrieben|gelesen)"),
     ("calendar", r"\b(termin|kalender|eintragen|trag\w* .*ein|erinner|verabredung|meeting|wann (ist|habe))"),
+    # "Was steht heute noch an?" got memory only, and Jarvis said he could not see the calendar
+    ("calendar", r"\b(was steht .{0,25}\ban\b|(hab|habe) ich .{0,25}\b(vor|geplant|frei|zeit)\b|vorhaben|"
+                 r"tagesplan|wochenplan|was ist (heute|morgen|am \w+) los)"),
+    # bookings in the inbox that belong in the calendar: both tool groups at once
+    ("mail", r"\b(buchung|buchungen|gebucht|reservier|bestätigung|tee ?time|startzeit|startzeiten)"),
+    ("mail", r"\b(paket\w*|päckchen|lieferung\w*|sendung\w*|versand|zustell\w*|tracking|bestellt|bestellung)"),
+    ("calendar", r"\b(buchung|buchungen|gebucht|reservier|bestätigung|tee ?time|startzeit|startzeiten)"),
+    ("calendar", r"\b(rückgängig|wieder raus|wieder (heraus|rausnehmen|löschen)|termine? .{0,20}(lösch|entfern))"),
     ("systems", r"\b(pi\b|raspi|raspberry|nas\b|synology|netzwerk|wlan|router|fritz|gerät|server|pi-hole|pihole|ip\b|"
                 r"internet|dns|backup|grafikkarte|gpu|vram|cpu|prozessor|arbeitsspeicher|ram\b|festplatte|"
                 r"speicherplatz|laufwerk|ausgefallen|ausfall|prognose|wann voll|voll sein)"),
+    ("homelab", r"\b(pi-?hole|werbung|blockier|grafana|prometheus|homelab|internet|geschwindigkeit|bandbreite|mbit|"
+                r"download|upload|datenvolumen|daten (heute|verbraucht)|wlan|mesh|auslastung|cpu|verlauf|spitze|"
+                r"am höchsten|am meisten)"),
     ("health", r"\b(schlaf|geschlafen|schritte|puls|garmin|body ?battery|stress|fitness|training|lauf|"
                r"gegessen|abendessen|alkohol|bier\b|wein\b|rückblick|wochenrückblick)"),
     ("music", r"\b(musik|spotify|song|lied|playlist|album|abspielen)"),
     ("weather", r"\b(wetter|vorhersage|sonne|sonnig|sonnen|uv\b|uv-|regen|regnet|schirm|schnee|schneit|gewitter|"
                 r"sturm|wind\b|windig|nebel|frost|glatt|temperatur(?! im)|grad draußen|wie warm|wie kalt|"
                 r"wird es hell|hell wird|wird es dunkel|dunkel wird|wie lange (ist|bleibt) es .{0,25}\bhell|tageslicht)"),
-    ("web", r"\b(such|recherch|google|internet|online|website|webseite|seite|öffne|news|nachrichten|aktuell|"
+    ("web", r"\b(such|recherch|google|ergoogel|internet|online|website|webseite|seite|öffne|news|nachrichten|aktuell|"
+            r"finde? .{0,30}heraus|herausfinden|schau (mal )?nach|guck (mal )?nach|nachschlagen|nachschauen|"
             r"preis|kostet|wer ist|wer war|was ist|wie viel kostet|bundesliga|spiel|ergebnis|kurs|aktie)"),
     ("pc", r"\b(programm|starte|befehl|powershell|kommandozeile|datei|ordner|installier|bildschirm|screenshot|"
            r"fenster|desktop|computer|rechner)"),
@@ -88,6 +100,7 @@ GROUP_RULES = [
               r"mein(en)? plan|schritt .{0,20}erledigt|abhaken|projektplan)"),
     ("phone", r"\b(aufs handy|ans handy|aufs telefon|push(-nachricht)?|schick mir .{0,30}handy)"),
     ("tasks", r"\b(prüf\w*|check|diagnose|bericht|prüfung)"),
+    ("updates", r"\b(update|upgrade|aktualisier|firmware|neue version|auf dem neuesten stand|veraltet)"),
     ("audit", r"\b(was hast du (heute|gestern)? ?(alles )?(gemacht|getan|geschaltet)|protokoll deiner|audit|"
               r"was hast du ausgeführt)"),
 ]
@@ -222,7 +235,9 @@ def _weather(n):
 
 def _solar(n):
     if not (_has(n, "solar", "photovoltaik", "pv\\b", "balkonkraftwerk", "akku", "speicher", "batterie")
-            and not _has(n, "warum", "erklär", "verlauf", "gestern", "woche", "monat", "automation")):
+            # thresholds and "when" are questions about the setup, not the current reading
+            and not _has(n, "warum", "erklär", "verlauf", "gestern", "woche", "monat", "automati", "wann", "ab wie",
+                         "schutz", "grenze", "schwelle", "aufhör", "einstell", "falsch", "doppel")):
         return None
     import dashboard
     try:
@@ -239,8 +254,14 @@ def _solar(n):
     return ", ".join(parts) + f", {_sir()}."
 
 
+# Updates are a question for Claude with the update tools, never the quick status line
+# ("Mach ein Update vom NAS" used to get "Das NAS: alles in Ordnung …").
+_UPDATE_WORDS = ("update", "upgrade", "aktualis", "neuesten stand", "version", "firmware", "dsm", "software",
+                 "installier", "pakete?\\b", "apps?\\b")
+
+
 def _nas(n):
-    if not (_has(n, "nas\\b", "synology") and not _has(n, "datei", "ordner", "freigabe", "backup", "warum")):
+    if not (_has(n, "nas\\b", "synology") and not _has(n, "datei", "ordner", "freigabe", "backup", "warum", *_UPDATE_WORDS)):
         return None
     import dashboard
     try:
@@ -258,7 +279,8 @@ def _nas(n):
 
 def _pi(n):
     if not (_has(n, "pi\\b", "raspi", "raspberry") and _has(n, "status", "wie geht", "läuft", "alles ok", "temperatur",
-                                                             "zustand", "fit", "gesund")):
+                                                             "zustand", "fit", "gesund")
+            and not _has(n, *_UPDATE_WORDS)):
         return None
     import dashboard
     try:
@@ -277,8 +299,8 @@ def _pi(n):
 
 
 MUSIC = [
-    (r"\b(pause|pausier|stopp|stop|anhalten|halt die musik|musik aus)", "play_pause", "Pausiert"),
-    (r"\b(weiter ?spielen|fortsetzen|musik an|spiel musik|play)\b", "play_pause", "Läuft"),
+    (r"\b(pause|pausier|stopp|stop|anhalten|halt die musik|musik aus)", "pause", "Pausiert"),
+    (r"\b(weiter ?spielen|fortsetzen|musik an|spiel musik|play)\b", "play", "Läuft"),
     (r"\b(nächste[nrs]?|skip|überspring)", "next", "Nächster Titel"),
     (r"\b(vorherige[nrs]?|zurück|letzte[nrs]? (lied|song|titel))", "previous", "Vorheriger Titel"),
     (r"\b(lauter)", "volume_up", "Lauter"),
@@ -398,6 +420,51 @@ def _home_state(n):
     return " und ".join(parts) + f", {_sir()}."
 
 
+def _climate(n):
+    """Handle clear room-thermostat commands locally so the read-only HA MCP is never used for them."""
+    if QUESTION.search(n) or not re.search(r"heiz\w*|thermostat|temperatur|wärme|grad", n):
+        return None
+    raw = _raw()
+    temperature = re.search(r"\bauf\s+(\d{1,2}(?:[.,]\d)?)\b|(\d{1,2}(?:[.,]\d)?)\s*(?:°\s*C|grad)\b", raw, re.I)
+    off = re.search(r"\b(aus|ausschalten|ausmachen|abschalten)\b", n)
+    on = re.search(r"\b(an|einschalten|anmachen|anschalten)\b", n)
+    if sum((bool(off), bool(on), bool(temperature))) != 1:
+        return None
+    try:
+        import jarvis_profile
+        groups = jarvis_profile._load_home().get("climate_groups", {})
+    except Exception:  # noqa: BLE001
+        return None
+    rooms = []
+    for room, entities in groups.items():
+        if not isinstance(entities, list):
+            continue
+        alias = _norm(str(room)).strip()
+        pattern = r"(?<!\w)" + re.escape(alias) + r"(?:heizung|thermostat(?:e)?)?(?!\w)"
+        if alias and re.search(pattern, n):
+            rooms.append((str(room), [str(eid) for eid in entities if str(eid).startswith("climate.")]))
+    if len(rooms) != 1 or not rooms[0][1]:
+        return None
+    name, entities = rooms[0]
+    if temperature:
+        raw_value = temperature.group(1) or temperature.group(2)
+        data = {"temperature": float(raw_value.replace(",", "."))}
+        service = "set_temperature"
+    else:
+        data = {"hvac_mode": "off" if off else "heat"}
+        service = "set_hvac_mode"
+    import jarvis_mcp
+    results = []
+    for eid in entities:
+        result = jarvis_mcp._home("home_control", {"entity_id": eid, "service": service, "data": data})
+        if not result or not result.startswith("Erledigt"):
+            done = "; ".join(results)
+            prefix = f"{done}. " if done else ""
+            return f"{prefix}{name}: {result or 'Keine Rückmeldung von Home Assistant.'}"
+        results.append(result)
+    return " ".join(results)
+
+
 def _home(n):
     if QUESTION.search(n):
         return None                                # a question never switches anything
@@ -501,6 +568,11 @@ def _parcels(n):
     return parcels.handle(n, _raw())
 
 
+def _printer(n):
+    import printer
+    return printer.handle(n, _raw())
+
+
 def _report(n):
     if not re.search(r"\b(verbrauchsbericht|tokenbericht|token bericht|was hast du (dazu)?gelernt|"
                      r"wie viele? tokens?|wie viel hab\w* ich verbraucht)\b", n):
@@ -537,7 +609,7 @@ def _tasks(n):
     return tasks.handle(n)
 
 
-LOCAL_HANDLERS = [_emergency, _personality, _context, _tasks, _desktop, _routine, _timers, _lists, _pronounce, _report, _pc, _commute, _parcels, _home_state, _home,
+LOCAL_HANDLERS = [_emergency, _personality, _context, _tasks, _desktop, _routine, _timers, _lists, _pronounce, _report, _pc, _commute, _parcels, _printer, _home_state, _climate, _home,
                   _music, _time, _date, _sun, _weather, _solar, _nas, _pi]
 
 
@@ -567,6 +639,18 @@ def run_local(text):
     return reply
 
 
+# Follow-ups ("Also was?", "Dann nochmal alles", "Mach das") name no topic, so the
+# keyword rules gave them memory only — and Jarvis, who still sees the conversation,
+# said his tools were missing. A turn without a topic keeps the last turn's tools.
+CARRY_S = 600
+WEB_ALWAYS = os.environ.get("JARVIS_WEB_ALWAYS", "1").strip().lower() not in ("0", "off", "false", "no", "aus")
+# A follow-up that does name a topic still belongs to the last question for a while:
+# "Ab wie viel Prozent greift der Schutz?" after a question about the HA automation
+# brought "home" of its own and lost the full HA server that reads automations.
+JOIN_S = 180
+_LAST = {"groups": [], "own": [], "model": None, "at": 0.0}
+
+
 def route(message, ha_full=False):
     """{'kind': 'local', 'reply': ..., 'handler': ...} or the llm_route dict."""
     text = (message or "").strip()
@@ -574,4 +658,27 @@ def route(message, ha_full=False):
         reply, handler = _local(text, LOCAL_HANDLERS)
         if reply:
             return {"kind": "local", "reply": reply, "handler": handler}
-    return llm_route(text, ha_full)
+    r = llm_route(text, ha_full)
+    own = [g for g in r["groups"] if g != "memory"]
+    age = time.time() - _LAST["at"]
+    if not own and _LAST["groups"] and age < CARRY_S:
+        r = dict(r, groups=list(dict.fromkeys(r["groups"] + _LAST["groups"])), reason="Folgefrage",
+                 model=_LAST["model"] if _LAST["model"] == MODEL_SMART else r["model"])
+    elif own and _LAST["own"] and age < JOIN_S:
+        # only the last turn's own groups join, so a long conversation does not pile them up
+        joined = list(dict.fromkeys(r["groups"] + _LAST["own"]))
+        if joined != r["groups"]:
+            r = dict(r, groups=joined, model=MODEL_SMART if _LAST["model"] == MODEL_SMART else r["model"])
+    if [g for g in r["groups"] if g != "memory"]:
+        _LAST.update(groups=r["groups"], own=own or _LAST["own"], model=r["model"], at=time.time())
+    # Web search rides along in every turn: what he cannot find in notes or tools, he looks
+    # up instead of saying he does not know. Added last and kept out of _LAST — it is no
+    # topic, and it does not ask for the bigger model (only a search request does, above).
+    if WEB_ALWAYS and "web" not in r["groups"]:
+        r = dict(r, groups=r["groups"] + ["web"])
+    return r
+
+
+def forget_topic():
+    """New conversation (or a test): the next vague turn carries nothing over."""
+    _LAST.update(groups=[], own=[], model=None, at=0.0)

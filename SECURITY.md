@@ -13,8 +13,44 @@ The model is never the security boundary. Permissions are enforced by code in `j
 | BLOCKED | never | refused in code |
 
 Unknown tools default to CONFIRM. Blocked Home Assistant domains: `lock`, `alarm_control_panel`,
-`camera`, `siren`, `valve`, `update`, `button`. Only `light`, `switch`, `fan`, `media_player` and
-`scene` can be switched at all.
+`camera`, `siren`, `valve`, `update`, `button`. `light`, `switch`, `fan`, `media_player` and `scene`
+can be switched. Climate control is limited to the `climate.*` entities listed in `config/home.json`
+under `climate_groups`; only `set_temperature` from 5–30 °C and a supported `set_hvac_mode` of `heat`, `off`
+or `auto` are allowed.
+
+Bookings from mail (`mail_events.py`): from senders whose address is at a domain in
+`JARVIS_MAIL_EVENTS_TRUSTED` (default PC CADDIE, golftimer, Golf House) they are entered without a
+card — the one exception to "background jobs only propose", chosen by the user. Fixed code reads
+the calendar attachment, the model plays no part; links are stripped; every entry is announced and
+`mail_events_undo` removes it (only entries Jarvis created, recognised by their own UID). Everything
+else, and every other sender, goes through one confirmation card. A forged sender is the remaining
+risk; the mail provider's spam filter guards against it.
+
+Deliveries (`shipments.py`) are part of the same exception: an all-day entry "📦 Shop · Carrier"
+on the expected day, from shipping mails of any sender (shops change too often for a list), with
+the tracking number but never a link; announced, moved when the day changes, and removed by the
+same `mail_events_undo`. Worst case of a forged shipping mail is one such note in the calendar.
+Same-day services and work mails stay out. With `TRACK17_API_KEY`, 17TRACK (a third party) is told
+each tracking number to follow it across carriers — nothing else (no address, no shop, no mail
+content); with only `DHL_API_KEY`, DHL itself is asked about DHL numbers.
+
+Several mailboxes (`mailboxes.py`, `MAIL2_…`): all read-only except drafts (APPEND) and
+"mark as read"; one failing account never blocks the others. Every module that reads mail over a
+period (inbox, bookings, deliveries, parcels) goes through `mailboxes.recent` and never looks back
+more than `JARVIS_MAIL_LOOKBACK_HOURS` (default 24) — less foreign content read, fewer old mails
+to act on.
+
+Before a calendar entry is offered or entered — the model's `calendar_add`, bookings from mail,
+deliveries — code reads that day first (`icloud_calendar.check`): an entry with a similar title on
+the same day means nothing is offered (for `calendar_add`, the request is refused before any card);
+an overlap with another entry is named on the card and in the announcement.
+
+Updates go only through `update_install` (CONFIRM, `updates.py`): one target per card, fixed commands
+(the model picks the target, never what runs), nothing in the background. DSM itself and Docker images
+are reported, not installed; so are FRITZ! repeaters (version read without login, compared with
+download.avm.de) and smart-home firmware HA lists without an update entity (compared with the newest
+device of the same model in the house). Checking talks to version.home-assistant.io, download.avm.de and
+the image registries anonymously — it sends image names, nothing about the house.
 
 ## Confirmation cards
 

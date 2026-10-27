@@ -3,9 +3,10 @@ Parcels — read from the shipping mails in the inbox, no tracking API, 0 tokens
 
     "Kommt heute ein Paket?", "Wo ist mein Paket?", "Welche Lieferungen sind unterwegs?"
 
-Looks at the mail headers (sender, subject, date) of the last 14 days for the
-usual carriers and shops and sorts them into: heute in Zustellung, abholbereit,
-unterwegs, zugestellt. Read-only (IMAP readonly + BODY.PEEK), nothing is marked.
+Looks at the mail headers (sender, subject, date) of the last 24 hours
+(mailboxes.LOOKBACK_H) for the usual carriers and shops and sorts them into: heute
+in Zustellung, abholbereit, unterwegs, zugestellt. Read-only (IMAP readonly +
+BODY.PEEK), nothing is marked.
 The watcher announces "heute in Zustellung" once per mail.
 """
 import email
@@ -40,21 +41,17 @@ def _dec(v):
         return v or ""
 
 
-def shipments(days=14, ttl=600):
-    """[{sender, subject, status, when (ts), id}] newest first, cached for ten minutes."""
+def shipments(hours=None, ttl=600):
+    """[{sender, subject, status, when (ts), id}] newest first, cached for ten minutes. Every account."""
     if time.time() - _CACHE["at"] < ttl:
         return _CACHE["items"]
-    import jarvis_mcp as j
-    if not (j.MAIL_USER and j.MAIL_PASSWORD):
+    import mailboxes
+    if not mailboxes.configured():
         return []
-    since = time.strftime("%d-%b-%Y", time.localtime(time.time() - days * 86400))
-    box = imaplib.IMAP4_SSL(j.MAIL_HOST, 993, timeout=20)
     out = []
-    try:
-        box.login(j.MAIL_USER, j.MAIL_PASSWORD)
-        box.select("INBOX", readonly=True)
-        _, data = box.search(None, "SINCE", since)
-        for i in data[0].split()[-200:]:
+
+    def read(acc, box):
+        for i in mailboxes.recent(box, hours)[-200:]:
             _, parts = box.fetch(i, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
             msg = email.message_from_bytes(parts[0][1])
             frm, subj = _dec(msg.get("From")), _dec(msg.get("Subject"))
@@ -70,15 +67,11 @@ def shipments(days=14, ttl=600):
                 when = time.time()
             out.append(dict(sender=name or addr, subject=subj, status=st, when=when,
                             id=(msg.get("Message-ID") or f"{frm}{subj}").strip()))
-    finally:
-        try:
-            box.logout()
-        except Exception:  # noqa: BLE001
-            pass
+
+    mailboxes.each(read, timeout=20)
     out.sort(key=lambda x: -x["when"])
     _CACHE.update(at=time.time(), items=out)
     return out
-
 
 def current(items, now=None):
     """Latest mail per sender; delivered ones only if from the last two days, 'heute' only if from today."""
@@ -122,6 +115,9 @@ def handle(n, raw=""):
                      r"erwarte\w*|zugestellt|abhol\w*)\b", n):
         return None                                 # "Paket" in another sense: not a delivery question
     try:
+        import shipments as tracked
+        if tracked.active():
+            return tracked.describe()       # shop, carrier, expected day — knows more than the subjects
         items = current(shipments())
     except Exception:  # noqa: BLE001 — mailbox down: the LLM path can still try
         return None

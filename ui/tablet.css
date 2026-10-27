@@ -1,0 +1,251 @@
+/* iPad home (tablet.js): a calm room display rather than the PC's command centre.
+   Big type you can read from the bed, one glowing orb that says what he is doing,
+   the house as tiles. Everything here hangs on body.tablet — the PC never sees it. */
+.tab{display:none}
+
+body.tablet{
+  --t-bg:#05080e; --t-card:rgba(16,26,40,.55); --t-card-hi:rgba(22,36,54,.7);
+  --t-line:rgba(120,190,230,.12); --t-ink:#e9f3fb; --t-dim:#7d93a8; --t-faint:#4a5d70;
+  --t-font:-apple-system,"SF Pro Display","SF Pro Text",system-ui,"Segoe UI",sans-serif;
+  background:
+    radial-gradient(900px 620px at 72% 34%, rgba(40,110,150,.22) 0%, transparent 62%),
+    radial-gradient(700px 520px at 8% 0%, rgba(30,60,110,.28) 0%, transparent 60%),
+    var(--t-bg);
+  font-family:var(--t-font);
+  height:auto; min-height:100dvh; overflow-x:hidden; overflow-y:auto;
+}
+body.tablet::before{display:none}                      /* no telemetry grid on the wall */
+body.tablet .topbar,body.tablet .livebar,body.tablet .grid{display:none}
+
+body.tablet .tab{
+  display:flex; flex-direction:column; flex:0 0 auto; gap:16px; height:100dvh; min-height:0;
+  padding:calc(10px + env(safe-area-inset-top)) calc(26px + env(safe-area-inset-right))
+          calc(18px + env(safe-area-inset-bottom)) calc(26px + env(safe-area-inset-left));
+  color:var(--t-ink);
+}
+/* Everything on one screen, tiles included: the screen takes what the tiles leave, a long agenda
+   scrolls inside its own box instead of pushing the mic below the fold. */
+.tscreen{
+  display:grid; flex:1 1 auto; min-height:0;
+  grid-template-columns:minmax(0,44fr) minmax(0,56fr);
+  grid-template-rows:auto minmax(0,1fr);
+  grid-template-areas:"bar bar" "day voice";
+  gap:18px 28px;
+}
+
+/* ── bar ── */
+.tbar{grid-area:bar;display:flex;align-items:center;gap:14px;min-height:44px}
+.tbrand{display:flex;align-items:center;gap:10px;font:600 13px/1 var(--mono);letter-spacing:.42em;color:var(--t-dim)}
+.torbdot{width:10px;height:10px;border-radius:50%;background:var(--cy);box-shadow:0 0 12px var(--cy);transition:background .4s,box-shadow .4s}
+.tslots{margin-left:auto;display:flex;align-items:center;gap:10px}
+body.tablet .tslots .chip-lg{background:var(--t-card);border:1px solid var(--t-line);border-radius:22px;padding:8px 16px}
+body.tablet .tslots .bell{width:44px;height:44px;border-radius:50%;background:var(--t-card);border:1px solid var(--t-line);font-size:17px}
+.tmenu{width:44px;height:44px;border-radius:50%;border:1px solid var(--t-line);background:var(--t-card);
+  color:var(--t-ink);font-size:22px;line-height:1;cursor:pointer}
+
+/* ── the day: clock, weather, agenda ── */
+.tday{grid-area:day;display:flex;flex-direction:column;min-height:0;gap:6px}
+.ttime{font-weight:200;font-size:clamp(64px,min(11.5vw,14vh),148px);line-height:.92;letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums}
+.tdate{font-size:21px;font-weight:400;color:var(--t-dim);margin-top:4px}
+.thello{font-size:17px;color:var(--t-faint);margin-bottom:14px}
+
+.tweather{background:var(--t-card);border:1px solid var(--t-line);border-radius:24px;padding:16px 18px;
+  display:flex;flex-direction:column;gap:14px}
+.tnow{display:flex;align-items:center;gap:14px}
+.tsky{font-size:42px;line-height:1;width:52px;text-align:center}
+.ttemp{font-size:46px;font-weight:300;letter-spacing:-.02em}
+.tnowtext{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tnowtext em{font-style:normal;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tnowtext small{font-size:14px;color:var(--t-dim)}
+.tdays{list-style:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.tdays li{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-radius:14px}
+.tdays li:first-child{background:rgba(95,228,255,.07)}
+.tdays b{font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--t-dim);text-transform:uppercase}
+.tdays span{font-size:24px;line-height:1.2}
+.tdays em{font-style:normal;font-size:14px}
+.tdays em small{color:var(--t-dim);margin-left:4px}
+.tdays i{font-style:normal;font-size:11px;color:#6fb8ff;min-height:13px}
+.tdays i.twhen{color:var(--t-dim);font-size:10px;text-align:center;line-height:1.25;padding:0 2px}
+
+.tagenda{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;margin-top:12px}
+.tagenda h3,.tsheetbox h3{font:600 11px/1 var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--cy);
+  margin:0 0 10px 4px}
+.tagenda ol{list-style:none;display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0}
+.tagenda li{display:grid;grid-template-columns:96px 1fr;align-items:baseline;gap:12px;padding:11px 16px;
+  background:var(--t-card);border:1px solid var(--t-line);border-radius:16px}
+.tagenda li b{font-size:13px;font-weight:600;color:var(--t-dim);white-space:nowrap}
+.tagenda li span{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tagenda li.now{border-color:rgba(95,228,255,.45);background:rgba(95,228,255,.08)}
+.tagenda li.now b{color:var(--cy)}
+.tagenda li.tempty{display:block;color:var(--t-dim);font-size:16px}
+
+/* ── voice: orb, words, mic ── */
+.tvoice{grid-area:voice;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;gap:6px;text-align:center;overflow:hidden}
+/* No written words here: he says them, and the space went to the tiles. Only a confirmation
+   card still shows in this box — it has to be seen and tapped. */
+.tcap .tme,.tcap .tjar,.tcap .bubble.confirm.approved,.tcap .bubble.confirm.denied{display:none}
+.tcap:not(:has(.confirm:not(.approved):not(.denied))){display:none}
+.tday{overflow:hidden}
+.tdock,.tquick{flex:0 0 auto}
+.torbwrap{flex:0 1 auto;width:min(270px,29vh);aspect-ratio:1;min-height:140px;position:relative}
+#tOrb{width:100%;height:100%;display:block}
+.tstate{font-size:20px;font-weight:500;letter-spacing:.01em;color:var(--t-ink);min-height:26px;transition:color .3s}
+.tstate.hearing{color:var(--amber)}
+.tstate.busy{color:var(--violet)}
+.tstate.blocked,.tstate.needs-click{color:var(--pink)}
+.tstate.sleeping{color:var(--t-dim)}
+
+.tcap{flex:1 1 auto;min-height:0;width:100%;max-width:640px;overflow-y:auto;display:flex;flex-direction:column;
+  gap:10px;padding:6px 4px;transition:opacity 1.2s;scrollbar-width:none}
+.tcap::-webkit-scrollbar{display:none}
+.tcap.stale{opacity:.28}
+.tme{font-size:18px;color:var(--t-dim);line-height:1.4}
+.tme:not(:empty)::before{content:"„";color:var(--t-faint)}
+.tme:not(:empty)::after{content:"“";color:var(--t-faint)}
+.tjar{font-size:23px;font-weight:400;line-height:1.42;color:var(--t-ink)}
+.tjar.thinking::after{content:" …";color:var(--cy);animation:blink .9s steps(2) infinite}
+
+/* a confirmation card, moved here from the hidden transcript: big enough to tap from the bed */
+body.tablet .tcap .bubble.confirm{max-width:none;align-self:stretch;text-align:left;font:15px/1.45 var(--t-font);
+  padding:16px 18px;border-radius:20px;background:rgba(255,179,64,.08);border:1px solid rgba(255,179,64,.5)}
+body.tablet .tcap .bubble.confirm .ctitle{font:600 11px/1.2 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--amber)}
+body.tablet .tcap .bubble.confirm .cdetail{font:16px/1.45 var(--t-font);white-space:pre-wrap;margin:8px 0 12px;color:var(--t-ink)}
+body.tablet .tcap .bubble.confirm .cbtns{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+body.tablet .tcap .bubble.confirm button{padding:14px 26px;border-radius:24px;font:600 17px var(--t-font);cursor:pointer;
+  border:1px solid var(--t-line);background:var(--t-card-hi);color:var(--t-ink)}
+body.tablet .tcap .bubble.confirm .cyes{background:rgba(46,217,155,.18);border-color:rgba(46,217,155,.6)}
+body.tablet .tcap .bubble.confirm .ctimer{font-size:13px;color:var(--t-dim)}
+
+/* the PC's ask bar, moved into the dock: one big mic, the keyboard on request */
+.tdock{display:flex;justify-content:center;width:100%;padding-top:4px}
+/* the phone rules (styles.css, up to 760 px) reach an iPad mini upright: keep the dock as it is */
+body.tablet .askbar{position:static;border-radius:0;flex-wrap:nowrap;background:none;border:none;padding:0;gap:12px;justify-content:center;width:100%;max-width:640px}
+body.tablet .askbar:focus-within{box-shadow:none}
+body.tablet .asklabel,body.tablet #ask,body.tablet #btnSend{display:none}
+body.tablet .askbar.typing #ask,body.tablet .askbar.typing #btnSend{display:block}
+body.tablet .askbar.typing #ask{flex:1;min-width:0;font:17px var(--t-font);color:var(--t-ink);padding:14px 18px;
+  background:var(--t-card-hi);border:1px solid var(--line-hot);border-radius:28px}
+body.tablet .askbar.typing #btnMic{width:58px;height:58px}
+/* the mic as one round button: what it does is said under the orb already */
+body.tablet #btnMic{flex:0 0 auto;min-width:0;width:72px;height:72px;padding:0;border-radius:50%;justify-content:center;
+  background:var(--t-card-hi);border:1.5px solid var(--t-line);-webkit-touch-callout:none}
+body.tablet #btnMic::before{content:"🎙";font-size:28px;line-height:1}
+body.tablet #btnMic .micdot{position:absolute;top:10px;right:12px;width:10px;height:10px}
+body.tablet #micLabel{display:none}
+body.tablet #btnMic .miclvl{height:3px;left:18px;right:18px;bottom:12px;border-radius:2px}
+body.tablet .askbar{align-items:center}
+body.tablet #btnStop,body.tablet #btnSend,body.tablet .tkeys{height:58px;min-width:58px;border-radius:29px;padding:0 20px;
+  font:500 16px var(--t-font);background:var(--t-card);border:1px solid var(--t-line);color:var(--t-ink);cursor:pointer}
+body.tablet #btnStop:disabled{display:none}
+body.tablet .askbar.typing .tkeys{background:rgba(95,228,255,.12);border-color:var(--line-hot)}
+
+.tquick{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:640px;padding-top:6px}
+.tquick button{padding:10px 16px;border-radius:20px;border:1px solid var(--t-line);background:var(--t-card);
+  color:var(--t-dim);font:15px var(--t-font);cursor:pointer}
+.tquick button:active,.tmenu:active,.tkeys:active{transform:scale(.96)}
+
+/* ── the house as tiles ── */
+/* all tiles visible, in as many rows as they need — the page scrolls for the rest */
+.ttiles{flex:0 0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:10px}
+.ttile{background:var(--t-card);border:1px solid var(--t-line);border-radius:20px;padding:13px 16px;
+  display:flex;flex-direction:column;gap:4px;min-width:0}
+.ttile span{font:600 10px/1.2 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--t-dim)}
+.ttile b{font-size:28px;font-weight:300;letter-spacing:-.01em;white-space:nowrap}
+.ttile b small{font-size:15px;color:var(--t-dim);margin-left:3px;font-weight:400}
+.ttile em{font-style:normal;font-size:13px;color:var(--t-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttile i{display:block;height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:4px}
+.ttile i u{display:block;height:100%;background:var(--cy);border-radius:2px;transition:width .8s}
+.ttile[data-kind]:not([data-kind=""]){cursor:pointer;position:relative}
+.ttile[data-kind]:not([data-kind=""])::after{content:"›";position:absolute;top:10px;right:14px;color:var(--t-faint);font-size:18px}
+.ttile:active,.tweather:active{transform:scale(.98)}
+.tweather{cursor:pointer}
+.ttile.good b{color:#7fe8b8}.ttile.warn b{color:var(--amber)}.ttile.bad b{color:var(--pink)}
+.ttile.rooms{grid-column:span 2}
+.ttile.rooms ul{list-style:none;display:flex;flex-direction:column;gap:3px;margin-top:2px}
+.ttile.rooms li{display:flex;justify-content:space-between;font-size:15px}
+.ttile.rooms li b{font-size:15px;font-weight:500}
+.ttile.rooms li.heat b{color:var(--amber)}
+
+/* ── settings sheet ── */
+.tsheet{position:fixed;inset:0;z-index:58;display:grid;place-items:end center;background:rgba(2,5,9,.55);
+  backdrop-filter:blur(6px)}
+.tsheet[hidden]{display:none}
+.tsheetbox{width:min(520px,calc(100vw - 32px));margin-bottom:calc(20px + env(safe-area-inset-bottom));
+  background:rgba(14,22,34,.96);border:1px solid var(--t-line);border-radius:26px;padding:20px;
+  display:flex;flex-direction:column;gap:10px;font-family:var(--t-font)}
+.tsheetrow{display:flex;gap:10px;flex-wrap:wrap}
+body.tablet .tsheetrow .tool,.tsheetbtn{flex:1 1 auto;padding:15px 18px;border-radius:16px;font:500 16px var(--t-font);
+  background:var(--t-card-hi);border:1px solid var(--t-line);color:var(--t-ink);cursor:pointer;text-align:center}
+body.tablet .tsheetrow .tool.on{border-color:var(--line-hot);color:var(--cy)}
+.tsheetbtn.tclose{background:none;color:var(--t-dim)}
+.tsheetsel{display:flex;flex-direction:column;gap:8px;font:500 13px var(--t-font);color:var(--t-dim);padding:4px 2px}
+.tsheetsel select{padding:14px 16px;border-radius:16px;font:500 16px var(--t-font);background:var(--t-card-hi);
+  border:1px solid var(--t-line);color:var(--t-ink)}
+.sstrip,.ssys{display:none}
+
+/* a low landscape screen (iPad in Safari with its bars): the greeting gives way to the agenda */
+@media (orientation:landscape) and (max-height:860px){
+  .thello{display:none}
+  .tdate{margin-bottom:10px}
+  .tweather{padding:12px 14px;gap:10px}
+  .tdays li{padding:5px 0}
+  .tagenda{margin-top:8px}
+}
+
+/* ── portrait: one column, the orb in the middle ── */
+@media (orientation:portrait){
+  .tscreen{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);
+    grid-template-areas:"bar" "day" "voice";gap:16px}
+  .tday{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"time weather" "date weather" "hello weather" "agenda agenda";
+    column-gap:24px;align-items:start}
+  .ttime{grid-area:time;font-size:104px}
+  .tdate{grid-area:date}
+  .thello{grid-area:hello}
+  .tweather{grid-area:weather;align-self:stretch}
+  .tagenda{grid-area:agenda;margin-top:8px}
+  .tagenda ol{max-height:156px}
+  .tvoice{overflow:hidden}
+  .torbwrap{width:min(230px,22vh)}
+}
+
+/* ── detail sheet: what a tile or the weather knows beyond its one number ── */
+.tdetail .tsheetbox{width:min(620px,calc(100vw - 32px));max-height:calc(100dvh - 60px - env(safe-area-inset-top))}
+.tdbody{overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;display:flex;flex-direction:column;gap:12px;padding:2px 4px}
+.tdbody>*{flex-shrink:0}      /* the sheet scrolls; squeezed, the rain chart lost its height */
+.tdbody h4{font:600 11px/1 var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--t-dim);margin:10px 0 0}
+.tdlead{font-size:22px;font-weight:300;color:var(--t-ink)}
+.tdlead.small{font-size:17px;color:var(--t-ink);opacity:.85}
+.tdlist{list-style:none;display:flex;flex-direction:column;gap:2px}
+.tdlist li{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:11px 14px;
+  background:var(--t-card);border-radius:12px;font-size:16px}
+.tdlist li span{color:var(--t-dim)}
+.tdlist li b{font-weight:500;text-align:right}
+.tdlist li b small{font-size:13px;color:var(--t-dim);font-weight:400;margin-left:6px}
+.tdlist li.good b{color:#7fe8b8}.tdlist li.warn b{color:var(--amber)}.tdlist li.bad b{color:var(--pink)}
+.tdnote{font-size:13px;color:var(--t-dim);line-height:1.5}
+.tdnote i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px}
+.tdnote i.k1{background:rgba(111,184,255,.35)}.tdnote i.k2{background:#6fb8ff}
+.tdrain{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:3px;height:96px;align-items:end;
+  padding:18px 4px 0;background:var(--t-card);border-radius:14px}
+.tdrain div{position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end}
+.tdrain i{display:block;background:rgba(111,184,255,.25);border-radius:3px 3px 0 0}
+.tdrain u{position:absolute;left:25%;right:25%;bottom:16px;background:#6fb8ff;border-radius:2px;max-height:calc(100% - 16px)}
+.tdrain .likely i{background:rgba(111,184,255,.5)}
+.tdrain .past{opacity:.3}
+.tdday{display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid var(--t-line)}
+.tdhead{display:flex;align-items:center;gap:12px}
+.tdday.focus{background:rgba(95,228,255,.06);border-radius:14px;padding:8px 8px 6px;border-top-color:transparent}
+.tdays li{cursor:pointer}
+.tdhead b{font-size:16px;font-weight:600;min-width:52px}.tdhead span{font-size:22px}.tdhead em{font-style:normal;color:var(--t-dim);font-size:15px}
+.tdline{font-size:15px;color:var(--t-ink)}
+.tdrain b{position:absolute;top:-16px;left:-4px;right:-4px;text-align:center;font-size:10px;font-weight:600;color:#9fd0ff}
+.tdrain em{height:16px;font-style:normal;font-size:11px;color:var(--t-dim);text-align:center;line-height:16px}
+.tdrain i{margin-bottom:0}
+.tdtable{width:100%;border-collapse:collapse;font-size:15px}
+.tdtable th{font:600 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--t-faint);text-align:left;padding:4px 6px}
+.tdtable td{padding:9px 6px;border-top:1px solid var(--t-line)}
+.tdtable td:nth-child(2){font-size:20px}
+.tdmail{list-style:none;display:flex;flex-direction:column;gap:6px}
+.tdmail li{display:flex;flex-direction:column;gap:2px;padding:11px 14px;background:var(--t-card);border-radius:12px}
+.tdmail b{font-size:15px;font-weight:600}.tdmail span{font-size:15px}.tdmail em{font-style:normal;font-size:12px;color:var(--t-dim)}

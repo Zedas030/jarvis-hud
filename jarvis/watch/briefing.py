@@ -99,23 +99,16 @@ def _batteries(states):
 
 
 def _mail_count():
-    import imaplib
-    user, pw = os.environ.get("MAIL_USER", "").strip(), os.environ.get("MAIL_PASSWORD", "").strip()
-    if not (user and pw):
+    import mailboxes
+    if not mailboxes.configured():
         return ""
-    box = imaplib.IMAP4_SSL(os.environ.get("MAIL_IMAP_HOST", "").strip(), 993, timeout=15)
-    try:
-        box.login(user, pw)
-        box.select("INBOX", readonly=True)
-        _, data = box.search(None, "UNSEEN")
-        n = len(data[0].split())
-    finally:
-        try:
-            box.logout()
-        except Exception:  # noqa: BLE001
-            pass
-    return f"Postfach: {n} ungelesene Mails (Details bei Bedarf mit mail_inbox)."
-
+    results, errors = mailboxes.each(lambda acc, box: (acc["name"], len(box.search(None, "UNSEEN")[1][0].split())),
+                                     timeout=15)
+    if not results:
+        return ""
+    n = sum(c for _, c in results)
+    split = f" ({', '.join(f'{a}: {c}' for a, c in results)})" if len(results) > 1 else ""
+    return f"Postfach: {n} ungelesene Mails{split} (Details bei Bedarf mit mail_inbox)."
 
 def morning_block():
     """Briefing data on the day's first turn, once. Empty string otherwise."""

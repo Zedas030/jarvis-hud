@@ -24,6 +24,8 @@ import subprocess
 import tempfile
 import time
 
+import hostos
+
 MODEL = os.environ.get("JARVIS_VISION_MODEL", "sonnet").strip()
 MAX_WIDTH = int(os.environ.get("JARVIS_VISION_MAX_WIDTH", "1600"))
 ENABLED = os.environ.get("JARVIS_VISION", "1").strip() not in ("0", "false", "no", "off")
@@ -68,7 +70,7 @@ def capture(whole=False):
         args += ["-Left", str(rect.left), "-Top", str(rect.top), "-Width", str(max(1, rect.right - rect.left)),
                  "-Height", str(max(1, rect.bottom - rect.top))]
     p = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=40,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       **hostos.QUIET)
     if p.returncode != 0 or not out.exists():
         return None, f"Screenshot fehlgeschlagen: {(p.stderr or '').strip()[:160]}"
     return out, None
@@ -88,7 +90,7 @@ def ask_image(png_path, question):
     t0 = time.time()
     p = subprocess.run(cmd, input=json.dumps(msg) + "\n", capture_output=True, text=True, encoding="utf-8",
                        errors="replace", env=runtime._env_for_child(), cwd=str(pathlib.Path(png_path).parent),
-                       timeout=TIMEOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       timeout=TIMEOUT, **hostos.QUIET)
     result, usage = None, {}
     for line in (p.stdout or "").splitlines():
         try:

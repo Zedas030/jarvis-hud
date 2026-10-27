@@ -1,0 +1,120 @@
+/* Stark-HUD (stark.js): the room display as a workshop wall — black glass, cyan light, cut
+   corners, numbers in mono with a glow, the arc reactor in the middle. Everything hangs on
+   body.tablet.stark and only restyles the room display's parts; the layout is three columns:
+   the day on the left, Jarvis in the middle, the machine room on the right. */
+body.tablet.stark{
+  --s-ink:#d6f6ff; --s-dim:#6fa6ba; --s-faint:#3d6577; --s-cy:#3fdcff; --s-cy-2:rgba(63,220,255,.35);
+  --s-panel:rgba(3,18,28,.62); --s-line:rgba(63,220,255,.28); --s-gold:#ffb52e; --s-red:#ff3b4e;
+  --t-ink:var(--s-ink); --t-dim:var(--s-dim); --t-faint:var(--s-faint); --t-line:var(--s-line);
+  --t-card:var(--s-panel); --t-card-hi:rgba(8,32,46,.8);
+  --cut:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));
+  background:
+    radial-gradient(900px 640px at 50% 42%, rgba(30,140,190,.22) 0%, transparent 65%),
+    repeating-linear-gradient(0deg, rgba(63,220,255,.035) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(90deg, rgba(63,220,255,.035) 0 1px, transparent 1px 34px),
+    #010509;
+}
+/* a hex field in the corner, like the reference walls */
+body.tablet.stark::after{content:"";position:fixed;right:-40px;bottom:-30px;width:360px;height:260px;pointer-events:none;opacity:.22;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='48' viewBox='0 0 42 48'%3E%3Cpath d='M21 1l19 11v24L21 47 2 36V12z' fill='none' stroke='%233fdcff' stroke-width='1.2'/%3E%3C/svg%3E");
+  -webkit-mask:radial-gradient(closest-side, #000 30%, transparent);mask:radial-gradient(closest-side, #000 30%, transparent)}
+
+/* ── three columns ── */
+body.stark .tscreen{grid-template-columns:minmax(0,27fr) minmax(0,46fr) minmax(0,27fr);
+  grid-template-areas:"bar bar bar" "day voice sys";gap:16px 22px}
+body.stark .ssys{grid-area:sys;display:flex;flex-direction:column;gap:12px;min-height:0;overflow-y:auto;scrollbar-width:none}
+body.stark .ssys::-webkit-scrollbar{display:none}
+
+/* ── bar: name, day strip, slots ── */
+body.stark .tbar{gap:18px;border-bottom:1px solid var(--s-line);padding-bottom:8px}
+body.stark .tbrand{color:var(--s-cy);text-shadow:0 0 10px rgba(63,220,255,.7);letter-spacing:.5em}
+body.stark .tbrand span::after{content:" · STARK INDUSTRIES";color:var(--s-faint);letter-spacing:.25em;text-shadow:none;font-size:10px}
+body.stark .sstrip{display:flex;flex:1;min-width:0;justify-content:center;gap:2px;list-style:none;overflow:hidden;
+  font:600 11px/1 var(--mono);color:var(--s-faint)}
+body.stark .sstrip li{padding:5px 3px;min-width:20px;text-align:center}
+body.stark .sstrip li.we{color:var(--s-dim)}
+body.stark .sstrip li.gone{opacity:.45}
+body.stark .sstrip li.now{color:#00141c;background:var(--s-cy);box-shadow:0 0 14px var(--s-cy);font-weight:800}
+body.stark .tslots{margin-left:0}
+body.stark .tmenu,body.stark .tslots .bell,body.stark .tslots .chip-lg{border-radius:4px;border-color:var(--s-line);background:var(--s-panel);color:var(--s-cy)}
+
+/* ── left: the day ── */
+body.stark .ttime{font-family:var(--mono);font-weight:300;font-size:clamp(56px,7.4vw,108px);letter-spacing:-.02em;color:#c9f4ff;
+  text-shadow:0 0 18px rgba(63,220,255,.55)}
+body.stark .ttime::after{content:attr(data-sec);font-size:.34em;color:var(--s-cy);margin-left:4px;letter-spacing:0}
+body.stark .tdate{font:500 14px var(--mono);text-transform:uppercase;letter-spacing:.18em;color:var(--s-cy)}
+body.stark .thello{font:13px var(--mono);color:var(--s-dim);margin-bottom:8px}
+body.stark .tweather,body.stark .tagenda li,body.stark .ttile,body.stark .spanel,body.stark .tsheetbox,
+body.stark .tdlist li,body.stark .tdmail li,body.stark .tdrain{
+  border-radius:0;clip-path:var(--cut);background:var(--s-panel);border:1px solid var(--s-line);
+  box-shadow:inset 0 0 22px rgba(63,220,255,.07)}
+body.stark .tweather{padding:14px}
+body.stark .ttemp{font-family:var(--mono);color:#c9f4ff;text-shadow:0 0 12px rgba(63,220,255,.5)}
+body.stark .tdays li:first-child{background:rgba(63,220,255,.1);border-radius:0}
+body.stark .tdays b{font-family:var(--mono);color:var(--s-cy)}
+body.stark .tdays i{color:var(--s-cy)}
+body.stark .tagenda h3,body.stark .spanel h4,body.stark .tsheetbox h3{font:700 10px/1 var(--mono);letter-spacing:.32em;
+  text-transform:uppercase;color:var(--s-cy);display:flex;align-items:center;gap:10px}
+body.stark .tagenda h3::after,body.stark .spanel h4::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--s-cy-2),transparent)}
+body.stark .tagenda li{padding:9px 14px;grid-template-columns:84px 1fr}
+body.stark .tagenda li b{font-family:var(--mono);font-size:11px;color:var(--s-cy)}
+body.stark .tagenda li span{font-size:15px}
+body.stark .tagenda li.now{border-color:var(--s-cy);background:rgba(63,220,255,.1)}
+
+/* ── middle: Jarvis ── */
+body.stark .torbwrap{width:min(440px,54vh);min-height:180px}
+body.stark .tstate{font:600 14px var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--s-cy);text-shadow:0 0 10px rgba(63,220,255,.6)}
+body.stark .tstate.hearing{color:var(--s-gold);text-shadow:0 0 10px rgba(255,181,46,.6)}
+body.stark .tstate.blocked,body.stark .tstate.needs-click{color:var(--s-red);text-shadow:0 0 10px rgba(255,59,78,.6)}
+body.stark .tme{font:14px var(--mono);color:var(--s-dim)}
+body.stark .tjar{font-size:20px;color:var(--s-ink)}
+body.stark #btnMic{border-radius:50%;border:1.5px solid var(--s-cy);background:rgba(63,220,255,.08);
+  box-shadow:0 0 18px rgba(63,220,255,.35),inset 0 0 14px rgba(63,220,255,.2)}
+body.stark #btnStop,body.stark .tkeys,body.stark #btnSend{border-radius:4px;border-color:var(--s-line);background:var(--s-panel);color:var(--s-cy)}
+body.stark .tquick button{border-radius:2px;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);padding:9px 20px;
+  border:1px solid var(--s-line);background:rgba(63,220,255,.07);color:var(--s-cy);font:600 12px var(--mono);
+  letter-spacing:.08em;text-transform:uppercase}
+
+/* ── right: the machine room ── */
+body.stark .spanel{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.sgauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 6px}
+.sgauges.two{grid-template-columns:minmax(0,1fr)}
+.sgauge{position:relative;display:grid;justify-items:center;gap:2px}
+.sgauge svg{width:72px;height:72px;transform:rotate(-90deg);filter:drop-shadow(0 0 6px rgba(63,220,255,.45))}
+.sgauge .trk{fill:none;stroke:rgba(63,220,255,.14);stroke-width:5}
+.sgauge .val{fill:none;stroke:var(--s-cy);stroke-width:5;stroke-linecap:butt;transition:stroke-dasharray .8s}
+.sgauge .in{fill:none;stroke:rgba(63,220,255,.25);stroke-width:1;stroke-dasharray:2 3}
+.sgauge.hot .val{stroke:var(--s-red)}.sgauge.dim .val{stroke:none}
+.sgauge b{position:absolute;top:24px;left:0;right:0;text-align:center;font:600 17px var(--mono);color:var(--s-ink)}
+.sgauge b small{font-size:10px;color:var(--s-dim)}
+.sgauge span{font:700 10px var(--mono);letter-spacing:.2em;color:var(--s-cy)}
+.sgauge em{font:normal 10px var(--mono);color:var(--s-dim)}
+.slines{list-style:none;display:flex;flex-direction:column;gap:5px}
+.slines li{display:flex;justify-content:space-between;gap:10px;font:12px var(--mono);color:var(--s-dim);
+  padding-bottom:5px;border-bottom:1px dashed rgba(63,220,255,.12)}
+.slines li b{color:var(--s-ink);font-weight:600}
+.slines li.good b{color:#5dffb0}.slines li.warn b{color:var(--s-gold)}.slines li.bad b{color:var(--s-red)}
+
+/* ── tiles and sheets in the same skin ── */
+body.stark .ttile span{color:var(--s-cy);font-family:var(--mono)}
+body.stark .ttile b{font-family:var(--mono);color:var(--s-ink)}
+body.stark .ttile.good b{color:#5dffb0}body.stark .ttile.warn b{color:var(--s-gold)}
+body.stark .ttile i u{background:var(--s-cy);box-shadow:0 0 8px var(--s-cy)}
+body.stark .tsheet{background:rgba(0,6,10,.7)}
+body.stark .tsheetbox{background:rgba(2,14,22,.96)}
+body.stark .tdrain i{background:rgba(63,220,255,.22)}
+body.stark .tdrain .likely i{background:rgba(63,220,255,.5)}
+body.stark .tdrain u{background:var(--s-cy)}
+
+/* ── upright: Jarvis on top, the day and the machine room side by side below ── */
+@media (orientation:portrait){
+  body.tablet.stark .tab{height:auto}
+  body.stark .tscreen{height:auto;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto;
+    grid-template-areas:"bar bar" "voice voice" "day sys"}
+  body.stark .tvoice{height:min(calc(100dvh - 120px - env(safe-area-inset-top)), 64dvh)}
+  body.stark .tbrand span::after{content:none}
+  body.stark .tday{display:flex;flex-direction:column}
+  body.stark .tagenda ol{max-height:none}
+  body.stark .ssys{overflow:visible}
+  body.stark .sstrip li:nth-child(n+1){min-width:16px;padding:4px 1px}
+}

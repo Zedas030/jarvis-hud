@@ -84,6 +84,7 @@ def route(text):
 
 class Base(unittest.TestCase):
     def setUp(self):
+        router.forget_topic()
         CALLS.clear()
         PC.clear()
         learning.PATH.unlink(missing_ok=True)
@@ -389,6 +390,60 @@ class PcControl(Base):
         self.local("Stumm aus")
         self.assertEqual(PC, [("volume", 30), ("step", 10), ("mute", True), ("mute", False)])
 
+    def test_volume_misheard(self):
+        # Heard like this at 11:54: no handler matched, and Jarvis said his volume tool was missing.
+        self.assertIn("100", self.local("stellt die Lautspecke auf 100%.", "pc"))
+        self.assertEqual(PC, [("volume", 100)])
+
+    def test_follow_up_keeps_the_last_tools(self):
+        # "Also was." after a mail question used to get memory only — "mir fehlt das Mail-Werkzeug".
+        self.assertIn("mail", route("Was steht in meinen Mails?")["groups"])
+        follow = route("Dann nochmal alles vor, aber du hast ja schon das meiste gesagt.")
+        self.assertIn("mail", follow["groups"])
+        self.assertEqual(follow["reason"], "Folgefrage")
+        self.assertIn("mail", route("Also was.")["groups"], "a chain of vague turns keeps the topic")
+        self.assertNotIn("mail", route("Wie wird das Wetter morgen in Hamburg?").get("groups", []),
+                         "a new topic brings its own tools only")
+
+    def test_follow_up_with_own_topic_keeps_the_full_ha_server(self):
+        # 13:12: "ab wie viel Prozent ..." brought "home" itself and lost ha_full from the automation question.
+        self.assertIn("ha_full", router.route("Zeig mir die Stromautomatisierung im Home Assistant", ha_full=True)["groups"])
+        r = route("Ich will wissen, ab wie viel Prozent er aufhört, aus der Batterie Strom zu ziehen.")
+        self.assertIn("home", r["groups"])
+        self.assertIn("ha_full", r["groups"])
+
+    def test_joined_groups_do_not_pile_up(self):
+        route("Was steht in meinen Mails?")
+        route("Recherchier mir bitte gründlich, welche Golfplätze es in Brandenburg gibt")   # takes mail along, only itself
+        self.assertNotIn("mail", route("Erklär mir, warum die Lampe im Wohnzimmer manchmal flackert")["groups"])
+
+    def test_follow_up_carry_expires(self):
+        route("Was steht in meinen Mails?")
+        router._LAST["at"] -= router.CARRY_S + 1
+        self.assertEqual(route("Also was.")["groups"], ["memory", "web"], "only the search that rides along")
+
+    def test_web_search_rides_along_without_the_big_model(self):
+        # "bitte finde selber heraus, welches Course Rating der Platz hat" got memory only and no search.
+        r = route("Wie lange hat das Freibad in Pankow heute offen?")
+        self.assertIn("web", r["groups"])
+        r = route("ich habe ein 48er Handicap und bitte finde selber heraus, welches Course Rating der Platz hat.")
+        self.assertIn("web", r["groups"])
+        self.assertEqual(r["model"], router.MODEL_SMART, "an explicit search request gets the bigger model")
+        router.forget_topic()
+        self.assertEqual(route("Sag mir einen netten Spruch").get("model"), router.MODEL_SIMPLE,
+                         "the search riding along does not make every turn expensive")
+
+    def test_web_search_is_no_topic_for_follow_ups(self):
+        route("Was steht in meinen Mails?")
+        self.assertIn("mail", route("Also was.")["groups"], "riding-along web must not end the follow-up carry")
+
+    def test_volume_number_first(self):
+        # Heard like this: the number before "Lautstärke" must set, not read the volume out.
+        self.assertIn("100", self.local("stelle mein PC auf 100% Lautstärke.", "pc"))
+        self.assertIn("100", self.local("Ein PC Jarvis auf 100% Lautstärke.", "pc"))
+        self.assertIn("40", self.local("Stell den Rechner auf 40 Prozent", "pc"))
+        self.assertEqual(PC, [("volume", 100), ("volume", 100), ("volume", 40)])
+
     def test_music_volume_stays_with_music(self):
         r = route("Musik leiser")
         self.assertNotEqual(r.get("handler"), "pc")
@@ -474,8 +529,9 @@ class Sun(Base):
     def test_rest_goes_to_weather_tool(self):
         for text in ("Wie hoch ist der UV-Index?", "Scheint morgen die Sonne?", "Wie viele Sonnenstunden heute?",
                      "Wie wird das Wetter am Wochenende?", "Wie warm wird es in Madrid?"):
-            r = self.llm(text, "weather")
-            self.assertNotIn("web", r["groups"], text)
+            self.llm(text, "weather")
+            # the search that rides along in every turn is fine; no search *request* though
+            self.assertNotIn("web", router.llm_route(text)["groups"], text)
 
     def test_no_weather_for_unrelated(self):
         for text in ("Starte Windows neu", "Mach das Licht heller", "Wie ist die Temperatur im Wohnzimmer?"):
@@ -486,6 +542,17 @@ class MailRoute(Base):
     def test_mark_read_goes_to_mail(self):
         self.llm("Markier alle Mails als gelesen", "mail")
         self.llm("Markier die von Amazon als gelesen", "mail")
+
+
+class CalendarRoute(Base):
+    def test_day_plan_questions_get_the_calendar(self):
+        # "was steht heute noch an?" got memory only, and Jarvis said he could not see the calendar
+        for text in ("was steht heute noch an?", "Was hab ich heute vor?", "Habe ich heute noch was vor?",
+                     "Was steht diese Woche an", "Hab ich am Samstag Zeit?"):
+            self.llm(text, "calendar")
+
+    def test_switches_stay_with_the_house(self):
+        self.assertNotIn("calendar", route("Steht der Fernseher an?").get("groups", []))
 
 
 class Cache(unittest.TestCase):

@@ -21,6 +21,8 @@ import threading
 import time
 import uuid
 
+import hostos
+
 # Sonnet by default: plenty for everyday questions and much lighter on the
 # subscription limit than Opus.
 MODEL = os.environ.get("JARVIS_MODEL", "sonnet").strip()
@@ -111,7 +113,7 @@ def _can_launch():
     try:
         p = subprocess.run(_claude_base() + ["--version"], cwd=WORKDIR, text=True,
                            encoding="utf-8", errors="replace", env=_clean_env(),
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                           **hostos.QUIET,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
         return p.returncode == 0, (p.stdout or p.stderr).strip()
     except Exception as e:  # noqa: BLE001
@@ -238,7 +240,7 @@ class _Proc:
                 cmd, cwd=WORKDIR, text=True, bufsize=1, encoding="utf-8", errors="replace",
                 stdin=subprocess.PIPE if stdin else subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_env_for_child(),
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                **hostos.QUIET)
         except FileNotFoundError:
             raise RuntimeError("claude CLI not found. Install Claude Code or set CLAUDE_CMD.")
         self.q = collections.deque()
@@ -538,7 +540,7 @@ LEAN_EFFORT = os.environ.get("JARVIS_EFFORT", "low").strip()
 MAX_OUTPUT = os.environ.get("JARVIS_MAX_OUTPUT_TOKENS", "1500").strip()
 POOL_SIZE = int(os.environ.get("JARVIS_POOL_SIZE", "3"))
 # built-in Claude Code tools a group brings along (everything else stays off)
-GROUP_BUILTINS = {"web": ["WebSearch"], "research": ["WebSearch"], "pc": ["PowerShell"], "ha_full": ["ToolSearch"]}
+GROUP_BUILTINS = {"web": ["WebSearch"], "research": ["WebSearch"], "pc": [hostos.shell_tool()], "ha_full": ["ToolSearch"]}
 # tools that run without a confirmation card; the rest goes through mcp__jarvis__approve
 import policy  # noqa: E402  — READ and LIMITED_WRITE run without a card; policy.py has the table
 NO_CONFIRM = policy.no_confirm()
@@ -601,7 +603,7 @@ class _LeanProc(_Proc):
             self.proc = subprocess.Popen(
                 cmd, cwd=WORKDIR, text=True, bufsize=1, encoding="utf-8", errors="replace",
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                **hostos.QUIET)
         except FileNotFoundError:
             raise RuntimeError("claude CLI not found. Install Claude Code or set CLAUDE_CMD.")
         self.q = collections.deque()

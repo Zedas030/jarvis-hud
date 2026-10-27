@@ -96,7 +96,7 @@ def _title(path):
 def overview(note=""):
     note = (note or "").strip()
     if note:
-        path = memory.MEMORY_DIR / f"{note}.md"
+        path = memory.note_path(note)
         if not path.exists():
             return f"Keine Notiz '{note}'."
         rows = []

@@ -258,6 +258,8 @@
 
   /* ── render ─────────────────────────────── */
   MemoryGraph.prototype._loop = function () {
+    // hidden (the iPad's home view, the mini view): no frames to draw, the battery is spared
+    if (this.cv.offsetParent === null) { requestAnimationFrame(this._loop); return; }
     this._resize();
     if (this._needsFit && this.cv.clientWidth >= 50 && this.cv.clientHeight >= 50) this.fit();
     this._tick();

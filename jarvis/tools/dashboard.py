@@ -71,11 +71,49 @@ def _golf_verdict(code, rain, wind, tmax):
     return ("ja", "ok")
 
 
+RAIN_CHANCE = 30         # % from which an hour counts as a rain hour, even without a forecast amount
+RAIN_FLOOR = 10          # ...and with an amount forecast, from here (0.1 mm at 2-4 % is the model's noise)
+
+
+def rain_hour(p, mm):
+    """An hour it may rain in: some amount forecast at a small chance, or a fair chance alone.
+    40 % alone hid evenings with 1.5 mm at 12-24 %."""
+    return (p or 0) >= RAIN_CHANCE or ((mm or 0) >= 0.1 and (p or 0) >= RAIN_FLOOR)
+
+
+def _pct(lo, hi):
+    return f"{hi} %" if lo == hi else f"{lo}–{hi} %"
+
+
+def rain_day(hours):
+    """hours: one day's [(hour, probability %, mm)], 0-23. Each stretch of rain hours with its own
+    chance — the same line for every day: "6–12 Uhr (30–100 %), 23–24 Uhr (18 %)" /
+    "ganztägig (40–100 %)" / "" (no rain hour)."""
+    spans, cur = [], None
+    for h, p, mm in hours:
+        if rain_hour(p, mm):
+            cur = [h, h + 1, p or 0, p or 0] if cur is None else [cur[0], h + 1, min(cur[2], p or 0), max(cur[3], p or 0)]
+        elif cur:
+            spans.append(cur)
+            cur = None
+    if cur:
+        spans.append(cur)
+    if spans and sum(e - s for s, e, _, _ in spans) >= 20:
+        when = f"ganztägig ({_pct(min(sp[2] for sp in spans), max(sp[3] for sp in spans))})"
+    else:
+        when = ", ".join(f"{s}–{e} Uhr ({_pct(lo, hi)})" for s, e, lo, hi in spans[:4])
+    return dict(when=when, peak=max([p or 0 for _, p, _ in hours] or [0]),
+                mm=round(sum(m or 0 for _, _, m in hours), 1),
+                times=", ".join(f"{s}–{e}" for s, e, _, _ in spans[:3]))
+
+
 def _weather():
     d = briefing._get("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=%s"
                       "&forecast_days=7&current=temperature_2m,weather_code"
-                      "&daily=weather_code,temperature_2m_max,temperature_2m_min,"
-                      "precipitation_probability_max,wind_speed_10m_max,sunset" % (briefing.LAT, briefing.LON, briefing.TZ_Q))
+                      "&hourly=precipitation_probability,precipitation"
+                      "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_min,"
+                      "precipitation_probability_max,precipitation_sum,wind_speed_10m_max,sunrise,sunset"
+                      % (briefing.LAT, briefing.LON, briefing.TZ_Q))
     day, now = d["daily"], d.get("current", {})
     rain, wind, tmax = day["precipitation_probability_max"][0] or 0, day["wind_speed_10m_max"][0] or 0, \
         day["temperature_2m_max"][0]
@@ -88,9 +126,50 @@ def _weather():
                              day["wind_speed_10m_max"][i] or 0, day["temperature_2m_max"][i])
     golf_day = "heute" if i == 0 else "morgen" if i == 1 else \
         WEEKDAYS[dt.date.fromisoformat(day["sunset"][i][:10]).weekday()]
-    return dict(now=now.get("temperature_2m"), tmin=day["temperature_2m_min"][0], tmax=tmax,
+    # the next days for the iPad's forecast row (the PC only shows today)
+    hr = d.get("hourly") or {}
+    by_day = {}
+    for t, p, mm in zip(hr.get("time", []), hr.get("precipitation_probability", []), hr.get("precipitation", [])):
+        by_day.setdefault(t[:10], []).append((int(t[11:13]), p or 0, round(mm or 0, 1)))
+    days = []
+    for k in range(min(5, len(day.get("time", [])))):
+        hours = by_day.get(day["time"][k], [])
+        days.append(dict(day="Heute" if k == 0 else WEEKDAYS[dt.date.fromisoformat(day["time"][k]).weekday()][:2],
+                         code=day["weather_code"][k], sky=briefing.WEATHER_CODES.get(day["weather_code"][k], "wechselhaft"),
+                         tmin=day["temperature_2m_min"][k], tmax=day["temperature_2m_max"][k],
+                         rain=day["precipitation_probability_max"][k] or 0,
+                         rain_min=(day.get("precipitation_probability_min") or [None] * 7)[k] or 0,
+                         mm=round((day.get("precipitation_sum") or [None] * 7)[k] or 0, 1),
+                         rain_when=rain_day(hours)["when"], rain_times=rain_day(hours)["times"],
+                         hours=[dict(h=h, p=p, mm=m, rain=rain_hour(p, m)) for h, p, m in hours]))
+    return dict(now=now.get("temperature_2m"), tmin=day["temperature_2m_min"][0], tmax=tmax, code=code,
                 sky=briefing.WEATHER_CODES.get(code, "wechselhaft"), rain=rain, wind=round(wind),
-                sunset=day["sunset"][0][-5:], golf=golf[0], golf_cls=golf[1], golf_day=golf_day)
+                sunset=day["sunset"][0][-5:], golf=golf[0], golf_cls=golf[1], golf_day=golf_day, days=days,
+                location=dict(latitude=float(briefing.LAT), longitude=float(briefing.LON), timezone=profile.TIMEZONE),
+                sun_times=[dict(date=stamp[:10], sunrise=(day.get("sunrise") or [None] * len(day["sunset"]))[k],
+                                sunset=stamp) for k, stamp in enumerate(day["sunset"])])
+
+
+def _agenda(limit=5):
+    """The next few appointments of the coming week, for the iPad's day view."""
+    import icloud_calendar as cal
+    if not cal.configured():
+        return None
+    now, out = dt.datetime.now(), []
+    for e in cal.events(dt.date.today(), 7):
+        if e.get("calendar", "").lower() == "abfuhrtermine" and not e.get("allday"):
+            continue
+        if (e.get("end") or e["start"]) < now:
+            continue
+        d = e["start"].date()
+        out.append(dict(title=e.get("title", "(ohne Titel)"), allday=bool(e.get("allday")),
+                        day="Heute" if d == now.date() else "Morgen" if d == now.date() + dt.timedelta(days=1)
+                        else WEEKDAYS[d.weekday()][:2] + e["start"].strftime(" %d.%m."),
+                        time="" if e.get("allday") else e["start"].strftime("%H:%M"),
+                        now=e["start"] <= now))
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _next_event():
@@ -139,6 +218,8 @@ def _house():
         router=dict(online=by.get(rt.get("online"), {}).get("state") == "on",
                     down=val(rt.get("down")), up=val(rt.get("up")), temp=val(rt.get("temp"))),
         person=by.get(profile.ha("person") or "", {}).get("state"),
+        # The station goes black while this is on — the iPad's focus follows the sleep schedule.
+        night=by.get(profile.ha("station_night") or "", {}).get("state") == "on",
     )
 
 
@@ -167,15 +248,12 @@ def _mail():
     import email
     import email.header
     import email.utils
-    import imaplib
-    import jarvis_mcp as j
-    if not (j.MAIL_USER and j.MAIL_PASSWORD):
+    import mailboxes
+    if not mailboxes.configured():
         return {"error": "nicht verbunden"}
     dec = lambda v: str(email.header.make_header(email.header.decode_header(v or ""))).strip()  # noqa: E731
-    box = imaplib.IMAP4_SSL(j.MAIL_HOST, 993, timeout=15)
-    try:
-        box.login(j.MAIL_USER, j.MAIL_PASSWORD)
-        box.select("INBOX", readonly=True)   # readonly: nothing gets marked as read
+
+    def read(acc, box):                       # box is read-only: nothing gets marked as read
         _, data = box.search(None, "UNSEEN")
         ids = data[0].split()
         latest = []
@@ -183,17 +261,18 @@ def _mail():
             _, parts = box.fetch(i, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
             msg = email.message_from_bytes(parts[0][1])
             name, addr = email.utils.parseaddr(dec(msg.get("From")))
-            when = email.utils.parsedate_to_datetime(msg["Date"]).strftime("%d.%m. %H:%M") \
-                if msg.get("Date") else ""
+            sent = email.utils.parsedate_to_datetime(msg["Date"]) if msg.get("Date") else None
             latest.append(dict(sender=name or addr, subject=dec(msg.get("Subject")) or "(ohne Betreff)",
-                               when=when))
-    finally:
-        try:
-            box.logout()
-        except Exception:  # noqa: BLE001
-            pass
-    return dict(unread=len(ids), latest=latest, at=time.strftime("%H:%M"))
+                               when=sent.strftime("%d.%m. %H:%M") if sent else "", ts=sent.timestamp() if sent else 0,
+                               account=acc["name"]))
+        return len(ids), latest
 
+    results, errors = mailboxes.each(read, timeout=15)
+    if not results:
+        return {"error": "; ".join(errors) or "nicht erreichbar"}
+    latest = sorted((m for _, ms in results for m in ms), key=lambda m: -m["ts"])[:4]
+    return dict(unread=sum(n for n, _ in results), latest=latest, at=time.strftime("%H:%M"),
+                accounts=len(results) + len(errors), errors=errors)
 
 def _nas():
     import jarvis_mcp as j
@@ -239,12 +318,14 @@ def data():
     return dict(
         weather=_cached("weather", 1800, _weather),
         event=_cached("event", 600, _next_event),
+        agenda=_cached("agenda", 600, _agenda),
         house=_cached("house", 30, _house),
         me=_cached("garmin", 900, _garmin),     # Garmin throttles logins — keep it rare
         mail=_cached("mail", 300, _mail),
         nas=_cached("nas", 300, _nas),
         pi=_cached("pi", 120, _pi),
         pc=_cached("pc", 20, _pc),
+        homelab=_cached("homelab", 30, _homelab),
         resources=_resources(),
     )
 
@@ -253,6 +334,11 @@ def _resources():
     import resources
     st = resources.status()
     return {"ok": st["ok"], "text": st["text"], "shed": st.get("shed", [])}
+
+
+def _homelab():
+    import homelab
+    return homelab.tile()
 
 
 def _pc():

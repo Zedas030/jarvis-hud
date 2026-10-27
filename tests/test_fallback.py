@@ -143,7 +143,9 @@ class Chain(unittest.TestCase):
         self.assertEqual(usage["api_calls"], 2)
 
     def test_confirmation_needed_tool_is_denied_without_hud(self):
-        SCRIPT["groq"] = [tool_call("calendar_add", {"title": "Zahnarzt", "start": "2026-10-16 10:00"}),
+        import datetime as dt   # a day to come: a past one is refused before any card is asked for
+        soon = f"{dt.date.today() + dt.timedelta(days=30)} 10:00"
+        SCRIPT["groq"] = [tool_call("calendar_add", {"title": "Zahnarzt", "start": soon}),
                           text("Das wurde nicht bestätigt.")]
         self.run_chain(["calendar"], message="Trag Zahnarzt ein")
         result = SEEN[1][1]["messages"][-1]["content"]

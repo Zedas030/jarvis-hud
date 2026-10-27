@@ -33,6 +33,7 @@ import urllib.request
 import background
 import commands
 import events
+import hostos
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 CONFIG = pathlib.Path(os.environ.get("JARVIS_HOMELAB_CONFIG", ROOT / "config" / "homelab.json"))
@@ -144,9 +145,9 @@ def check_nas(metrics):
 
 def _ping(host):
     try:
-        p = subprocess.run(["ping", "-n" if os.name == "nt" else "-c", "1", "-w", "1500" if os.name == "nt" else "2", host],
+        p = subprocess.run(hostos.ping_args(host),
                            capture_output=True, text=True, timeout=8,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                           **hostos.QUIET)
         return p.returncode == 0 and "ttl=" in p.stdout.lower()
     except (OSError, subprocess.TimeoutExpired):
         return False

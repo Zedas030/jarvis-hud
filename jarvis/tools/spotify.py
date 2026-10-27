@@ -1,0 +1,303 @@
+"""
+Spotify on every device of the account — the phone on the Bluetooth speaker as much as the PC — through
+the Web API (Spotify Connect). Two jobs:
+
+  hold / release   "Jarvis" turns the music down to the lowest step (JARVIS_SPOTIFY_HOLD_MODE=leise, the
+                   default) or pauses it (=pause), so he hears the request clearly; once he is done the
+                   old volume comes back, or it plays on — only if he did it himself, and never after
+                   "Musik aus" in between. A device Spotify cannot set the volume of is paused instead.
+  control          play, pause, next, previous for the music tool, on whatever device is playing.
+
+The media keys in jarvis_mcp only reach Spotify on this PC; with this module set up the music tool uses
+the Web API instead and falls back to the keys when it fails.
+
+One-time setup (README, "Spotify"): an app on developer.spotify.com with the redirect URI below, its
+Client ID in JARVIS_SPOTIFY_CLIENT_ID, then  .venv\\Scripts\\python.exe scripts\\spotify_login.py
+Needs Premium (a family plan member is fine): Spotify refuses playback control for free accounts.
+"""
+import json
+import os
+import pathlib
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
+CLIENT_ID = os.environ.get("JARVIS_SPOTIFY_CLIENT_ID", "").strip()
+TOKEN_FILE = pathlib.Path(os.environ.get("JARVIS_SPOTIFY_TOKEN", ROOT / "config" / "spotify_token.json"))
+HOLD = os.environ.get("JARVIS_SPOTIFY_HOLD", "1").strip().lower() not in ("0", "off", "aus", "false", "no", "nein")
+# Plays on by itself after this long, should the HUD never say "done" (tab closed, network gone).
+HOLD_MAX_S = float(os.environ.get("JARVIS_SPOTIFY_HOLD_MAX_S", "120"))
+# "leise": the music keeps running at QUIET_PCT; "pause": it stops (the behaviour before)
+HOLD_MODE = "pause" if os.environ.get("JARVIS_SPOTIFY_HOLD_MODE", "leise").strip().lower() in ("pause", "stopp") else "leise"
+QUIET_PCT = max(0, min(100, int(os.environ.get("JARVIS_SPOTIFY_QUIET_PCT", "20"))))
+REDIRECT = "http://127.0.0.1:8722/callback"    # Spotify allows loopback IPs, no longer "localhost"
+SCOPES = "user-read-playback-state user-modify-playback-state"
+API = "https://api.spotify.com/v1"
+TOKEN_URL = "https://accounts.spotify.com/api/token"
+TIMEOUT = 4
+# A hold must outlive a restart of Jarvis (code change, .env): before, the restart forgot it and the music
+# stayed paused. And what hold/release did, with Spotify's answers — the HUD's own log is out of reach on the iPad.
+HELD_FILE = pathlib.Path(os.environ.get("JARVIS_SPOTIFY_HELD", ROOT / "logs" / "spotify_held.json"))
+LOG = pathlib.Path(os.environ.get("JARVIS_SPOTIFY_LOG", ROOT / "logs" / "spotify.log"))
+LOG_KEEP = 300
+
+_LOCK = threading.RLock()
+_ACCESS = {"token": "", "until": 0.0}
+_HELD = {"device": None, "at": 0.0, "timer": None, "volume": None, "quiet": None}
+STATUS = {"error": "", "holds": 0}
+
+
+def _log(text):
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {text}\n"
+    with _LOCK:
+        try:
+            LOG.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                lines = LOG.read_text(encoding="utf-8").splitlines(keepends=True)[-(LOG_KEEP - 1):]
+            except FileNotFoundError:
+                lines = []
+            LOG.write_text("".join(lines) + line, encoding="utf-8")
+        except OSError:
+            pass
+
+
+def configured():
+    return bool(CLIENT_ID) and TOKEN_FILE.exists()
+
+
+def status():
+    return dict(STATUS, configured=configured(), hold=HOLD, hold_mode=HOLD_MODE, held=_HELD["device"] is not None)
+
+
+def save_token(data):
+    """The refresh token from scripts/spotify_login.py, or a rotated one from a refresh."""
+    TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    TOKEN_FILE.write_text(json.dumps({"refresh_token": data["refresh_token"]}), encoding="utf-8")
+
+
+def _refresh():
+    try:
+        refresh = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))["refresh_token"]
+    except (OSError, ValueError, KeyError) as e:
+        raise RuntimeError("kein Spotify-Login (scripts/spotify_login.py)") from e
+    body = urllib.parse.urlencode({"grant_type": "refresh_token", "refresh_token": refresh,
+                                   "client_id": CLIENT_ID}).encode()
+    req = urllib.request.Request(TOKEN_URL, data=body, headers={"Content-Type": "application/x-www-form-urlencoded"})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        data = json.loads(r.read())
+    if data.get("refresh_token") and data["refresh_token"] != refresh:
+        save_token(data)                      # PKCE refresh tokens rotate; the old one stops working
+    _ACCESS.update(token=data["access_token"], until=time.time() + int(data.get("expires_in", 3600)) - 60)
+
+
+def _api(method, path, retry=True):
+    """(HTTP status, JSON or None). 204 is Spotify's "done" and also "no device active"."""
+    with _LOCK:
+        if not _ACCESS["token"] or time.time() > _ACCESS["until"]:
+            _refresh()
+        token = _ACCESS["token"]
+    req = urllib.request.Request(API + path, method=method, headers={"Authorization": f"Bearer {token}"},
+                                 data=b"" if method in ("PUT", "POST") else None)
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            raw = r.read()
+            try:
+                return r.status, (json.loads(raw) if raw.strip() else None)
+            except ValueError:            # pause/play answer 200 with a bare text body, not JSON
+                return r.status, None
+    except urllib.error.HTTPError as e:
+        if e.code == 401 and retry:
+            _ACCESS["token"] = ""
+            return _api(method, path, retry=False)
+        return e.code, None
+
+
+def _ok(code):
+    return code in (200, 202, 204)
+
+
+def _device_q(device):
+    return "?device_id=" + urllib.parse.quote(device) if device else ""
+
+
+def _player():
+    """(is playing, device id, volume or None if Spotify cannot set it) of the active device."""
+    code, state = _api("GET", "/me/player")
+    if code != 200 or not state:
+        return False, None, None
+    dev = state.get("device") or {}
+    vol = dev.get("volume_percent") if dev.get("supports_volume", True) else None
+    return bool(state.get("is_playing")), dev.get("id"), vol
+
+
+def playing():
+    """(is playing, device id) of the account's active device; (False, None) when nothing is active."""
+    on, device, _ = _player()
+    return on, device
+
+
+def _set_volume(pct, device):
+    q = f"?volume_percent={int(pct)}" + ("&device_id=" + urllib.parse.quote(device) if device else "")
+    return _ok(_api("PUT", "/me/player/volume" + q)[0])
+
+
+def hold(who=""):
+    """Wake word: pause what plays so the microphone hears the request, remember to play on."""
+    if not (HOLD and configured()):
+        return False
+    with _LOCK:
+        try:
+            if _HELD["device"] is not None:           # a second "Jarvis" in the same breath
+                _arm_timer()
+                return True
+            on, device, vol = _player()
+            if not on:
+                _log(f"{who or '?'}: Jarvis gerufen, es lief keine Musik")
+                return False
+            if HOLD_MODE == "leise" and vol is not None and vol > QUIET_PCT:
+                if _set_volume(QUIET_PCT, device):
+                    _HELD.update(device=device or "", at=time.time(), volume=vol, quiet=QUIET_PCT)
+                    STATUS.update(error="", holds=STATUS["holds"] + 1)
+                    _save_held()
+                    _arm_timer()
+                    _log(f"{who or '?'}: leiser {vol} % → {QUIET_PCT} % ({(device or '?')[:8]})")
+                    return True
+                _log(f"{who or '?'}: Lautstärke nicht setzbar, pausiere stattdessen")
+            elif HOLD_MODE == "leise" and vol is not None:
+                _log(f"{who or '?'}: läuft schon leise ({vol} %), nichts zu tun")
+                return False
+            code, _ = _api("PUT", "/me/player/pause" + _device_q(device))
+            if not _ok(code):
+                STATUS["error"] = f"Pause: HTTP {code}"
+                _log(STATUS["error"])
+                return False
+            _HELD.update(device=device or "", at=time.time(), volume=None, quiet=None)
+            STATUS.update(error="", holds=STATUS["holds"] + 1)
+            _save_held()
+            _arm_timer()
+            _log(f"{who or '?'}: Pause ({(device or '?')[:8]})")
+            return True
+        except Exception as e:  # noqa: BLE001 — offline or no login: the request still works, just louder
+            STATUS["error"] = str(e)[:160]
+            _log("Pause fehlgeschlagen: " + STATUS["error"])
+            return False
+
+
+def _save_held():
+    try:
+        HELD_FILE.parent.mkdir(parents=True, exist_ok=True)
+        HELD_FILE.write_text(json.dumps({"device": _HELD["device"], "at": _HELD["at"], "volume": _HELD["volume"],
+                                         "quiet": _HELD["quiet"]}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _restore():
+    """After a restart: take the hold back, or play on at once when it has run out meanwhile."""
+    try:
+        held = json.loads(HELD_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    _HELD.update(device=held.get("device") or "", at=float(held.get("at") or 0), volume=held.get("volume"),
+                 quiet=held.get("quiet", 1 if held.get("volume") is not None else None))
+    _log(("Leiser" if _HELD["volume"] is not None else "Pause") + " nach Neustart übernommen")
+    _arm_timer(max(1.0, HOLD_MAX_S - (time.time() - _HELD["at"])))
+
+
+def _arm_timer(seconds=None):
+    if _HELD["timer"]:
+        _HELD["timer"].cancel()
+    _HELD["timer"] = threading.Timer(seconds or HOLD_MAX_S, release)
+    _HELD["timer"].daemon = True
+    _HELD["timer"].start()
+
+
+def forget():
+    """The user said what the music should do ("Musik aus", "nächster Titel") — no playing on after that."""
+    with _LOCK:
+        if _HELD["timer"]:
+            _HELD["timer"].cancel()
+        _HELD.update(device=None, at=0.0, timer=None, volume=None, quiet=None)
+        HELD_FILE.unlink(missing_ok=True)
+
+
+def release(who="", why=""):
+    """Jarvis is done: the old volume back, or play on where the wake word paused it. Nothing if he
+    did not do either."""
+    with _LOCK:
+        device, since, vol, quiet = _HELD["device"], _HELD["at"], _HELD["volume"], _HELD["quiet"]
+        forget()
+        if device is None:
+            return False
+        held_s = f"{who or 'Zeitlimit'}: weiter nach {time.time() - since:.0f} s" + (f" (wartete auf: {why})" if why else "")
+        try:
+            if vol is not None:
+                return _loud_again(device, vol, quiet, held_s)
+            # Someone started music elsewhere meanwhile: leave it. The paused iPhone itself said "playing"
+            # 19 s after the pause and stayed silent — so on that device a play is sent regardless.
+            on, now = playing()
+            if on and now and device and now != device:
+                _log(f"{held_s}: läuft schon auf einem anderen Gerät")
+                return True
+            code, _ = _api("PUT", "/me/player/play" + _device_q(device))
+            if not _ok(code) and device:              # the phone went to sleep and left the device list
+                code, _ = _api("PUT", "/me/player/play")
+            STATUS["error"] = "" if _ok(code) else f"Weiter: HTTP {code}"
+            _log(f"{held_s}: " + ("ok" if _ok(code) else f"HTTP {code} (iPhone eingeschlafen?)"))
+            return _ok(code)
+        except Exception as e:  # noqa: BLE001
+            STATUS["error"] = str(e)[:160]
+            _log(f"{held_s}, fehlgeschlagen: " + STATUS["error"])
+            return False
+
+
+def _loud_again(device, vol, quiet, held_s):
+    # Turned up or down by hand meanwhile: that is the user's volume now, it stays.
+    _, now, current = _player()
+    target = QUIET_PCT if quiet is None else quiet
+    if now == device and current is not None and min(abs(current - target), abs(current - vol)) > 1:
+        _log(f"{held_s}: Lautstärke inzwischen von Hand auf {current} %, bleibt so")
+        return True
+    ok = _set_volume(vol, device)
+    STATUS["error"] = "" if ok else "Lautstärke zurück: fehlgeschlagen"
+    _log(f"{held_s}: " + (f"wieder {vol} %" if ok else "Lautstärke zurück fehlgeschlagen"))
+    return ok
+
+
+def control(action):
+    """The music tool on any device: play, pause, play_pause, next, previous. True when Spotify took it."""
+    if not configured():
+        return False
+    try:
+        with _LOCK:
+            held = _HELD["device"] is not None
+            quiet_device, quiet_vol = _HELD["device"], _HELD["volume"]
+            forget()
+            if quiet_vol is not None:                 # turned down by the wake word: not still quiet after "Musik aus"
+                _set_volume(quiet_vol, quiet_device)
+                held = False                          # the music never stopped, so the toggle reads it as it is
+            on, device = playing()
+            if action == "play_pause":
+                # Held by the wake word, the music was playing a moment ago — so the toggle means pause.
+                action = "pause" if (on or held) else "play"
+            if action == "pause":
+                code = 204 if not on else _api("PUT", "/me/player/pause" + _device_q(device))[0]
+            elif action == "play":
+                code = _api("PUT", "/me/player/play" + _device_q(device))[0]
+            elif action in ("next", "previous"):
+                code = _api("POST", f"/me/player/{action}" + _device_q(device))[0]
+                if held and _ok(code) and not on:     # "nächster Titel" during the hold: play that one
+                    _api("PUT", "/me/player/play" + _device_q(device))
+            else:
+                return False
+            return _ok(code)
+    except Exception as e:  # noqa: BLE001 — the media keys take over
+        STATUS["error"] = str(e)[:160]
+        return False
+
+
+if HOLD and configured():
+    _restore()

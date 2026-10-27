@@ -34,6 +34,8 @@ import time
 import urllib.error
 import urllib.request
 
+import hostos
+
 HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the repository
 _raw = os.environ.get("JARVIS_FALLBACK", "groq,gemini,ollama").strip().lower()
 ORDER = [] if _raw in ("", "off", "0", "no", "false") else [p.strip() for p in _raw.split(",") if p.strip()]
@@ -189,7 +191,7 @@ class McpClient:
         self.proc = subprocess.Popen([sys.executable, "-I", os.path.join(HERE, "jarvis", "tools", "jarvis_mcp.py")],
                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                      env=env, text=True, encoding="utf-8", bufsize=1,
-                                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                     **hostos.QUIET)
         self.lines = queue.Queue()
         threading.Thread(target=self._pump, daemon=True).start()
         self.next_id = 0

@@ -67,6 +67,8 @@ class Remote(unittest.TestCase):
         r, _ = self.req("GET", "/")
         self.assertEqual((r.status, r.getheader("Location")), (302, "/pair.html"))
         self.assertEqual(self.req("GET", "/pair.html")[0].status, 200)
+        for icon in ("/favicon.svg", "/icon-32.png", "/icon-192.png"):   # the pairing page and manifest show them
+            self.assertEqual(self.req("GET", icon)[0].status, 200, icon)
         self.assertEqual(self.req("GET", "/api/status")[0].status, 401)
         self.assertEqual(self.req("GET", "/api/dashboard")[0].status, 401)
         self.assertEqual(self.req("POST", "/api/run", {"message": "hi"}, origin="https://" + HOST)[0].status, 401)
@@ -79,6 +81,22 @@ class Remote(unittest.TestCase):
     def test_pc_only_endpoints_closed_remotely(self):
         for p in ("/api/pair/start", "/api/devices", "/api/permission/request", "/api/internal"):
             self.assertEqual(self.req("POST", p, {}, origin="https://" + HOST)[0].status, 403, p)
+
+    def test_refused_post_does_not_spoil_the_connection(self):
+        # The iPad's status post was refused unread; the next request on the same
+        # kept-alive connection began with that JSON and failed with 400.
+        c = http.client.HTTPConnection("127.0.0.1", self.remote.server_address[1], timeout=5)
+        h = {"Host": HOST, "Origin": "https://" + HOST, "Content-Type": "application/json"}
+        c.request("POST", "/api/hud", body='{"visible": false, "st": "off"}', headers=h)
+        r = c.getresponse()
+        r.read()
+        self.assertEqual(r.status, 403)
+        c.request("GET", "/pair.html", headers={"Host": HOST})
+        self.assertEqual(c.getresponse().status, 200)
+        c.close()
+
+    def test_restart_allowed_from_a_paired_device(self):
+        self.assertNotIn("/api/restart", server.LOCAL_ONLY)
 
     def test_pairing_flow_and_revoke(self):
         code = self.code()
@@ -97,6 +115,29 @@ class Remote(unittest.TestCase):
         did = devices.listing()[0]["id"]
         self.assertTrue(devices.revoke(did))
         self.assertEqual(self.req("GET", "/", cookie=cookie)[0].status, 302)
+
+    def test_each_device_keeps_its_own_view(self):
+        import commands
+        commands.update_state(lambda s: (s.pop("dashboard_layouts", None), s.__setitem__("dashboard_layout", "zen")))
+        r, _ = self.pair(self.code())
+        cookie = r.getheader("Set-Cookie").split(";")[0]
+        local = f"127.0.0.1:{server.PORT}"
+
+        def view(remote):
+            if remote:
+                return json.loads(self.req("GET", "/api/layout", cookie=cookie)[1])["layout"]
+            return json.loads(self.req("GET", "/api/layout", host=local, local=True)[1])["layout"]
+
+        self.assertEqual((view(False), view(True)), ("zen", "zen"), "the old shared choice is where both start")
+        r, _ = self.req("POST", "/api/layout", {"layout": "tablet"}, cookie=cookie, origin="https://" + HOST, token=True)
+        self.assertEqual(r.status, 200)
+        r, _ = self.req("POST", "/api/layout", {"layout": "orbit"}, host=local, origin="http://" + local, local=True, token=True)
+        self.assertEqual(r.status, 200)
+        self.assertEqual((view(False), view(True)), ("orbit", "tablet"), "the PC's pick must not move the iPad")
+        r, data = self.req("GET", "/", cookie=cookie)
+        self.assertIn(b'name="jarvis-layout" content="tablet"', data)
+        r, _ = self.req("POST", "/api/layout", {"layout": "nope"}, host=local, origin="http://" + local, local=True, token=True)
+        self.assertEqual(r.status, 400)
 
     def test_code_burns_after_wrong_guesses(self):
         code = self.code()

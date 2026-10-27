@@ -106,10 +106,10 @@ class Watch(unittest.TestCase):
 
     def test_devices(self):
         hw_ping = hw._ping
-        hw._ping = lambda host: host == "192.0.2.1"
+        hw._ping = lambda host: host == "router.example"
         try:
-            found = hw.check_devices({"devices": [{"name": "Der Router", "host": "192.0.2.1", "critical": True},
-                                                  {"name": "Der Drucker", "host": "192.0.2.9"}]})
+            found = hw.check_devices({"devices": [{"name": "Der Router", "host": "router.example", "critical": True},
+                                                  {"name": "Der Drucker", "host": "drucker.example"}]})
         finally:
             hw._ping = hw_ping
         self.assertEqual([(f["ok"], f["severity"]) for f in found], [(True, "critical"), (False, "warn")])

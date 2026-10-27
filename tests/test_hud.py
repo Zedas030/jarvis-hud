@@ -38,5 +38,30 @@ class Notifications(unittest.TestCase):
             self.assertIn(needle, js)
 
 
+
+class AbortedRequests(unittest.TestCase):
+    """A request the browser gave up on is no error worth a traceback; anything else still is."""
+    def report(self, exc):
+        import contextlib
+        import io
+        srv = server.Server(("127.0.0.1", 0), server.Handler)
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                try:
+                    raise exc
+                except Exception:  # noqa: BLE001
+                    srv.handle_error(None, ("127.0.0.1", 1))
+        finally:
+            srv.server_close()
+        return err.getvalue()
+
+    def test_browser_gone_is_quiet(self):
+        for exc in (ConnectionAbortedError(10053, "abgebrochen"), ConnectionResetError(), BrokenPipeError()):
+            self.assertEqual(self.report(exc), "", type(exc).__name__)
+
+    def test_real_errors_still_show(self):
+        self.assertIn("ValueError", self.report(ValueError("kaputt")))
+
 if __name__ == "__main__":
     unittest.main()

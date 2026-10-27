@@ -58,6 +58,17 @@ def _notes():
     if not VAULT.exists():
         return []
     return [p for p in VAULT.rglob("*.md") if TRASH_DIR not in p.parents]
+
+
+def note_path(name):
+    """The note `name` ("Vorlieben", "Projekte/Umzug") under MEMORY_DIR. An existing one is found
+    whatever its case: Windows does not tell "vorlieben" from "Vorlieben", Linux would start a
+    second note."""
+    path = MEMORY_DIR / f"{name}.md"
+    if path.exists() or not MEMORY_DIR.exists():
+        return path
+    want = path.relative_to(MEMORY_DIR).as_posix().lower()
+    return next((p for p in MEMORY_DIR.rglob("*.md") if p.relative_to(MEMORY_DIR).as_posix().lower() == want), path)
 DEFAULT_COLOUR = "#8fa3bf"
 
 _CACHE = {"at": 0.0, "data": None, "sig": None}
@@ -119,7 +130,7 @@ def build_graph(force=False):
                     tags=[t.strip() for t in (meta.get("tags") or "").split(",") if t.strip()],
                     updated=meta.get("updated", ""),
                     snippet=snippet, degree=0,
-                    # Home Assistant entities for live stars (see briefing.live)
+                    # Home-Assistant-Entitäten für lebendige Sterne (siehe briefing.live)
                     online=meta.get("online", ""), pegel=meta.get("pegel", ""),
                     groesse=meta.get("groesse", ""),   # extra radius for a hand-picked star
                 )

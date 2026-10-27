@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from isolate import TMP  # noqa: E402,F401  (must come before any Jarvis module)
@@ -18,7 +19,6 @@ import assistant as a    # noqa: E402
 import background        # noqa: E402
 import events            # noqa: E402
 import fallback_llm      # noqa: E402
-import jarvis_mcp        # noqa: E402
 import memory            # noqa: E402
 import policy            # noqa: E402
 import runtime           # noqa: E402
@@ -70,8 +70,9 @@ class Draft(unittest.TestCase):
     def run_draft(self, **kw):
         args = dict(to="anna@example.org", subject="Samstag", body="Hallo Anna,\nbleibt es bei Samstag?")
         args.update(kw)
-        with Patch(a.imaplib, IMAP4_SSL=FakeIMAP), \
-             Patch(jarvis_mcp, MAIL_HOST="imap.example.org", MAIL_USER="me@example.org", MAIL_PASSWORD="x"):
+        # mailboxes.py reads the accounts from the environment; one fake account here
+        fake = {"MAIL_IMAP_HOST": "imap.example.org", "MAIL_USER": "me@example.org", "MAIL_PASSWORD": "x"}
+        with Patch(a.imaplib, IMAP4_SSL=FakeIMAP), mock.patch.dict(os.environ, fake):
             return a.mail_draft(**args)
 
     def test_draft_goes_to_drafts_only(self):
