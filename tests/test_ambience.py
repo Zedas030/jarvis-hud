@@ -39,7 +39,7 @@ class Classify(unittest.TestCase):
         old = ambience.IGNORE
         ambience.IGNORE = __import__("re").compile("handy", __import__("re").I)
         try:
-            self.assertEqual(ambience.classify([player("handy_user", media_content_type="music")])[0], "")
+            self.assertEqual(ambience.classify([player("handy_nutzer", media_content_type="music")])[0], "")
         finally:
             ambience.IGNORE = old
 

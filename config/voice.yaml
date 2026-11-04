@@ -1,0 +1,95 @@
+# Jarvis voice engine — every threshold and timeout of listening, turn-taking, barge-in and speaking.
+# Loaded by jarvis/voice/voice_config.py (JARVIS_VOICE_CONFIG points elsewhere). Values here are the
+# defaults the code falls back to when a key is missing, so deleting a line is always safe.
+# Tuning: see README → "Sprach-Engine" → "Tuning-Protokoll".
+
+engine:
+  enabled: true            # false: the HUD keeps the old browser-only pipeline (ui/app.js)
+  bind: 127.0.0.1          # WebSocket address; the remote port (tailscale serve) stays on localhost too
+  port: 8724               # 8720 HUD, 8721 remote HUD, 8723 Sonos clips, 8730 GPU voice
+  sample_rate: 16000       # microphone frames from the clients (mono int16)
+  frame_ms: 20             # one WebSocket frame = 20 ms = 320 samples
+  out_rate: 24000          # playback PCM sent to the clients (resampled from the voice provider)
+  preroll_ms: 600          # kept before the first detected speech ("Jarvis" starts softly)
+  debug_audio: false       # write every user segment and barge-in clip to logs/voice_debug/ as WAV
+  state_log: logs/voice_state.jsonl   # every state change with timestamp and trigger
+
+vad:
+  model: models/silero_vad.onnx   # scripts/fetch_voice_models.py; missing file = energy VAD fallback
+  start_threshold: 0.55    # LISTENING: speech probability that starts an utterance
+  stop_threshold: 0.35     # ...and below which a frame counts as silence (hysteresis)
+  barge_threshold: 0.70    # SPEAKING: higher bar, the room has his own voice in it
+  min_speech_ms: 200       # shorter bursts are a cough or a click, not a sentence
+  max_speech_ms: 25000     # a stuck microphone or music: dropped after this
+
+endpoint:
+  # Adaptive wait after the last speech frame before the utterance counts as finished:
+  #   wait = base + (unfinished ? unfinished_extra : 0) + (question ? question_bonus : 0) + learned
+  base_ms: 450             # a finished sentence ("... aus.") ends this soon after the last word
+  unfinished_extra_ms: 900 # "und dann ...", trailing comma, no verb yet: wait longer
+  question_bonus_ms: -100  # a clear question ("...?") may end a little sooner
+  no_text_ms: 700          # no partial transcript yet (CPU mode): plain wait
+  max_ms: 1800             # never wait longer than this, whatever the rules say
+  learn_step_ms: 100       # the user kept talking after we closed the turn: wait this much longer next time
+  learn_max_ms: 600        # ...up to this bonus; it decays by learn_step_ms per clean turn
+  continue_window_ms: 4000 # speech again this soon after a turn was sent = same sentence (glued, run cancelled)
+  partial_every_ms: 700    # how often the growing utterance is transcribed for partials (GPU only)
+  turn_model: ""           # optional ONNX turn-detection model (smart-turn); empty = rules only
+
+stt:
+  partials: auto           # auto = only when Whisper runs on the GPU; true/false force it
+  final_beam: 5            # beam size for the final transcript
+  partial_beam: 1          # greedy for partials, they only steer the endpoint
+  min_chars: 2             # transcripts with fewer letters/digits are noise
+  vocabulary:              # always primed into Whisper (plus WHISPER_LOCAL_PROMPT and device names from config/home.json)
+    - Jarvis
+    - Home Assistant
+    - Grafana
+    - Prometheus
+    - Axis
+    - Salto
+    - Telenot
+    - Dedrone
+    - Sonos
+    - Spotify
+    - Raspberry Pi
+    - Pi-hole
+    - UniFi
+    - Paperless
+    - Jellyfin
+
+wake:
+  conversation_s: 4.0      # after an answer: this long no "Jarvis" is needed (×1.6 after a question)
+  window_s: 7.0            # after a bare "Jarvis": listening this long
+  barge_needs_name_with_ambience: true   # TV or music in the room: talking over him needs "Jarvis"
+
+barge:
+  duck_ms: 60              # speech probability above barge_threshold this long: volume down (not yet paused)
+  duck_gain: 0.2           # ...to this share of the volume, in fade_ms
+  confirm_ms: 150          # speech still there after this: pause the output and listen
+  fade_ms: 30              # gain ramps for duck, pause and resume (no clicks)
+  clip_silence_ms: 500     # silence ending the interruption clip
+  clip_max_ms: 8000        # an interruption longer than this is checked as it stands
+  resume_after_ms: 1500    # interrupted, then nothing said: go on from the start of the sentence
+  backchannel: ["mhm", "mh", "hm", "hmm", "ja", "ja ja", "jo", "genau", "okay", "ok", "aha", "ach so",
+                "alles klar", "verstehe", "gut", "stimmt", "richtig", "klar", "oh", "ah", "äh", "ähm"]
+  stop_words: ["stopp", "stop", "halt", "ruhe", "ruhig", "still", "sei still", "sei ruhig", "schon gut",
+               "danke reicht", "danke das reicht", "reicht", "genug", "danke", "pause", "warte", "moment",
+               "hör auf", "aufhören", "lass gut sein", "abbrechen"]
+  echo_text_ratio: 0.6     # share of the clip's words found in his own recent sentences = his echo, not the user
+  sonos_duck_via_ha: true  # Sonos: also lower the speaker's volume through Home Assistant while paused
+
+tts:
+  first_chunk_min_chars: 12   # the first piece of an answer may be this short ("Guten Abend, Sir,")...
+  first_chunk_max_chars: 70   # ...and is cut at a comma once the sentence gets this long
+  min_chunk_chars: 28         # later pieces: whole sentences at least this long
+  gap_ms: 120                 # silence between sentences in the playback stream
+  provider_timeout_s: 20      # a provider that stays silent this long: next one in the chain
+
+llm:
+  thinking_cue_after_ms: 1200  # no first word after this: a soft tone tells "I am thinking" (0 = off)
+  first_word_target_ms: 800    # metric target; logged as "late" when missed
+
+metrics:
+  file: logs/voice_metrics.jsonl   # one line per turn with every stage's duration
+  prometheus: true                 # GET /metrics on the HUD port (text format for Grafana on the Pi)

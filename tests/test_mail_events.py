@@ -32,7 +32,7 @@ TEE = mail("Ihre Buchung | 25.10.2026 09:20 Uhr, Ost Tee 10",
 FITTING = mail("Reservierungsbestätigung", sender="Golf House",
                text="Ihre Reservierungs-Nr.: 100.200 Buchung: 60-minütiges Fitting Datum: 27.10.2026 Zeit von: 16:30h",
                attachments=[ics("20261027T163000", "20261027T173000", "Golf House Berlin Kleinmachnow", "gh-1",
-                                "Musterstraße 1 12345 Musterstadt")])
+                                "Heinrich-Hertz-Straße 1d 14532 Kleinmachnow")])
 PAST = mail("Ihre Buchung | 19.10.2026 08:50 Uhr", attachments=[ics("20261019T085000", "20261019T110000",
                                                                     "Golfspiel: Tee 1", "PCCO-2")])
 BOOKED_THEN_CANCELLED = mail("Ihre Buchung | 30.10.2026 08:30 Uhr, Ostplatz von Tee 1",
@@ -103,7 +103,7 @@ class MailEvents(unittest.TestCase):
         try:
             cal.configured = lambda: False
             cal.add_event = lambda *a, **k: (added.append(a), ("ok", f"https://cal/x{len(added)}@jarvis-hud.ics"))[1]
-            found = mail_events.scan(14, mails=[TEE, FITTING])
+            found = mail_events.scan(14, mails=[TEE, FITTING], now=NOW)
             self.assertEqual(len(found), 2)
             self.assertEqual(len(mail_events.card_lines("alle")), 2)
             text = mail_events.add([found[0]["id"]])

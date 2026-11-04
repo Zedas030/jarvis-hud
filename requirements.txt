@@ -1,9 +1,16 @@
-# Haupt-Umgebung (.venv) — Server, Spracherkennung, Microsoft- und Piper-Stimme, Garmin.
-# Der Server selbst braucht nur die Python-Standardbibliothek.
+# Core environment (.venv): the server itself needs only the Python standard library; these make
+# voice, calendar and system status work on any machine, CPU only. See also:
+#   requirements-gpu.txt      Whisper on an NVIDIA card (CUDA 12)
+#   requirements-windows.txt  volume, ducking, window control on the Windows PC
+#   requirements-tts.txt      the local GPU voice (own environment .venv-tts)
+#   requirements-dev.txt      tests and tooling
 edge-tts>=7.3.1
-faster-whisper==1.2.1
-nvidia-cublas-cu12      # Whisper auf der Grafikkarte (CUDA 12)
-nvidia-cudnn-cu12
-piper-tts==1.8.0
+faster-whisper==1.2.1    # speech recognition (CPU: WHISPER_LOCAL_DEVICE=cpu, model small)
+piper-tts==1.8.0         # offline voice (models/piper)
+onnxruntime>=1.17        # Silero VAD (voice_vad.py); piper brings it too, but the engine needs it by name
+numpy                    # audio frames (voice_dsp.py, voice_vad.py)
+websockets>=13           # voice engine: audio channel browser/satellite <-> server (voice_ws.py)
+pyyaml>=6                # config/voice.yaml
+psutil>=5.9              # system status, resource manager (sysmon.py, infra.py, resources.py)
 garminconnect==0.3.17
-pypdf>=5,<7             # PDFs in the local document search (optional)
+pypdf>=5,<7              # PDFs in the local document search (optional)

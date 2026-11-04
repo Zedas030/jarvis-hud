@@ -46,9 +46,9 @@ class HostOS(unittest.TestCase):
 
     def test_ping(self):
         with Branch(True):
-            self.assertEqual(hostos.ping_args("router.example"), ["ping", "-n", "1", "-w", "1500", "router.example"])
+            self.assertEqual(hostos.ping_args("10.0.0.1"), ["ping", "-n", "1", "-w", "1500", "10.0.0.1"])
         with Branch(False):
-            self.assertEqual(hostos.ping_args("router.example"), ["ping", "-c", "1", "-w", "2", "router.example"])
+            self.assertEqual(hostos.ping_args("10.0.0.1"), ["ping", "-c", "1", "-w", "2", "10.0.0.1"])
 
     def test_shell_tool(self):
         with Branch(True):

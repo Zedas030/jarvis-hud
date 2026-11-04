@@ -28,6 +28,9 @@ import time
 import background
 import events
 import memory
+import jarvis_log
+
+log = jarvis_log.get(__name__)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 DATA = pathlib.Path(os.environ.get("JARVIS_HEALTH_DATA", ROOT / "logs" / "health_daily.json"))
@@ -157,7 +160,7 @@ def fetch(today=None, g=None):
         try:
             got[day] = fetch_day(g, day)
         except Exception as e:  # noqa: BLE001 — one bad day must not lose the others
-            print(f"  weekly_review: {day}: {e}", flush=True)
+            log.warning("%s: %s", day, e)
 
     def merge(d):
         for day, rec in got.items():
@@ -254,7 +257,31 @@ def _fmt(v, unit="", nd=1):
     return f"{round(v, nd) if nd else round(v)}{unit}".replace(".", ",")
 
 
-def facts(d, end):
+ROOM_SENSORS = {"Wohnzimmer": "sensor.zeit_wohnzimmer_7_tage", "Schlafzimmer": "sensor.zeit_schlafzimmer_7_tage"}
+
+
+def rooms_line(states=None):
+    """Hours per room over the last seven days, from Home Assistant's history_stats sensors over the presence
+    helper (input_select.nutzer_raum; Schlafzimmer includes the bathroom). "" without Home Assistant or sensors."""
+    if states is None:
+        try:
+            import briefing
+            states = {s["entity_id"]: s for s in briefing._ha_states()}
+        except Exception:  # noqa: BLE001 — a bonus line, never a reason to skip the review
+            return ""
+    parts = []
+    for room, eid in ROOM_SENSORS.items():
+        try:
+            hours = float((states.get(eid) or {}).get("state"))
+        except (TypeError, ValueError):
+            continue
+        parts.append(f"{room} {hours:.0f} h")
+    if not parts:
+        return ""
+    return "Zeit zu Hause nach Raum (Präsenzmelder, letzte 7 Tage): " + ", ".join(parts) + "."
+
+
+def facts(d, end, states=None):
     cur, prev = week_stats(d, end), week_stats(d, end - dt.timedelta(days=7))
     found = patterns(d, end)
     lines = [f"Woche bis {end.strftime('%d.%m.')}: Daten an {cur['days']} von 7 Tagen."]
@@ -267,6 +294,9 @@ def facts(d, end):
                   f"Body Battery morgens {_fmt(cur['bb_high'], nd=0)} (Vorwoche {_fmt(prev['bb_high'], nd=0)}).",
                   f"Golf: {cur['golf_rounds']} Runde(n), {cur['golf_minutes']} Minuten "
                   f"(Vorwoche {prev['golf_rounds']})."]
+    rooms = rooms_line(states)
+    if rooms:
+        lines.append(rooms)
     if found:
         lines.append("Muster der letzten Wochen:\n" + "\n".join(f"- {p}" for p in found))
     else:
@@ -303,7 +333,7 @@ def step(now=None):
         try:
             fetch(now.date())
         except Exception as e:  # noqa: BLE001 — Garmin down, no login: the review says what is missing
-            print(f"  weekly_review: Garmin nicht lesbar ({e})", flush=True)
+            log.warning("Garmin nicht lesbar (%s)", e)
     if now.weekday() == 6 and now.hour >= REVIEW_HOUR and background.claim("weekly-review", background.week_key(now.date())):
         review(now.date())
 

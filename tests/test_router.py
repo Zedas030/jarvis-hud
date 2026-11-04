@@ -14,6 +14,7 @@ import pathlib
 import sys
 import time
 import unittest
+import unittest.mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from isolate import TMP  # noqa: E402  (must come before any Jarvis module)
@@ -656,3 +657,35 @@ class Parcels(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MusicRooms(Base):
+    """The music into another room goes to the music tool as a transfer, without the LLM."""
+
+    def setUp(self):
+        super().setUp()
+        import speakers
+        self.moved = []
+        self.patches = [unittest.mock.patch.object(speakers, "rooms", return_value=["Schlafzimmer", "Wohnzimmer"]),
+                        unittest.mock.patch.object(jarvis_mcp, "_music_room",
+                                                   side_effect=lambda room: self.moved.append(room) or f"Die Musik läuft jetzt im {room}.")]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+
+    def test_target_is_the_room_not_said_as_source(self):
+        self.assertIn("Wohnzimmer", self.local("Mach die Musik aufm Schlafzimmer im Wohnzimmer an", "music"))
+        self.local("Schieb die Musik vom Schlafzimmer ins Wohnzimmer", "music")
+        self.local("Mach im Schlafzimmer die Musik aus dem Wohnzimmer an", "music")
+        self.local("Musik ins Schlafzimmer", "music")
+        self.assertEqual(self.moved, ["Wohnzimmer", "Wohnzimmer", "Schlafzimmer", "Schlafzimmer"])
+
+    def test_plain_music_commands_and_lights_stay_as_they_were(self):
+        route("Musik leiser")
+        self.assertEqual(self.moved, [])
+        self.assertNotEqual(route("Mach das Licht im Wohnzimmer an").get("handler"), "music")
+        self.llm("Spiel die Playlist Chill im Wohnzimmer", "music")
+        self.assertEqual(self.moved, [])

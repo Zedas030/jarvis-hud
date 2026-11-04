@@ -248,6 +248,45 @@ class Local:
                 print(f"  GPU-Stimme fehlgeschlagen, Piper übernimmt: {str(e)[:100]}", flush=True)
         return self._piper(text)
 
+    def stream(self, text):
+        """Piper sentence by sentence as raw PCM while it is still speaking: the first chunk arrives
+        after ~0.1 s instead of the whole clip. The GPU voice (Chatterbox) has no stream and goes
+        through synth(); the engine then gets the clip as one piece."""
+        url = os.environ.get("LOCAL_TTS_URL", "").strip()
+        if url and _GPU["ready"] and not _GPU.get("paused"):
+            data, mime = self.synth(text)
+            return iter([data]), mime
+        try:
+            from piper import PiperVoice, SynthesisConfig
+        except ImportError as e:
+            raise Transient(f"Piper: {e}")
+        with Local._vlock:
+            if Local._voice is None:
+                Local._voice = PiperVoice.load(self.model)
+        try:
+            import daytime
+            speed = self.speed * daytime.speed_factor()
+        except Exception:  # noqa: BLE001
+            speed = self.speed
+        rate = int(getattr(getattr(Local._voice, "config", None), "sample_rate", 22050) or 22050)
+
+        def chunks():
+            with Local._vlock:
+                for c in Local._voice.synthesize(text, syn_config=SynthesisConfig(length_scale=speed)):
+                    yield c.audio_int16_bytes
+        gen = chunks()
+        try:
+            first = next(gen)
+        except StopIteration:
+            raise Transient("Piper: leer")
+        except Exception as e:  # noqa: BLE001
+            raise Transient(f"Piper: {e}")
+
+        def rest():
+            yield first
+            yield from gen
+        return rest(), f"audio/pcm;rate={rate}"
+
     def _piper(self, text):
         import wave
         try:
@@ -256,8 +295,13 @@ class Local:
                 if Local._voice is None:
                     Local._voice = PiperVoice.load(self.model)
                 buf = io.BytesIO()
+                try:
+                    import daytime
+                    speed = self.speed * daytime.speed_factor()     # a little slower late in the evening
+                except Exception:  # noqa: BLE001
+                    speed = self.speed
                 with wave.open(buf, "wb") as w:
-                    Local._voice.synthesize_wav(text, w, syn_config=SynthesisConfig(length_scale=self.speed))
+                    Local._voice.synthesize_wav(text, w, syn_config=SynthesisConfig(length_scale=speed))
             return buf.getvalue(), "audio/wav"
         except Exception as e:  # noqa: BLE001
             raise Transient(f"Piper: {e}")
@@ -493,6 +537,11 @@ def _speak(text, stream):
         if not a or not a.configured() or _blocked(name):
             continue
         say = text if a.supports_tags else _strip_tags(text)
+        try:
+            import daytime
+            say = daytime.prepare(say, a.supports_tags)      # "[whispers]" at night
+        except Exception:  # noqa: BLE001
+            pass
         with _LOCK:
             prev = _state().get("active")
             switching = prev is not None and prev != name

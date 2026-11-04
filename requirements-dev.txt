@@ -1,0 +1,5 @@
+# Tests and tooling (not needed to run Jarvis).
+#   .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+#   .venv\Scripts\python.exe -m coverage run -m unittest discover -s tests && .venv\Scripts\python.exe -m coverage report
+coverage>=7
+ruff>=0.5

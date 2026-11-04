@@ -50,6 +50,9 @@ UNSUPPORTED_GROUPS = {"pc", "ha_full"}
 # Tools that change something. After one of these ran, no second provider takes
 # over (it would repeat the action); after read-only tools a handover is safe.
 import policy  # noqa: E402
+import jarvis_log
+
+log = jarvis_log.get(__name__)
 ACTING_TOOLS = policy.acting()
 # Typographic spaces and hyphens some models emit; the voice chain reads them oddly.
 _PLAIN = str.maketrans({" ": " ", " ": " ", " ": " ", "‑": "-", "‐": "-"})
@@ -137,6 +140,9 @@ def status():
 
 def _cool_down(name, seconds, why):
     _COOL[name] = {"until": time.time() + max(30, min(seconds, 6 * 3600)), "why": why}
+    import metrics
+    metrics.counter("fallback_cooldowns_total", provider=name, why=why.split(" ", 1)[0])
+    log.warning("%s pausiert %d s: %s", name, int(_COOL[name]["until"] - time.time()), why)
 
 
 def _retry_seconds(err, body):

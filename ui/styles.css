@@ -435,6 +435,7 @@ body.boot .corestate{opacity:0}
 .chip-lg.timer{border-color:rgba(255,179,64,.5)}
 .chip-lg.timer b,.chip-lg.timer .ico{color:var(--amber);font-variant-numeric:tabular-nums}
 .chip-lg[hidden]{display:none}
+.tool[hidden]{display:none}
 
 /* ── devices (pairing on the PC) ── */
 body.remote #btnPair{display:none}

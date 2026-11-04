@@ -7,20 +7,31 @@
    fallback; a fresh setup opens Sonnenlauf. The layout menu (next to the name in the classic view,
    in ⋯ here) picks from the shared catalogue. A pick the server did not take (an old token after a
    restart, the server away) is kept as "pending" and sent again from the reloaded page, so it is
-   never silently lost. ?view=<layout-id> previews an entry without changing the saved choice. */
+   never silently lost — but only for ten minutes: an old pending pick must not pin a device to a
+   view for good. ?view=<layout-id> previews an entry without changing the saved choice; a page
+   opened from the home screen (standalone) ignores it, its launch URL is not a deliberate preview.
+   What the server says wins over anything kept locally; without it the page opens Sonnenlauf. */
 (function () {
   var q = function (s) { return document.querySelector(s); };
   var params = new URLSearchParams(location.search);
   var stored = function () { try { return localStorage.getItem('jarvis.tabletView'); } catch (e) { return null; } };
   var store = function (v) { try { localStorage.setItem('jarvis.tabletView', v); } catch (e) { /* private mode */ } };
   var ipad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
   var catalogue = window.JarvisLayouts;
   var LAYOUTS = catalogue ? catalogue.entries.map(function (entry) { return entry.id; }) : ['tablet', 'stark', 'classic'];
-  var requested = params.get('view');
+  var DEFAULT = LAYOUTS.indexOf('solstice') >= 0 ? 'solstice' : ipad ? 'tablet' : 'classic';
+  var requested = standalone ? null : params.get('view');
   var sharedMeta = document.querySelector('meta[name="jarvis-layout"]');
   var shared = sharedMeta ? sharedMeta.content : '';
-  var PENDING = 'jarvis.layoutPending';
-  var pending = (function () { try { return localStorage.getItem(PENDING); } catch (e) { return null; } })();
+  var PENDING = 'jarvis.layoutPending', PENDING_MS = 10 * 60 * 1000;
+  var pending = (function () {
+    try {
+      var raw = JSON.parse(localStorage.getItem(PENDING) || 'null');
+      if (typeof raw === 'string') return null;                       // the old format: no age, not trusted
+      return raw && Date.now() - raw.at < PENDING_MS ? raw.id : null;
+    } catch (e) { return null; }
+  })();
   if (LAYOUTS.indexOf(pending) < 0 || pending === shared) pending = null;
   var saveLayout = function (id) {
     var token = document.querySelector('meta[name="jarvis-token"]');
@@ -34,7 +45,7 @@
   var clearPending = function () { try { localStorage.removeItem(PENDING); } catch (e) { /* private mode */ } };
   if (!pending) clearPending();
   var choice = LAYOUTS.indexOf(requested) >= 0 ? requested : pending || (LAYOUTS.indexOf(shared) >= 0 ? shared : stored());
-  var layout = LAYOUTS.indexOf(choice) >= 0 ? choice : ipad ? 'tablet' : 'classic';
+  var layout = LAYOUTS.indexOf(choice) >= 0 ? choice : DEFAULT;
   var config = catalogue && catalogue.get(layout);
   if (catalogue) catalogue.activate(layout);
   // Both menus share the catalogue; keep unrelated URL parameters when changing views.
@@ -49,7 +60,7 @@
       var go = function () { location.href = target.pathname + target.search + target.hash; };
       saveLayout(selected).then(function () { clearPending(); go(); }, function (e) {
         console.warn('[jarvis] layout not saved yet, retrying after reload:', e);
-        try { localStorage.setItem(PENDING, selected); } catch (err) { /* private mode */ }
+        try { localStorage.setItem(PENDING, JSON.stringify({ id: selected, at: Date.now() })); } catch (err) { /* private mode */ }
         go();
       });
     };
@@ -85,6 +96,7 @@
   q('#tSlots').appendChild(q('#chipTimer'));
   q('#tSlots').appendChild(q('#btnBell'));
   q('#tSheetBtns').appendChild(q('#btnStation'));
+  q('#tSheetBtns').appendChild(q('#btnOutput'));
   q('#tSheetBtns').appendChild(q('#btnRestart'));
   document.body.appendChild(q('#nightShade'));     // fixed, but its old parent is hidden now
 
@@ -319,6 +331,12 @@
     var tech = techState(d);
     if (tech.total) out.push(tile(tech.bad ? 'warn' : 'good', 'Technik', tech.bad ? tech.bad : '✓', tech.bad ? 'Probleme' : '',
       tech.total + ' Geräte geprüft', null, 'tech'));
+    var u = d.usage || {};
+    if (u.total) {
+      var trend = u.trend_pct == null ? '' : ' · ' + (u.trend_pct > 0 ? '+' : '') + u.trend_pct + ' %';
+      out.push(tile(u.trend_pct != null && u.trend_pct > 25 ? 'warn' : '', 'Tokens', num(Math.round(u.tokens / 1000)), 'k',
+        (u.local_pct != null ? u.local_pct + ' % lokal' : '') + trend, u.local_pct, 'usage'));
+    }
     q('#tTiles').innerHTML = out.join('');
   }
 
@@ -388,7 +406,8 @@
       var m = d.mail || {};
       if (m.error) return ['Post', note(m.error)];
       return ['Post', list([row('Ungelesen', num(m.unread)), row('Postfächer', num(m.accounts))])
-        + '<h4>Neueste</h4><ul class="tdmail">' + (m.latest || []).map(function (x) {
+        + '<h4>Ungelesen' + (m.inbox && m.unread > m.inbox.length ? ' · neueste ' + m.inbox.length : '') + '</h4>'
+        + '<ul class="tdmail">' + (m.inbox || m.latest || []).map(function (x) {
           return '<li><b>' + esc(x.sender) + '</b><span>' + esc(x.subject) + '</span><em>' + esc(x.when) + ' · ' + esc(x.account) + '</em></li>';
         }).join('') + '</ul>'
         + ((m.errors || []).length ? note('Nicht erreichbar: ' + m.errors.join('; ')) : '')
@@ -416,6 +435,21 @@
       if (h.router && !h.error) out += '<h4>Internet</h4>' + list([row('Verbindung', r.online ? 'online' : 'offline', r.online ? 'good' : 'bad'),
         row('Download', num(r.down * 8 / 1000, 1) + ' Mbit/s'), row('Upload', num(r.up * 8 / 1000, 1) + ' Mbit/s')]);   // the router counts kB/s
       return ['Technik', out || note('Keine Geräte verbunden.')];
+    },
+    usage: function (d) {
+      var u = d.usage || {};
+      if (!u.total) return ['Tokens', note('Noch keine Anfragen diese Woche.')];
+      var rows = [row('Anfragen (7 Tage)', num(u.total)), row('Lokal erledigt', u.local_pct != null ? u.local_pct + ' %' : '—', u.local_pct >= 60 ? 'good' : ''),
+                  row('Ans Modell', num(u.llm)), row('Tokens diese Woche', Number(u.tokens || 0).toLocaleString('de-DE')),
+                  row('Vorwoche', Number(u.prev_tokens || 0).toLocaleString('de-DE')),
+                  row('Trend', u.trend_pct == null ? '—' : (u.trend_pct > 0 ? '+' : '') + u.trend_pct + ' %', u.trend_pct > 25 ? 'warn' : u.trend_pct < 0 ? 'good' : ''),
+                  row('Gelernte Formulierungen', num(u.aliases) + (u.drafts ? ' (+' + u.drafts + ' Entwürfe)' : ''))];
+      if (u.misses != null) rows.push(row('Gleich nochmal gefragt', num(u.misses), u.misses > 3 ? 'warn' : ''));
+      var top = (u.top || []).map(function (t) {
+        return '<li><b>' + esc(t.msg) + '</b><span>' + t.count + '× · ' + Number(t.tokens || 0).toLocaleString('de-DE') + ' Tokens</span></li>';
+      }).join('');
+      return ['Tokens und Router', list(rows) + (top ? '<h4>Teuerste Wiederholungen</h4><ul class="tdmail">' + top + '</ul>'
+        + note('Wiederholte Fragen, die noch ans Modell gehen — Kandidaten für den Router.') : '')];
     }
   };
   /* day: a tapped day in the forecast row — the sheet opens on that day, not on today */

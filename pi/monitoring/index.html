@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de" data-site="monitor">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ORBIT Monitor</title>
+<meta name="description" content="Live-Monitoring des Heimnetzes 10.0.0.0/24">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f5f9">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/orbit.css?v=4.4.0">
+<script>(function(){var t;try{t=localStorage.getItem('orbit-theme')}catch(e){}if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==='dark'?'#0a0d13':'#f3f5f9'})()</script>
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+<div class="app">
+  <aside class="side" id="side" aria-label="Navigation">
+    <a class="brand" href="#/" aria-label="ORBIT Monitor – Übersicht">
+      <span class="brand-mark"><svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><circle cx="16" cy="16" r="4.6" fill="currentColor"/><g class="orb"><ellipse cx="16" cy="16" rx="13" ry="5.4" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".6" transform="rotate(-24 16 16)"/><circle cx="27.6" cy="10.9" r="2" fill="currentColor"/></g></svg></span>
+      <span><span class="brand-name">ORBIT</span><span class="brand-sub">Monitor · Heimnetz live</span></span>
+    </a>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot" id="sidefoot"></div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <div class="main-col">
+    <header class="top">
+      <button class="icon-btn menu-btn" id="menu" type="button" aria-label="Menü" aria-expanded="false"></button>
+      <div class="crumb" id="crumb"></div>
+      <button class="search-btn" type="button" data-open-search aria-label="Suchen"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-4.3-4.3"/></svg><span>Gerät, IP, Dienst suchen …</span><kbd>/</kbd></button>
+      <span class="live" id="live"><i class="sd"></i><span class="lt">verbinde …</span></span>
+      <a class="btn cross" href="http://10.0.0.110:8094/" title="Zur Dokumentation (ORBIT ATLAS)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg><span class="lbl">Dokumentation</span></a>
+      <button class="icon-btn" id="theme" type="button" aria-label="Hell/Dunkel umschalten"></button>
+    </header>
+    <main class="content" id="main" tabindex="-1"><div class="boot">Lade ORBIT Monitor …</div></main>
+  </div>
+</div>
+<noscript><p style="padding:20px">Diese Seite benötigt JavaScript.</p></noscript>
+<script src="assets/orbit-ui.js?v=4.4.0"></script>
+<script src="assets/security.js?v=4.4.0"></script>
+<script src="assets/monitor.js?v=4.4.0"></script>
+</body>
+</html>

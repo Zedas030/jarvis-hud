@@ -63,5 +63,20 @@
     "Bedroom": [
       "climate.bedroom"
     ]
+  },
+  "departure": {
+    "_comment": "Vor dem Losfahren zu einem Termin: diese Thermostate (aus climate_groups) auf climate_away Grad, als Vorschlag mit Karte; 0 = ausschalten",
+    "climate": [
+      "climate.living_room"
+    ],
+    "climate_away": 17
+  },
+  "focus": {
+    "_comment": "Fokus-Sitzung: diese Spotify-Playlist startet beim „Fokus 45 Minuten“ (leer = keine Musik)",
+    "playlist": "spotify:playlist:37i9dQZF1DX8NTLI2TtZa6"
+  },
+  "presence_room": "input_select.room",
+  "mic_rooms": {
+    "Schlafzimmer": "iPad"
   }
 }

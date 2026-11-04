@@ -23,6 +23,10 @@ from urllib.parse import urlparse, parse_qs
 ROOT = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 import paths  # noqa: E402,F401 — the jarvis/<group> folders
+import jarvis_log  # noqa: E402
+import metrics  # noqa: E402
+
+log = jarvis_log.get("server")
 UI = ROOT / "ui"
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("application/wasm", ".wasm")        # the wake word runtime (ui/vendor); Windows often knows neither
@@ -104,6 +108,10 @@ import personality  # noqa: E402
 import resources  # noqa: E402
 import policy  # noqa: E402
 import homelab_watch  # noqa: E402
+import energy_coach  # noqa: E402
+import homelab_review  # noqa: E402
+import house_habits  # noqa: E402
+import weather_alerts  # noqa: E402
 import reflection  # noqa: E402
 import suggestions  # noqa: E402
 import weekly_review  # noqa: E402
@@ -115,8 +123,19 @@ import spotify     # noqa: E402
 import voice       # noqa: E402
 import wakeword    # noqa: E402
 import ambience    # noqa: E402
+import alexa_voice  # noqa: E402
+import sonos       # noqa: E402
 import overlay     # noqa: E402
 import watchers    # noqa: E402
+import daytime     # noqa: E402
+import focus       # noqa: E402
+import maintenance  # noqa: E402
+import selfcheck   # noqa: E402
+import user_habits  # noqa: E402
+import wellbeing   # noqa: E402
+import voice_config  # noqa: E402
+import voice_metrics  # noqa: E402
+import voice_ws    # noqa: E402
 
 PORT = int(os.environ.get("JARVIS_PORT", "8720"))
 # Remote access (iPhone, iPad): a second port, also on localhost only, that
@@ -134,6 +153,15 @@ DASHBOARD_LAYOUTS = frozenset(("tablet", "stark", "classic", "aurora", "ivory", 
                                "bento", "horizon", "editorial", "neon", "zen", "orbit", "solstice",
                                "atelier", "mono", "nexus", "tide", "prism"))
 DASHBOARD_DEFAULT = "solstice"
+
+
+def _sonos_hold(speaker, on):
+    if alexa_voice.is_alexa(speaker):
+        return                         # Alexa lowers its own music while it speaks
+    try:
+        (sonos.hold if on else sonos.release)(speaker)
+    except Exception as e:  # noqa: BLE001 — no house: the music just stays as loud as it was
+        log.warning("Sonos leiser/lauter: %s", str(e)[:120])
 
 
 def _saved_dashboard_layout(device="pc"):
@@ -207,7 +235,7 @@ def _prewarm_soon():
             sid = SESSION["id"]
             runtime.prewarm(sid, commands.system_block(fresh=sid is None))
         except Exception as e:  # noqa: BLE001
-            print(f"  prewarm failed: {e}", flush=True)
+            log.warning("prewarm failed: %s", e)
     threading.Thread(target=work, daemon=True).start()
 
 
@@ -234,6 +262,15 @@ def log_usage(route, model, groups, usage, system_chars=0, prefix_chars=0, messa
         est=dict(system=system_chars // 3, context=prefix_chars // 3,
                  tool_results=u.get("tool_result_chars", 0) // 3, reply=len(reply or "") // 3),
         ms=ms, message=(message or "")[:80])
+    kind = (route or "?").split(":", 1)[0]
+    metrics.counter("turns_total", route=kind)
+    if ms:
+        metrics.observe("turn_ms", ms, route=kind)
+    if model:
+        metrics.counter("model_calls_total", model=model, route=kind)
+        for k in ("input", "output", "cache_read", "cache_write"):
+            if row[k]:
+                metrics.counter("tokens_total", row[k], model=model, kind=k)
     try:
         USAGE_LOG.parent.mkdir(exist_ok=True)
         with USAGE_LOG.open("a", encoding="utf-8") as fh:
@@ -246,11 +283,28 @@ def log_usage(route, model, groups, usage, system_chars=0, prefix_chars=0, messa
 # Jarvis' own voice in the quiet hours (JARVIS_QUIET_HOURS): this share of the slider value.
 NIGHT_VOLUME = float(os.environ.get("JARVIS_NIGHT_VOLUME", "0.5"))
 
+
+def _voice_factor():
+    """Late evening (daytime.py) and a bad night (wellbeing.py) make the HUD a little softer; the
+    quiet-hour share stays separate (night_volume)."""
+    try:
+        return round(daytime.volume_factor() * wellbeing.volume_factor(), 3)
+    except Exception:  # noqa: BLE001
+        return 1.0
+
 BRIEFING_LLM = os.environ.get("JARVIS_BRIEFING_LLM", "1").strip() not in ("0", "false", "no", "off")
 BRIEFING_PROMPT = (commands.LEAN_PERSONA + "\n\nFormuliere aus den Fakten ein gesprochenes Tagesbriefing: "
                    "Begrüßung passend zur Tageszeit, dann Termine, Wetter mit Golf-Einschätzung, Speicher und "
                    "Solar, Mails; fast leere Batterien nur wenn gemeldet. Vier bis sechs kurze Sätze. Keine Börse, "
                    "keine Nachrichten. Nichts erfinden, was nicht in den Fakten steht.")
+
+
+def _voice_engine_status():
+    """The HUD switches to the WebSocket client when the engine runs."""
+    cfg = voice_config.load()
+    s = voice_ws.status()
+    return {"enabled": bool(cfg.engine.get("enabled", True)), "running": s["running"], "port": s["port"] or cfg.engine.port,
+            "error": s["error"], "sessions": s["sessions"], "conversation_s": cfg.wake.conversation_s}
 
 
 def notifications():
@@ -327,6 +381,13 @@ class Handler(BaseHTTPRequestHandler):
         if os.environ.get("JARVIS_VERBOSE"):
             sys.stderr.write("  " + (fmt % args) + "\n")
 
+    def log_request(self, code="-", size="-"):
+        # every answer counts: API paths by name, the HUD and its files as one bucket
+        p = urlparse(self.path).path
+        metrics.counter("http_requests_total", path=p if p.startswith("/api/") or p == "/metrics" else "static",
+                        status=str(code))
+        super().log_request(code, size)
+
     def _json(self, body, code=200, headers=None):
         data = json.dumps(body).encode()
         self.send_response(code)
@@ -371,7 +432,7 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:                    # cut off in the HUD: nobody listens any more
             self.close_connection = True
         except Exception as e:  # noqa: BLE001 — provider broke off mid-sentence
-            print(f"  Stimme abgebrochen: {str(e)[:120]}", flush=True)
+            log.warning("Stimme abgebrochen: %s", str(e)[:120])
             self.close_connection = True
         finally:
             close = getattr(chunks, "close", None)
@@ -449,9 +510,12 @@ class Handler(BaseHTTPRequestHandler):
                 usage=commands.load().get("usage"),
                 billing=billing.summary(),
                 wake=wakeword.status(), spotify=spotify.status(), ambience=ambience.status(), timers=scheduler.public(), quiet=events.quiet_now(),
-                night_volume=NIGHT_VOLUME,
+                night_volume=NIGHT_VOLUME, voice_factor=_voice_factor(), voice_mode=daytime.mode(),
+                focus=focus.state().get("until") if focus.active() else None,
                 fallback=fallback_llm.status(),
                 persona=personality.label(),
+                sonos=sonos.status(self._layout_device()),
+                voice_engine=_voice_engine_status(),
                 session=SESSION["id"], boot=BOOT_ID, remote=self.remote, remote_enabled=REMOTE))
 
         if p == "/api/events":
@@ -478,6 +542,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(sysmon.sample())
             except Exception as e:  # noqa: BLE001 — psutil or nvidia-smi missing
                 return self._json({"error": str(e)[:120]})
+
+        if p == "/metrics":
+            # Prometheus text format for Grafana on the Pi; no token (numbers only, no words)
+            if not voice_config.load().metrics.get("prometheus", True):
+                return self._bytes(b"disabled", "text/plain", 404)
+            text = metrics.prometheus() + voice_metrics.prometheus() + metrics.tool_calls_from_audit(audit.PATH)
+            return self._bytes(text.encode("utf-8"), "text/plain; version=0.0.4; charset=utf-8")
+
+        if p == "/api/voice/metrics":
+            return self._json(voice_metrics.snapshot())
 
         if p == "/api/notifications":
             return self._json(notifications())
@@ -543,7 +617,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "unauthorized"}, 401)
         ctype = self.headers.get("Content-Type", "").split(";", 1)[0].lower()
         if p in {"/api/run", "/api/speak", "/api/new", "/api/cancel", "/api/balance", "/api/duck", "/api/musichold", "/api/hud", "/api/restart",
-                 "/api/layout", "/api/pair/start", "/api/devices", "/api/devices/revoke"} and ctype != "application/json":
+                 "/api/layout", "/api/output", "/api/speak/stop", "/api/pair/start", "/api/devices", "/api/devices/revoke"} and ctype != "application/json":
             return self._json({"error": "application/json required"}, 415)
         try:
             raw = self._read(MAX_AUDIO if p == "/api/listen" else MAX_JSON)
@@ -561,10 +635,45 @@ class Handler(BaseHTTPRequestHandler):
             _save_dashboard_layout(self._layout_device(), layout)
             return self._json({"ok": True, "layout": layout})
 
+        if p == "/api/output":
+            try:
+                body = json.loads(raw or b"{}")
+                eid = sonos.set_output(self._layout_device(), body.get("target") if isinstance(body, dict) else "")
+            except (ValueError, TypeError):
+                return self._json({"error": "unknown speaker"}, 400)
+            return self._json({"ok": True, **sonos.status(self._layout_device())})
+
+        if p == "/api/speak/stop":
+            # Talking over him: the Sonos stops now; hold=True keeps further sentences back until he goes on.
+            target = sonos.output_for(self._layout_device())
+            if target and alexa_voice.is_alexa(target):
+                alexa_voice.stop(target, hard=True)   # paused or cut off: Alexa goes quiet either way
+            elif target:
+                sonos.stop(target, hold=bool((json.loads(raw or b"{}") or {}).get("hold")))
+            return self._json({"ok": True})
+
         if p == "/api/speak":
             try:
                 body = json.loads(raw or b"{}")
                 text = (body.get("text") or "").strip()
+                target = sonos.output_for(self._layout_device())
+                if target and alexa_voice.is_alexa(target):
+                    # an Echo reads the text itself: no voice is made here, no credits used
+                    return self._json({"sonos": sonos.label(target), "seconds": alexa_voice.say(target, text),
+                                       "voice": "Alexa"})
+                if target and sonos.hushed(target):
+                    return self._json({"sonos": sonos.label(target), "seconds": 0, "held": True})
+                if target:
+                    # The device asked, the speaker answers — streamed, from the first sentence on. If the
+                    # announcement cannot start, the sound is already made and the device plays it after all.
+                    chunks, mime, provider = voice.speak_stream(text)
+                    try:
+                        secs = sonos.say(target, chunks, mime, text, quiet=events.quiet_now())
+                        return self._json({"sonos": sonos.label(target), "seconds": secs, "voice": provider})
+                    except sonos.Fallback as e:
+                        log.warning("Sonos: %s", str(e.__cause__)[:160])
+                        self._bytes(e.data, e.mime)
+                        return
                 if body.get("stream"):
                     return self._speak_stream(*voice.speak_stream(text))
                 data, mime, provider = voice.speak_full(text)
@@ -604,7 +713,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.remote:
                 did = devices.check(devices.token_from_cookie(self.headers.get("Cookie")))
                 name = next((d["name"] for d in devices.listing() if d["id"] == did and d["name"]), did)
-                wakeword.device_log(name, (json.loads(raw or b"{}") or {}).get("text", ""))
+            else:
+                name = "PC"                    # barge-in lines from the PC's own HUD
+            wakeword.device_log(name, (json.loads(raw or b"{}") or {}).get("text", ""))
             return self._json({"ok": True})
 
         if p == "/api/hud":
@@ -639,6 +750,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 threading.Thread(target=spotify.release, args=(who, str(body.get("why", ""))[:120]),
                                  daemon=True).start()
+            speaker = sonos.output_for(self._layout_device())
+            if speaker:              # the speaker that will answer goes quiet too, whatever plays on it
+                threading.Thread(target=_sonos_hold, args=(speaker, body.get("on") is True), daemon=True).start()
             return self._json({"ok": True})
 
         if p == "/api/balance":
@@ -651,7 +765,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/permission/answer":
             try:
                 ans = json.loads(raw or b"{}")
-            except json.JSONDecodeError:
+            except ValueError:   # bad JSON or bytes that are not UTF-8 — both are ValueError
                 return self._json({"error": "bad json"}, 400)
             entry = PENDING.get(str(ans.get("id")))
             if not entry:
@@ -739,6 +853,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"allow": False})
         emit = ACTIVE["emit"]
         if not emit:   # nobody is watching the HUD -> nobody can confirm
+            metrics.counter("cards_total", outcome="nobody")
             return self._json({"allow": False})
         rid = secrets.token_hex(6)
         entry = {"event": threading.Event(), "allow": False}
@@ -747,7 +862,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             emit(dict(t="confirm", id=rid, tool=tool,
                       detail=_describe_call(tool, req.get("input")), timeout=PERM_TIMEOUT))
-            entry["event"].wait(PERM_TIMEOUT)
+            answered = entry["event"].wait(PERM_TIMEOUT)
+            metrics.counter("cards_total", outcome="allowed" if entry["allow"] else "denied" if answered else "timeout")
             emit(dict(t="confirm_done", id=rid, allow=entry["allow"]))
             audit.write("card", tool=tool, allow=entry["allow"], args=policy.redact(req.get("input") or {}))
         except OSError:
@@ -756,7 +872,7 @@ class Handler(BaseHTTPRequestHandler):
             PENDING.pop(rid, None)
         return self._json({"allow": entry["allow"]})
 
-    def _lean(self, message, emit, typed=False):
+    def _lean(self, message, emit, typed=False, hint=""):
         """Lean path: local router first, otherwise one small stateless Claude call."""
         t0 = time.time()
         commands.update_state(lambda d: d.__setitem__("last_turn_at", time.time()))
@@ -781,6 +897,10 @@ class Handler(BaseHTTPRequestHandler):
             message = "Tagesbriefing bitte."
         else:
             route = router.route(message, ha_full=bool(commands.ha_request(message)))
+            try:
+                selfcheck.note(message, route)       # the same question again within seconds = a miss
+            except Exception:  # noqa: BLE001
+                pass
             if route["kind"] == "local":
                 reply = route["reply"]
                 emit(dict(t="note", message=f"lokal erledigt ({route['handler']}) — 0 Tokens"))
@@ -810,6 +930,8 @@ class Handler(BaseHTTPRequestHandler):
             prefix = commands.lean_prefix(message, route["groups"])
             if typed:                                    # typed: longer text, only the first paragraph is spoken
                 prefix = prefix.replace("</kontext>", personality.TYPED_HINT + "\n</kontext>")
+            if hint:                                     # the voice engine: "unterbrochen nach Satz N" is context, not the question
+                prefix = prefix.replace("</kontext>", hint + "\n</kontext>")
         why = ("Claude nicht erreichbar" if runtime.runtime_kind() != "claude" else
                "Claude-Limit erreicht" if fallback_llm.claude_blocked(commands.load().get("usage")) else None)
         if why and fallback_llm.available():
@@ -855,6 +977,7 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:  # noqa: BLE001
+            log.exception("run failed: %s", str(e)[:200])
             try:
                 emit(dict(t="error", message=str(e)[:300]))
             except OSError:
@@ -936,7 +1059,7 @@ class Handler(BaseHTTPRequestHandler):
     def _stream(self, raw):
         try:
             payload = json.loads(raw or b"{}")
-        except json.JSONDecodeError:
+        except ValueError:   # bad JSON or bytes that are not UTF-8 — both are ValueError
             return self._json({"error": "bad json"}, 400)
         message = (payload.get("message") or "").strip()
         if not message:
@@ -978,7 +1101,7 @@ class Handler(BaseHTTPRequestHandler):
             message = cmd["message"]
 
         if runtime.LEAN:
-            return self._lean(message, emit, typed=bool(payload.get("typed")))
+            return self._lean(message, emit, typed=bool(payload.get("typed")), hint=str(payload.get("hint") or "")[:300])
 
         last = commands.load().get("last_turn_at") or 0
         if SESSION["id"] and time.time() - last > SESSION_IDLE_MIN * 60:
@@ -1028,6 +1151,7 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:  # noqa: BLE001
+            log.exception("run failed: %s", str(e)[:200])
             try:
                 emit(dict(t="error", message=str(e)[:300]))
             except OSError:
@@ -1080,6 +1204,7 @@ def main():
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
+    jarvis_log.setup()             # logs/jarvis.log (JSON lines), warnings also on the console
     moved, deleted = memory.housekeeping()
     if moved or deleted:
         print(f"  Aufgeräumt: {len(moved)} in den Papierkorb, {deleted} endgültig gelöscht", flush=True)
@@ -1130,6 +1255,14 @@ def main():
     reflection.start()             # learning loop: Lernprotokoll, weekly rules proposal
     weekly_review.start()          # Garmin once a day, weekly review on Sunday
     homelab_watch.start()          # outages and unusual values in the homelab
+    energy_coach.start()           # learns the plugs, says when solar power is left over
+    homelab_review.start()         # Sunday: outages, security and energy of the week
+    weather_alerts.start()         # DWD warnings for here, each once
+    house_habits.start()           # habits in the house -> routine proposals, lights left on
+    user_habits.start()            # the user's own habits -> answers by himself or warmed up
+    wellbeing.start()              # Garmin as a trigger: gentle mornings, early-night hint
+    maintenance.start()            # certificates, docker images, backup age — daily
+    focus.start_loop()             # focus sessions: held notices, distraction hint, summary
     import mail_events
     mail_events.start()            # bookings in mail -> calendar (trusted senders) or a proposal
     import shipments
@@ -1141,7 +1274,14 @@ def main():
     docsearch.start()              # local full-text index of the shared folders (hourly, incremental)
     router.EMERGENCY_HOOKS.update(deny=_deny_open_cards, cancel=runtime.cancel_active)
     wakeword.start()               # openWakeWord, if JARVIS_WAKE=oww
+    if voice_config.load().engine.get("enabled", True):
+        voice_ws.start(PORT, API_TOKEN)   # full-duplex voice engine (config/voice.yaml), ws://127.0.0.1:8724
     ambience.start()               # music / sport / TV playing in the house (Home Assistant)
+    if sonos.configured():
+        try:
+            print(f"  Sonos-Ausgabe: {sonos.start()}", flush=True)   # clip server on the LAN
+        except OSError as e:
+            print(f"  Sonos-Ausgabe aus: {e}", flush=True)
     overlay.start()                # desktop card while the HUD tab is hidden
     if os.environ.get("JARVIS_CHILD") == "1":    # only a supervised child can be restarted
         threading.Thread(target=_watch_code, daemon=True).start()

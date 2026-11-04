@@ -88,6 +88,14 @@ class Review(unittest.TestCase):
         self.assertIn("65 statt 80", late[0])
         self.assertFalse(any("Golf" in p for p in found))                # never played: no pattern
 
+    def test_rooms_line_from_home_assistant(self):
+        states = {"sensor.zeit_wohnzimmer_7_tage": {"state": "23.6"}, "sensor.zeit_schlafzimmer_7_tage": {"state": "61.2"}}
+        self.assertEqual(wr.rooms_line(states), "Zeit zu Hause nach Raum (Präsenzmelder, letzte 7 Tage): Wohnzimmer 24 h, Schlafzimmer 61 h.")
+        self.assertEqual(wr.rooms_line({"sensor.zeit_wohnzimmer_7_tage": {"state": "unavailable"}}), "")
+        self.assertEqual(wr.rooms_line(), "")                       # no Home Assistant in tests
+        _, _, text = wr.facts(synthetic(), END, states)
+        self.assertIn("Wohnzimmer 24 h", text)
+
     def test_too_little_data_says_so(self):
         d = {k: v for k, v in synthetic().items() if k >= "2026-10-21"}
         _, found, text = wr.facts(d, END)

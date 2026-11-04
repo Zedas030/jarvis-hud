@@ -7,12 +7,15 @@ Every source has its own cache. A request never waits on a slow source: it
 gets the last known value and a stale source refreshes in the background.
 """
 import datetime as dt
+import os
 import re
 import threading
 import time
 
 import briefing
 import jarvis_profile as profile
+
+MAIL_LIST = int(os.environ.get("JARVIS_DASH_MAIL_LIST", "50"))   # unread mails the tablet's mail sheet lists
 
 _CACHE, _BUSY, _LOCK = {}, set(), threading.Lock()
 
@@ -257,9 +260,14 @@ def _mail():
         _, data = box.search(None, "UNSEEN")
         ids = data[0].split()
         latest = []
-        for i in ids[-4:][::-1]:
-            _, parts = box.fetch(i, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
-            msg = email.message_from_bytes(parts[0][1])
+        if not ids:
+            return 0, latest
+        # one FETCH for the whole page of headers: fifty round trips per account would stall the refresh
+        _, parts = box.fetch(b",".join(ids[-MAIL_LIST:]).decode(), "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
+        for part in parts:
+            if not isinstance(part, tuple):
+                continue
+            msg = email.message_from_bytes(part[1])
             name, addr = email.utils.parseaddr(dec(msg.get("From")))
             sent = email.utils.parsedate_to_datetime(msg["Date"]) if msg.get("Date") else None
             latest.append(dict(sender=name or addr, subject=dec(msg.get("Subject")) or "(ohne Betreff)",
@@ -270,8 +278,9 @@ def _mail():
     results, errors = mailboxes.each(read, timeout=15)
     if not results:
         return {"error": "; ".join(errors) or "nicht erreichbar"}
-    latest = sorted((m for _, ms in results for m in ms), key=lambda m: -m["ts"])[:4]
-    return dict(unread=sum(n for n, _ in results), latest=latest, at=time.strftime("%H:%M"),
+    newest = sorted((m for _, ms in results for m in ms), key=lambda m: -m["ts"])
+    # latest stays four for the small tiles; the tablet's mail sheet scrolls through the whole page
+    return dict(unread=sum(n for n, _ in results), latest=newest[:4], inbox=newest[:MAIL_LIST], at=time.strftime("%H:%M"),
                 accounts=len(results) + len(errors), errors=errors)
 
 def _nas():
@@ -326,8 +335,29 @@ def data():
         pi=_cached("pi", 120, _pi),
         pc=_cached("pc", 20, _pc),
         homelab=_cached("homelab", 30, _homelab),
+        usage=_cached("usage", 300, _usage),
         resources=_resources(),
     )
+
+
+def _usage():
+    """Tokens this week against last week, the local share, the dearest repeated questions, misses."""
+    import learning
+    week = learning.report(7)
+    both = learning.report(14)
+    prev = max(0, both.get("tokens", 0) - week.get("tokens", 0))
+    total = week.get("total", 0)
+    out = dict(total=total, llm=week.get("llm", 0), tokens=week.get("tokens", 0), prev_tokens=prev,
+               local_pct=round(100 * week.get("local", 0) / total) if total else None,
+               trend_pct=round(100 * (week.get("tokens", 0) - prev) / prev) if prev else None,
+               top=[dict(msg=m, count=c, tokens=t) for m, c, t in week.get("repeat") or []][:5],
+               aliases=week.get("aliases", 0), drafts=week.get("drafts", 0))
+    try:
+        import selfcheck
+        out["misses"] = len(selfcheck.misses(7))
+    except Exception:  # noqa: BLE001
+        out["misses"] = None
+    return out
 
 
 def _resources():

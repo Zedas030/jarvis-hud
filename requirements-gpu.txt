@@ -1,0 +1,4 @@
+# Whisper on the graphics card (CUDA 12). Not for the server without GPU.
+#   .venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-gpu.txt
+nvidia-cublas-cu12
+nvidia-cudnn-cu12

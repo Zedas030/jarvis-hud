@@ -27,6 +27,7 @@ Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine AP
 - [Konfiguration](#konfiguration)
 - [Bedienung](#bedienung)
 - [Sprachausgabe: Anbieter-Kette](#sprachausgabe-anbieter-kette)
+- [Sprach-Engine: Zuhören, Unterbrechen, Weitersprechen](#sprach-engine-zuhören-unterbrechen-weitersprechen)
 - [Notbetrieb: Ersatz-Kette](#notbetrieb-ersatz-kette)
 - [Ressourcen, Kontext, Aufgaben und Gedächtnis](#ressourcen-kontext-aufgaben-und-gedächtnis)
 - [Kontrolle, Persönlichkeit und Alltag](#kontrolle-persönlichkeit-und-alltag)
@@ -45,11 +46,11 @@ Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine AP
 
 | | |
 |---|---|
-| 🎙️ **Freihändig sprechen** | Live-Mikrofon mit Pausen- und Satzende-Erkennung, Push-to-Talk, Unterbrechen durch Reinreden mit „Jarvis“. Optional mit Aktivierungswort („Jarvis …“ oder lokal per openWakeWord); ohne „Jarvis“ wird nichts bearbeitet oder protokolliert. |
+| 🎙️ **Freihändig sprechen** | Live-Mikrofon mit Pausen- und Satzende-Erkennung, Push-to-Talk, Unterbrechen durch Reinreden: er hält an, hört zu und macht weiter, wenn nichts kommt. Optional mit Aktivierungswort („Jarvis …“ oder lokal per openWakeWord); ohne „Jarvis“ wird nichts bearbeitet oder protokolliert. |
 | ⏰ **Timer, Wecker, Erinnerungen** | *„Timer 10 Minuten für die Nudeln“*, *„Weck mich morgen um halb sieben“*, *„Erinnere mich in 20 Minuten an die Wäsche“*, *„Mach das Licht in einer Stunde aus“*. Lokal, ohne Tokens, übersteht Neustarts. |
 | 📣 **Meldet sich selbst** | Waschmaschine fertig, Termin in 15 Minuten bzw. „Zeit loszufahren“ (mit Fahrzeit), Paket kommt heute, Speicher voll, NAS-Problem, neues Gerät im WLAN. Mit Ruhezeiten. |
 | 📦 **Unterwegs und Post** | *„Wann muss ich los?“* (Fahrzeit zum nächsten Termin über OpenStreetMap), *„Kommt heute ein Paket?“* (aus den Versandmails). Lokal, ohne Tokens. |
-| 🖥️ **PC-Steuerung** | *„Lautstärke auf 30 Prozent“*, *„Ton aus“*, *„Öffne Spotify“*, *„Sperr den Bildschirm“*. Spotify wird leiser, solange Jarvis spricht; nachts spricht er leiser. |
+| 🖥️ **PC-Steuerung** | *„Lautstärke auf 30 Prozent“*, *„Ton aus“*, *„Öffne Spotify“*, *„Sperr den Bildschirm“*. Spotify wird leiser, solange Jarvis zuhört oder spricht, auf jedem Gerät des Kontos; nachts spricht er leiser. |
 | 📉 **Wird sparsamer** | Merkt sich Formulierungen, die Claude einmal auflösen musste („Leselampe aus“), und schaltet sie danach selbst. Gleiche Fragen innerhalb von 5 Minuten kommen aus dem Zwischenspeicher. *„Verbrauchsbericht“* sagt, wie viel lokal lief. |
 | 🗣️ **Aussprache** | NAS, Pi, kWh & Co. werden richtig gesprochen; eigene Wörter per *„Sprich Tuya als Tuja aus“*. |
 | 🛒 **Listen und Routinen** | Einkaufs- und To-do-Liste per Sprache (Home Assistant oder Vault-Notiz). Routinen wie „Gute Nacht“: ein Satz, mehrere Aktionen, per Sprache angelegt. |
@@ -63,7 +64,7 @@ Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine AP
 | 🪶 **Schlanke LLM-Aufrufe** | Eigener Prompt statt Claude-Code-Standard, Werkzeuge nach Bedarf, automatische Modellwahl (Haiku/Sonnet). In Messungen **über 25× weniger Tokens** als ein Standard-Aufruf. |
 | 🔊 **Ausfallsichere Stimme** | Kette aus Cloud-, lokalen GPU- und Gratis-Stimmen. Erschöpfte Anbieter werden bis zum Reset übersprungen, ohne hörbaren Abbruch. |
 | 🏠 **Smart Home** | Home Assistant: schalten, Zustände abfragen, Energie (Solar/Speicher), Raumklima, Luftqualität. Optional der volle HA-MCP-Server für Automationen und Verlauf. |
-| 🛰️ **Heimnetz** | Status von Raspberry Pi und Synology-NAS, Geräteliste, Wächter für neue Geräte im WLAN. |
+| 🛰️ **Heimnetz** | Status von Raspberry Pi und Synology-NAS, Geräteliste, Wächter für neue Geräte im WLAN. *„Lagebericht“* fasst Uptime Kuma, die Sicherheitszentrale auf dem Pi und den Energie-Kreislauf zusammen und meldet Ausfälle, dringende Sicherheitsbefunde und eine hängende Nulleinspeisung von selbst. |
 | 📅 **Alltag** | Kalender (CalDAV/iCloud), Postfach (IMAP, nur lesen), Garmin-Gesundheitsdaten, Spotify, Websuche. |
 | 🖥️ **HUD** | Dashboard mit Wetter- und Aktivitäts-Ampel, Haus, Gesundheit, Systeme, Post, 3D-Wissensgraph und Verbrauchsanzeige. |
 | 🔐 **Kontrolliert** | Nur `localhost`, Bestätigungskarten für Systemeingriffe, geschützte Geräte, kein Selbstumbau zur Laufzeit. |
@@ -88,18 +89,51 @@ Die Architektur trennt **Router** (Regeln), **Werkzeuge** (MCP-Server) und **Ged
 **Zuhause**
 - *„Mach das Licht im Wohnzimmer auf 40 Prozent“*, *„Ist die Waschmaschine noch an?“*, *„Szene Kino“*
 - *„Wie viel liefert die Solaranlage, und wie voll ist der Speicher?“*
+- *„Was kostet mich der PC im Monat?“*, *„Wer zieht Standby-Strom?“*: Stromkosten aus den Zählern der Steckdosen (Preis `JARVIS_POWER_PRICE`); Standby misst der Energie-Coach über mehrere Tage.
+- Verlässt du die Wohnung und es läuft noch Licht, Musik oder ein Gerät aus `config/home.json` → `away_check`, kommt eine Nachricht aufs Handy und ein Vorschlag „Ausschalten“, den du in Jarvis auf einer Karte bestätigst. Von selbst schaltet er nichts.
+- Sonntags ab 18 Uhr: Wochenbericht fürs Heimnetz (Ausfälle, Sicherheitsbewertung, Internet-Abbrüche, Verbrauch und Sonnenstrom), gesprochen und als Notiz unter `Erinnerungen/Homelab`.
+- *„Welche Sicherheitsbefunde sind offen?“*, *„Nimm den Echo-Befund für 30 Tage als Ausnahme“* (Karte), *„Starte eine Sicherheitsprüfung“*.
+- Kommst du nach mindestens 20 Minuten heim: *„Willkommen zurück. Während du weg warst: …“* mit dem, was Jarvis in der Zeit gemeldet hat.
+- Amtliche Warnungen des Deutschen Wetterdienstes (über Bright Sky) meldet er von selbst, ab „markant“; schwere auch nachts und aufs Handy. *„Gibt es Unwetterwarnungen?“*
+- Gewohnheiten im Haus: Schaltest du ein Licht an mindestens 4 von 10 Tagen zur gleichen Zeit, schlägt Jarvis samstags eine Routine vor (*„Gute Nacht“*), angelegt erst nach der Karte. Ist ein Licht viel länger an als sonst, sagt er es einmal.
+- *„Sag im Wohnzimmer: Essen ist fertig“* spricht über den Echo Dot, im Schlafzimmer über den Sonos (`config/home.json` → `speakers`).
+- *„Mach die Musik vom Schlafzimmer im Wohnzimmer an“*, *„Musik ins Schlafzimmer“* schiebt die Spotify-Wiedergabe auf den Lautsprecher des Raums (Spotify Connect, läuft dort weiter; braucht das Spotify-Login). Welcher Spotify-Name zum Raum gehört, steht in `config/home.json` → `speakers` → `spotify`; fehlt er, gilt der Raumname (Sonos und Alexa-Gruppen heißen in Spotify meist wie der Raum). Ohne Raum geht auch ein Gerätename, etwa *„Musik auf den PC“*.
+- *„Öffne Netflix auf dem Fernseher“*, *„Fernseher pause/lauter/leiser“* über Alexa am Fire TV — nur feste Befehle und App-Namen (`config/home.json` → `tv`).
+- Antworten aus dem Echo: am HUD-Knopf 🔈 „Echo Wohnzimmer“ wählen — was du am PC tippst oder sagst, spricht dann Alexa (mit Alexas Stimme, Satz für Satz; kostet keine Sprach-Guthaben).
+- Morgen-Briefing: geht morgens im Wohnzimmer das erste Mal etwas an (LED, Fernseher, oder du sprichst mit dem Echo), sagt der Echo einmal Wetter, Warnungen, Termine, Sonnen-Tipp, Meldungen der Nacht und ungelesene Mails (`config/home.json` → `morning_briefing`).
+- Rückfragen: nach *„Licht im Wohnzimmer an“* reichen zwei Minuten lang *„heller“*, *„dunkler“*, *„auf 30 Prozent“*, *„wieder aus“*; nach *„TV an“* auch *„und im Schlafzimmer auch“*.
+- *„Energie-Tipp“*, *„Wann soll ich die Spülmaschine anmachen?“*: Der Energie-Coach sagt aus Akkustand, Hausverbrauch und Sonnenvorhersage, wann heute oder morgen Strom übrig ist und was dann laufen sollte. Ist der Akku voll und Überschuss da, meldet er sich einmal am Tag von selbst. Er schaltet nie selbst. Steckdosen, die beim ersten Blick aus waren (z. B. der Boiler), gelten als selten genutzt und werden nie vorgeschlagen; *„Den Boiler nutze ich oft“* ändert das.
 - *„Welche Batterien muss ich tauschen?“*
 - Mit dem HA-MCP-Server: *„Warum ist es im Schlafzimmer so kalt? Zeig mir den Verlauf.“*
 
 **Technik und Netzwerk**
 - *„Wie geht es dem Pi / dem NAS?“* liefert Temperatur, Speicher und Laufzeit, außerdem den Plattenstatus mit Warnung ab 85 %.
 - *„Ist ein unbekanntes Gerät im WLAN?“* Neue Geräte meldet der Wächter von selbst.
-- *„Starte die Container auf dem Pi neu“* (SSH, mit Bestätigung).
+- *„Starte die Container auf dem Pi neu“* (Werkzeug `pi_run`: ein Befehl per SSH, immer mit Bestätigungskarte; offensichtlich zerstörerische Befehle lehnt es ab).
+- *„Lagebericht“*, *„Läuft alles?“*, *„Wie ist die Sicherheitslage?“*, *„Läuft die Nulleinspeisung?“* liefern lokal und ohne Tokens den Stand aus Uptime Kuma (Statusseite `jarvis`), der ORBIT-Sicherheitszentrale und Home Assistant (`config/homelab.json` → `energy`).
+
+**Smarter im Alltag** (seit Oktober 2026)
+- *„Was habe ich dich letzte Woche zum Drucker gefragt?“*, *„Worüber haben wir gestern gesprochen?“* beantwortet der Router aus dem Gesprächsprotokoll (0 Tokens). *„Wie war mein Schlaf, als ich das letzte Mal krank war?“* bekommt das Werkzeug `memory_timeline`: je Tag Gespräche, Garmin, Meldungen, Ausfälle und Speicherstände, nach Datum verknüpft (`episodes.py`).
+- **Deine Gewohnheiten:** Fragst du an mindestens vier Tagen zur gleichen Zeit dasselbe (*„Wann muss ich los?“* dienstags um 7:40), schlägt Jarvis samstags vor, es dir von selbst zu sagen, oder, wenn das Modell antworten muss, die Antwort drei Minuten vorher in den Zwischenspeicher zu holen, damit sie sofort und ohne Tokens kommt. Erst die Karte richtet es ein. *„Welche Gewohnheiten kennst du?“*, *„Vergiss die Gewohnheit …“* (`user_habits.py`).
+- **Garmin als Auslöser:** Schlaf-Score unter 60, Stress ab 50 oder Body Battery unter 30 am Morgen machen den Vormittag „schonend“: kurzes, ruhiges Briefing, kein Sarkasmus, Vorschläge und Energie-Tipps nur gezeigt statt gesprochen, Stimme etwas leiser. Abends ab 21 Uhr bei Body Battery unter 25 einmal der Hinweis auf einen frühen Abend, mit dem Auslöser der Gute-Nacht-Routine. *„Wie geht es mir heute?“* (`wellbeing.py`).
+- **Vor dem Losfahren:** Hat ein Termin einen Ort, meldet Jarvis 30 Minuten vor der Losfahrzeit, was zu Hause noch läuft (wie beim Verlassen) und welche Thermostate er auf die Abwesenheitstemperatur stellen würde (`config/home.json` → `departure`; `climate_away: 0` schaltet sie stattdessen aus). Der Vorschlag liegt dann schon bereit: *„ausschalten“* genügt, dazu die Karte, oder der Ja-Knopf auf dem Handy (`departure.py`).
+- **Strombudget:** `JARVIS_POWER_BUDGET_EUR` (oder `budget_eur` in `config/energy_coach.json`): *„Liege ich im Budget?“*, und ab dem fünften Tag des Monats einmal am Tag ab 18 Uhr die Meldung, wenn die Hochrechnung drüber liegt, mit dem größten Verursacher.
+- **Wartungskalender:** Zertifikate, die bald ablaufen, Docker-Images auf dem Pi, die zu alt sind, das Alter des letzten NAS-Backups, Platten, die nicht „normal“ sind (`config/homelab.json` → `maintenance`). *„Was steht im Wartungskalender?“*, *„Wann läuft das Zertifikat ab?“*, täglich eine Meldung je fälligem Punkt (`maintenance.py`).
+- **Paperless-ngx:** *„Was zahle ich für die Haftpflicht?“*, *„Wann läuft der Handyvertrag?“*: Volltextsuche in der gescannten Post, Dokumente lesen (`PAPERLESS_URL`, `PAPERLESS_TOKEN`). Fremde Inhalte, nur lesend.
+- **UniFi:** *„Wer ist gerade im WLAN?“*, *„Laufen alle Access Points?“* (`UNIFI_URL` mit API-Schlüssel oder Benutzer; `unifi.py`).
+- **Jellyfin:** *„Was habe ich zuletzt geschaut?“*, *„Serie auf dem Fernseher weiterschauen“*, *„Such den Film Heat“*; Abspielen auf jedem Gerät mit Jellyfin-App (`JELLYFIN_URL`, `JELLYFIN_API_KEY`, `JELLYFIN_USER`, `JELLYFIN_TV`).
+- **Stimme nach Tageszeit:** Ab 21 Uhr spricht er leiser und etwas langsamer, in den Ruhezeiten flüstert er (Stimmen mit Regie-Tags bekommen `[whispers]`), und das Modell antwortet dann in höchstens zwei Sätzen. *„Flüstermodus an“* / *„Sprich wieder normal“* schalten von Hand bis zum Morgen (`daytime.py`).
+- **Rückfrage mit Gedächtnis:** *„Mach Wohnzimmer an“* bei einer Lampe und einer Steckdose: Jarvis fragt einmal *„Meinen Sie die Lampe oder die Steckdose?“*, führt die Antwort aus und merkt sie sich für diese Formulierung; danach fragt er nie wieder und braucht kein Modell (`learning.py` → `choices`, zu sehen unter *„Was hast du gelernt?“*).
+- **Handy als Karte:** Vorschläge beim Verlassen und vor dem Losfahren kommen mit Ja/Nein-Knöpfen aufs Handy (Home-Assistant-App). Die Antwort läuft über einen Helfer in Home Assistant zurück und zählt wie die Karte; siehe [Handy](#handy-ja-und-nein-von-unterwegs) (`phone_actions.py`).
+- **Fokus-Sitzungen:** *„Fokus 45 Minuten“*: Meldungen werden gesammelt statt gesprochen (Wecker klingeln), die Fokus-Playlist startet (`config/home.json` → `focus`), nach zehn Minuten in YouTube, Netflix oder Reddit kommt einmal ein Hinweis, am Ende die Zusammenfassung mit dem, was inzwischen anlag. *„Fokus beenden“*, *„Wie lange noch Fokus?“* (`focus.py`).
+- **Selbstkontrolle:** Stellst du eine Frage innerhalb von 25 Sekunden umformuliert noch einmal, zählt das als Fehlschlag der ersten Antwort, samt dem Handler oder Modell, das sie gab. Die Lernschleife sieht diese Stellen, *„Wie gut warst du diese Woche?“* nennt sie (`selfcheck.py`).
+- **Token-Kachel:** Im Raum-Display zeigt die Kachel „Tokens“ die Woche, den Anteil lokal erledigter Anfragen und den Trend zur Vorwoche; das Blatt listet die teuersten wiederholten Fragen, also die Kandidaten für den Router.
+- **Routinen-Vorschau:** *„Was passiert, wenn ich Gute Nacht sage?“*, *„Was macht die Routine Feierabend?“* zählt die Schritte auf, ohne etwas zu schalten.
 
 **Erweiterungsideen** (siehe [Roadmap](#roadmap))
-- Fokus-Sitzungen mit Ablenkungs-Hinweisen, Kamera- oder Bildschirm-Kontext
+- Kamera- oder Bildschirm-Kontext auf Anfrage
 - Raum-Mikrofone (ESP32/Satelliten), mehrere Nutzerprofile per Sprecher-Erkennung
-- Weitere Werkzeuggruppen: Paperless, Jellyfin/Plex, Proxmox, Unifi, Fahrzeug-APIs, Fitness-Plattformen
+- Weitere Werkzeuggruppen: Proxmox, Fahrzeug-APIs, Fitness-Plattformen
 - Eigene Stimme per Sprachprobe (lokal), Mehrsprachigkeit
 
 ---
@@ -146,6 +180,7 @@ flowchart LR
 | `lists.py` · `routines.py` | Einkaufs-/To-do-Liste (HA-To-do oder Vault-Notiz), Routinen aus `config/routines.json` |
 | `events.py` · `watchers.py` | Push-Kanal zum HUD (Server-Sent Events, Ruhezeiten) und die Regeln für Meldungen von selbst |
 | `wakeword.py` | Aktivierungswort: Text-Erkennung oder openWakeWord am Mikrofon des PCs |
+| `voice_engine.py` · `voice_ws.py` | Full-Duplex-Sprach-Engine: Zustandsmaschine, Silero VAD, adaptives Satzende, Barge-in, Fortsetzen; WebSocket für Browser und Satelliten (`config/voice.yaml`) |
 | `fallback_llm.py` | Notbetrieb: Ersatz-Kette Groq → Gemini → Ollama mit Jarvis-Werkzeugen |
 | `learning.py` · `answer_cache.py` | Gelernte Formulierungen (`config/learned.json`), Verbrauchsbericht, Antwort-Zwischenspeicher |
 | `commute.py` · `parcels.py` | Fahrzeit zu Terminen (Nominatim + OSRM), Paketstatus aus Versandmails |
@@ -167,6 +202,7 @@ claude auth login
 # 2  Python-Umgebung
 py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
+# mit NVIDIA-GPU zusätzlich: -r requirements-gpu.txt · auf dem Windows-PC: -r requirements-windows.txt
 
 # 3  Konfiguration
 copy .env.example .env                      # Werte eintragen
@@ -176,6 +212,8 @@ mkdir vault\Erinnerungen
 # 4  Start
 start-jarvis.bat
 ```
+
+**Mit dem PC starten (optional):** eine Verknüpfung auf `start-jarvis.bat` im Autostart-Ordner (`shell:startup`, Arbeitsordner das Repo, Fenster minimiert) startet Jarvis beim Anmelden. Abschalten im Task-Manager unter „Autostart-Apps“ oder die Verknüpfung löschen.
 
 **Lokale Stimmen (optional)**
 
@@ -214,9 +252,10 @@ Alle Einstellungen stehen kommentiert in [`.env.example`](.env.example). Persön
 | Sparen | `JARVIS_CACHE_S` (Standard 300, 0 = aus) | Gleiche Lese-Fragen so lange aus dem Zwischenspeicher |
 | Pendeln | `JARVIS_HOME_LAT/LON` (sonst Wetter-Koordinaten), `JARVIS_TRAFFIC_FACTOR` (1.25), `JARVIS_COMMUTE_BUFFER_MIN` (5), `JARVIS_LEAVE_WARN_MIN` (5) | Startpunkt, Verkehrszuschlag, Puffer, Vorwarnung |
 | PC und Lautstärke | `JARVIS_DUCK` (0.3, 0 = aus), `JARVIS_DUCK_APPS` (spotify.exe), `JARVIS_NIGHT_VOLUME` (0.5) | Musik leiser beim Sprechen, Stimme in den Ruhezeiten; eigene Apps in `config/apps.json` |
-| Spotify | `JARVIS_SPOTIFY_CLIENT_ID`, `JARVIS_SPOTIFY_HOLD` (1), `JARVIS_SPOTIFY_HOLD_MAX_S` (120), `JARVIS_SPOTIFY_HOLD_MODE` (leise), `JARVIS_SPOTIFY_QUIET_PCT` (1) | Bei „Jarvis“ wird die Musik auf jedem Gerät des Kontos (auch Handy an der Anlage) ganz leise und kommt danach auf die alte Lautstärke zurück; hat man sie zwischendurch von Hand verstellt, bleibt sie so. Mit `JARVIS_SPOTIFY_HOLD_MODE=pause` hält sie stattdessen an, ebenso auf Geräten, deren Lautstärke Spotify nicht setzen kann; Musikbefehle gehen übers Konto. Einmalig App auf developer.spotify.com (Redirect URI `http://127.0.0.1:8722/callback`), dann `scripts\spotify_login.py` |
+| Spotify | `JARVIS_SPOTIFY_CLIENT_ID`, `JARVIS_SPOTIFY_HOLD` (1), `JARVIS_SPOTIFY_HOLD_MAX_S` (120), `JARVIS_SPOTIFY_HOLD_MODE` (leise), `JARVIS_SPOTIFY_QUIET_FACTOR` (0.3), `JARVIS_SPOTIFY_QUIET_PCT` (20) | Bei „Jarvis“ und bei jeder Ansage, auch wenn er sich von selbst meldet, geht die Musik auf dem Gerät des Kontos, das gerade spielt (auch Handy an der Anlage), auf ein Drittel ihrer Lautstärke, höchstens 20 %, und kommt danach auf die alte Lautstärke zurück; hat man sie zwischendurch von Hand verstellt, bleibt sie so. Mit `JARVIS_SPOTIFY_HOLD_MODE=pause` hält sie stattdessen an, ebenso auf Geräten, deren Lautstärke Spotify nicht setzen kann; Musikbefehle gehen übers Konto. Einmalig App auf developer.spotify.com (Redirect URI `http://127.0.0.1:8722/callback`), dann `scripts\spotify_login.py` |
 | Aussprache | `config/aussprache.json` | Eigene Einträge, entsteht per Sprache |
-| Dienste | `ICLOUD_*`, `MAIL_*`, `HA_*`, `SYNOLOGY_*`, `JARVIS_PI_*`, `GARMIN_*` | Integrationen; jede ist optional |
+| Dienste | `ICLOUD_*`, `MAIL_*`, `HA_*`, `SYNOLOGY_*`, `JARVIS_PI_*`, `GARMIN_*`, `PAPERLESS_*`, `UNIFI_*`, `JELLYFIN_*` | Integrationen; jede ist optional |
+| Smarter | `JARVIS_USER_HABITS` (1), `JARVIS_WELLBEING` (1), `JARVIS_WB_SLEEP_LOW/STRESS_HIGH/BATTERY_LOW` (60/50/30), `JARVIS_WB_BATTERY_EVENING` (25), `JARVIS_DEPARTURE_PREP_MIN` (30), `JARVIS_POWER_BUDGET_EUR` (0 = aus), `JARVIS_MAINTENANCE` (1), `JARVIS_WHISPER_HOURS` (= Ruhezeiten), `JARVIS_LATE_FROM` (21), `JARVIS_LATE_VOLUME` (0.8), `JARVIS_FOCUS_WARN_MIN` (10), `JARVIS_FOCUS_DISTRACT`, `JARVIS_SELFCHECK_SECONDS` (25), `JARVIS_PHONE_ACTION_ENTITY` | Gewohnheiten, Garmin-Auslöser, Losfahren, Budget, Wartung, Stimme nach Tageszeit, Fokus, Selbstkontrolle, Handy-Rückkanal |
 | Geräte | `config/home.json` | Zuordnung der Dashboard-Felder (Solar, Speicher, Räume, Router, Luft) zu Home-Assistant-Entities, dazu `appliances` (Leistungsmesser für „… ist fertig“) und `device_aliases` (weitere Wörter je Gerät, z. B. „Wohnzimmer“ und „Lampe“ für ein Licht, das in Home Assistant nur „LED“ heißt; greift ohne Neustart nach spätestens 5 Minuten) |
 | Routinen | `config/routines.json` | Entsteht per Sprache; Format in `config/routines.example.json` |
 
@@ -232,7 +271,7 @@ Alle Einstellungen stehen kommentiert in [`.env.example`](.env.example). Persön
 | Timer und Wecker | Countdown oben in der Leiste. Es klingelt, dann spricht er. Reinreden, `Esc` oder **Stop** beendet das Klingeln, *„Schlummern“* gibt 9 Minuten. |
 | Meldungen | Erscheinen mit gelbem Rand im Gespräch und werden vorgelesen; in den Ruhezeiten nur angezeigt. |
 | Push-to-Talk | Live-Button halten, sprechen, loslassen. |
-| Unterbrechen | „Jarvis“ in seine Antwort reinsagen (gern gleich mit der neuen Frage), oder `Esc` bzw. Leertaste. Ohne „Jarvis“ redet er beim Dazwischenreden einfach weiter |
+| Unterbrechen | Einfach reinreden: Nach 60 ms Stimme wird er leiser, nach 150 ms hält er an und hört zu (Sonos: ≈ 1 s wegen dessen Puffer). Sagst du etwas, ist das die neue Frage; „Stopp“ beendet die Antwort. Sagst du nichts, nur „mhm“, oder hört das Mikro bloß ihn selbst aus dem Sonos, macht er nach 1,5 s mit dem angefangenen Satz weiter. Läuft Fernsehen oder Sport, zählt eine neue Frage nur mit „Jarvis“. Außerdem `Esc` bzw. Leertaste. Details: [Sprach-Engine](#sprach-engine-zuhören-unterbrechen-weitersprechen) |
 | Mini-Fenster | Verlässt du den Jarvis-Tab, steht unten rechts auf dem Desktop ein kleiner Roboter-Panda über allen Fenstern, darunter eine Leiste mit „Spricht / Hört zu / Denkt nach“, der letzten Zeile, **■ Stopp** und **🎙 Mikro**. Der Panda spielt den Zustand vor (Mund beim Sprechen, Ohren hoch beim Zuhören, schräger Kopf beim Nachdenken, schläft bei Pause) und zieht ein Gesicht passend zur Antwort: aus dem Ton-Tag (`[dry]` → kritisch, `[amused]` → fröhlich, `[sighs]` → besorgt …) oder aus Wörtern wie „leider“, „Fehler“, „erledigt“. Er folgt der Maus mit den Augen, freut sich über einen Klick (fünf schnelle Klicks: Pirouette) und lässt sich per Ziehen verschieben. Zurück im Tab verschwindet er. Ein eigenes Fenster des Servers, kein Browser-Bild-im-Bild; `JARVIS_OVERLAY=0` schaltet es ab, `JARVIS_OVERLAY_STYLE=karte` bringt die alte Karte mit Orb zurück |
 | 3D-Drucker | *„Wie weit ist der Drucker?“*, *„Welches Filament ist im AMS?“*, *„Wie heiß ist die Düse?“* — lokal aus Home Assistant (Integration [ha-bambulab](https://github.com/greghesp/ha-bambulab)), 0 Tokens. Jarvis sagt von selbst Bescheid, wenn ein Druck fertig ist, fehlschlägt, aus einem Grund anhält (Filament leer, erste Schicht, Filamentsalat …) oder der Drucker einen Fehler meldet. Er liest nur, steuern tut er den Drucker nie. `JARVIS_PRINTER=0` schaltet es ab |
 | Updates | *„Gibt es Updates?“* prüft FRITZ!Box und andere Home-Assistant-Geräte, NAS (DSM und Pakete) und Pi (Pakete, Pi-hole). *„Installier das Pi-hole-Update“* — jedes Gerät nur mit Freigabe-Karte, nie automatisch. DSM selbst und Docker bleiben Handarbeit, der Fire TV aktualisiert sich im Standby selbst |
@@ -262,6 +301,109 @@ Fish Audio ─▶ ElevenLabs ─▶ Lokal (Chatterbox GPU · Piper CPU) ─▶ A
 - **Transparenz:** Das Dashboard zeigt den aktiven Anbieter mit Restguthaben und die gesperrten Anbieter samt Datum. Beim Wechsel gibt es optional eine kurze Ansage.
 - **Ton-Tags** wie `[dry]` werden von Anbietern umgesetzt, die sie beherrschen, und für alle anderen entfernt.
 - Die Kette ist reiner Code, sie verbraucht keine LLM-Tokens.
+
+---
+
+## Sprach-Engine: Zuhören, Unterbrechen, Weitersprechen
+
+Seit 02.11.2026 läuft das Gespräch nicht mehr im Browser, sondern in einer **Full-Duplex-Engine auf dem
+Server** (`jarvis/voice/voice_engine.py`). Der Browser schickt das Mikrofon als 20-ms-Frames über einen
+WebSocket (`ws://127.0.0.1:8724`) und spielt zurückkommende Sätze ab; alles andere (Sprachaktivität,
+Satzende, Unterbrechen, Weitersprechen, Modellaufruf) entscheidet der Server. Dieselbe Schnittstelle
+bekommt später ein Raum-Satellit auf dem Linux-Server. Die Analyse, die zu dem Umbau führte, steht in
+[`VOICE-ANALYSE.md`](VOICE-ANALYSE.md).
+
+### Zustandsmaschine
+
+```
+IDLE → LISTENING → THINKING → SPEAKING → ( INTERRUPTED → LISTENING | RESUMING → SPEAKING ) → IDLE
+```
+
+Jeder Wechsel steht mit Zeitstempel und Auslöser in `logs/voice_state.jsonl` und im HUD-Protokoll. Das
+Mikrofon bleibt in SPEAKING offen.
+
+| Zustand | Was passiert |
+|---|---|
+| LISTENING | **Silero VAD** (ONNX, ~0,1 ms je Frame) erkennt Sprache; alle ~0,7 s ein **Partial** aus Whisper (nur auf der GPU). Das Satzende ist **adaptiv**: fertiger Satz 450 ms, Frage 350 ms, unfertig („und dann, ähm,“) 1350 ms, ohne Text 700 ms; wer nach dem Senden weiterspricht, lehrt die Engine, 100 ms länger zu warten (bis +600 ms). Danach Whisper mit Beam 5, Aktivierungswort-Prüfung, Anfrage an `/api/run` (Router, Cache, Claude, Notbetrieb wie bisher). |
+| THINKING | Sprache kurz nach dem Senden: der laufende Aufruf wird abgebrochen, beide Hälften werden zusammengeklebt. Nach 1,2 s ohne erstes Wort ein leiser Denk-Ton. |
+| SPEAKING | Sätze entstehen aus dem Token-Strom (`voice_tts.py`), der erste Satz schon am ersten Komma („Guten Abend, Sir,“). Jeder Satz wird **einmal** synthetisiert und behalten. Reinreden: nach 60 ms Sprache Lautstärke auf 20 %, nach 150 ms Pause → INTERRUPTED (gemessen 143–218 ms bis zur Pause). |
+| INTERRUPTED | Der Clip wird transkribiert und eingeordnet: **Geräusch / eigenes Echo** → weiter; **Rückmeldung** („mhm“, „ja“, „genau“) → weiter; **Stopp-Wort** → Ende; **ein Wort ohne Namen** → weiter; **echte Äußerung** → neue Anfrage, mit dem Hinweis „unterbrochen nach Satz N von M“ im Kontext; **nichts gesagt** nach 1,5 s → weiter. |
+| RESUMING | Der unterbrochene Satz läuft vom Satzanfang, danach der Rest, ohne neue Synthese. |
+
+Ins Gesprächsfenster (`state.json` → `window`) kommt bei einer Unterbrechung nur der **tatsächlich
+gesprochene** Teil plus `[unterbrochen]`, nicht der geplante Rest.
+
+### Gemessen (dieser PC, RTX 5080, Piper als Stimme, Router-Antwort)
+
+| Stufe | Wert |
+|---|---|
+| Ende der Äußerung bis Satzende gilt | 350–470 ms |
+| Whisper `large-v3-turbo` final | 130–160 ms |
+| Router | 7–20 ms |
+| Piper, erster Ton | 130–160 ms (2,2 s beim allerersten Satz: Modell laden) |
+| **Ende der Äußerung bis erstes Wort** | **≈ 0,8–0,9 s** (Router), bei Claude plus dessen erster Satz (1–3 s) |
+| Reinreden bis Pause | 143–218 ms |
+
+`scripts/voice_scenarios.py` spielt die Aufnahmen aus `tests/fixtures/voice/` durch die echte Engine
+(Silero, Whisper, Stimme) mit einem Fake-Modell und druckt Zustände, Transkripte und Metriken.
+
+### Konfiguration
+
+Alles steht kommentiert in [`config/voice.yaml`](config/voice.yaml) (PyYAML; `JARVIS_VOICE_CONFIG` zeigt
+auf eine andere Datei; fehlende Schlüssel fallen auf die Standardwerte in `voice_config.py` zurück):
+
+| Block | Wichtigste Werte |
+|---|---|
+| `engine` | `enabled` (false = alte Browser-Pipeline), `bind`/`port` (8724), `preroll_ms`, `debug_audio` (Segmente als WAV nach `logs/voice_debug/`) |
+| `vad` | `start_threshold` 0,55 (Nutzer startet), `barge_threshold` 0,70 (Nutzer unterbricht), `min_speech_ms`, `max_speech_ms` |
+| `endpoint` | `base_ms`, `unfinished_extra_ms`, `question_bonus_ms`, `no_text_ms`, `max_ms`, `learn_step_ms`/`learn_max_ms`, `continue_window_ms`, `partial_every_ms`, `turn_model` (optionales ONNX-Turn-Modell) |
+| `stt` | `partials` (auto/true/false), `final_beam`, `vocabulary` (wird mit `WHISPER_LOCAL_PROMPT` und den Raum-, Geräte- und Lautsprechernamen aus `config/home.json` zu Whispers Prompt) |
+| `wake` | `conversation_s` (Konversationsmodus nach jeder Antwort, ×1,6 nach einer Frage), `window_s`, `barge_needs_name_with_ambience` |
+| `barge` | `duck_ms`, `duck_gain`, `confirm_ms`, `fade_ms`, `clip_silence_ms`, `resume_after_ms`, `backchannel`, `stop_words`, `echo_text_ratio`, `sonos_duck_via_ha` |
+| `tts` | `first_chunk_min_chars`/`first_chunk_max_chars`, `min_chunk_chars`, `gap_ms`, `provider_timeout_s` |
+| `llm` | `thinking_cue_after_ms`, `first_word_target_ms` |
+| `metrics` | `file` (`logs/voice_metrics.jsonl`), `prometheus` (GET `/metrics`) |
+
+Einmalig: `.venv\Scripts\python.exe scripts\fetch_voice_models.py` lädt Silero VAD nach `models/`
+(ohne die Datei läuft ein Pegel-VAD). Die Engine braucht `websockets` und `pyyaml` (`requirements.txt`).
+
+### Metriken
+
+`logs/voice_metrics.jsonl` hat je Gespräch eine Zeile (`wait_ms`, `stt_ms`, `llm_first_ms`,
+`first_sentence_ms`, `tts_first_ms`, `first_word_ms`, `barge_react_ms`, `interrupted`, `spoken`).
+`GET http://localhost:8720/metrics` liefert dasselbe als Prometheus-Text (Histogramme, Zähler
+`jarvis_voice_barge_ins_total{outcome="…"}`, `jarvis_voice_echo_false_alarms_total`,
+`jarvis_voice_user_continued_total`, `jarvis_voice_late_first_word_total`) für Grafana auf dem Pi;
+`GET /api/voice/metrics` als JSON fürs HUD.
+
+### Lautsprecher im Raum
+
+| Ausgabe | Unterbrechen | Fortsetzen |
+|---|---|---|
+| PC / iPad selbst | 150 ms bis Pause (Ducking ab 60 ms), Browser-Echo-Unterdrückung kennt den eigenen Ausgang | am Satzanfang, ohne neue Synthese |
+| Sonos | Stream wird gekappt, die Lautstärke über Home Assistant gesenkt; der Sonos puffert selbst 0,5–1,5 s, also ≈ 1 s bis Stille. Das Echo der eigenen Stimme filtert ein Pegelmodell plus Textabgleich (`EchoGuard`); ein speexdsp-Canceller wird benutzt, wenn das Paket installiert ist (nicht getestet) | am Satzanfang, die Durchsage startet neu |
+| Echo (Alexa) | Alexa-TTS ist weder stopp- noch referenzierbar: nur eine Äußerung **mit „Jarvis“** zählt | – |
+
+### Tuning-Protokoll
+
+Erst `logs/voice_state.jsonl` und `logs/voice_metrics.jsonl` ansehen (oder
+`scripts/voice_scenarios.py`), dann **einen** Wert ändern, Datei speichern (sie wird beim nächsten
+Gespräch neu gelesen), zehn Sätze sprechen.
+
+| Symptom | Wert | Richtung |
+|---|---|---|
+| Antwortet mitten in meinem Satz | `endpoint.base_ms` | +100 ms; bei Denkpausen `unfinished_extra_ms` +300 ms; prüfen, ob `partials` laufen (HUD meldet „Partials“ beim Start, sonst gilt `no_text_ms`) |
+| Antwortet zu spät | `endpoint.base_ms` | −50 ms, `question_bonus_ms` −50 ms; `learn_max_ms` begrenzen |
+| Hört Satzanfänge nicht | `vad.start_threshold` | 0,55 → 0,45; `engine.preroll_ms` +200 |
+| Reagiert auf Husten, Tastatur, Fernseher | `vad.start_threshold` | → 0,65; `vad.min_speech_ms` → 300 |
+| Stockt beim Sprechen ohne Reinreden | `vad.barge_threshold` | 0,70 → 0,80; `barge.confirm_ms` → 250; bei Sonos `barge.echo_text_ratio` → 0,5 |
+| Reinreden wird nicht bemerkt | `vad.barge_threshold` | → 0,60; `barge.confirm_ms` → 120 |
+| Nach „mhm“ hört er auf | `barge.backchannel` | das Wort ergänzen (so wie Whisper es schreibt, siehe `barge_text` im HUD-Protokoll) |
+| Wartet nach einer Unterbrechung zu lange / zu kurz | `barge.resume_after_ms` | 1500 ± 500 |
+| Knackt bei Pause/Weiter | `barge.fade_ms` | 30 → 60 |
+| Erster Ton kommt spät | `tts.first_chunk_max_chars` | 70 → 50; Stimme in `TTS_CHAIN` prüfen (Piper streamt, Fish streamt, Chatterbox nicht) |
+| Versteht Fachbegriffe falsch | `stt.vocabulary` | Begriff ergänzen (oder `WHISPER_LOCAL_PROMPT`) |
+| Spricht ohne „Jarvis“ bei Fernsehen los | `wake.barge_needs_name_with_ambience` | true lassen; `JARVIS_WAKE=Jarvis` |
 
 ---
 
@@ -485,11 +627,15 @@ Unter **📱 Geräte** stehen alle gekoppelten Geräte, ✕ sperrt eines sofort 
 
 **Auf dem Handy:** Tippen auf den Mikrofon-Knopf schaltet Live an und aus, Gedrückthalten ist Push-to-Talk. Das Mikrofon startet nie von selbst, es gibt kein Tagesbriefing, und Meldungen erscheinen still (der PC liest sie vor). Das Aktivierungswort hört nur am PC.
 
-**Auf dem iPad:** Eine eigene Ansicht statt der Kommandozentrale, wie ein ruhiges Raum-Display. Links stehen eine große Uhr mit Begrüßung, das Wetter jetzt und für fünf Tage und die nächsten Termine der Woche. Rechts leuchtet eine Kugel, die zeigt, was Jarvis gerade tut: wartet auf „Jarvis“, hört zu, denkt, spricht. Alles passt auf einen Bildschirm, ohne Scrollen: Mikro-Knopf, Schnellbefehle und eine Reihe Kacheln sind immer sichtbar, weitere Termine scrollen in ihrem Kasten. Jarvis' Antworten stehen hier nicht als Text, er spricht sie; nur eine Freigabe-Karte erscheint unter der Kugel, damit man sie antippen kann. Darunter stehen groß deine Frage und seine Antwort, dazu der Mikro-Knopf, ⌨ zum Tippen und ein paar Schnellbefehle. Unten zeigen Kacheln Solar, Speicher, Räume, Luft, Post, Schlaf und Technik (NAS, Pi, Internet). Antippen einer Kachel oder des Wetters öffnet ein Blatt mit allen Details: einzelne Batterien, Soll-Temperaturen, die neuesten Mails, Garmin-Werte, Zustand der Geräte. Beim Wetter steht für jeden Tag gleich, wann es regnet, wie wahrscheinlich und wie viel (z. B. „Regen 6–12 Uhr (30–100 %), 23–24 Uhr (18 %) · ~1,8 mm“). Als Regenstunde zählt jede Stunde ab 30 %, mit vorhergesagter Menge schon ab 10 %, in der Vorschau unter jedem Tag die Uhrzeiten. Das Blatt zeigt für heute und die nächsten vier Tage dieselbe Zeile und darunter die 24 Stunden als Balken. Passt nicht alles auf den Bildschirm, lässt sich die Seite scrollen. Im ⋯-Menü liegen Station, Neustart und der Weg zurück zur klassischen Ansicht mit Gedächtnis-Graph. **Layout pro Gerät:** In der klassischen Ansicht neben dem Namen JARVIS, im Raum-Display unter ⋯, wählt ein Auswahlfeld das Layout für genau dieses Gerät: *Raum-Display*, *Stark-HUD* oder *Klassisch mit Gedächtnis-Graph*. So bekommt das iPad am Bett ein ruhiges Display, ein Wandmonitor die Werkstatt-Optik, der Schreibtisch-PC die Kommandozentrale. Zum Ansehen geht auch `?view=tablet`, `?view=stark` oder `?view=classic`.
+**Auf dem iPad:** Eine eigene Ansicht statt der Kommandozentrale, wie ein ruhiges Raum-Display. Links stehen eine große Uhr mit Begrüßung, das Wetter jetzt und für fünf Tage und die nächsten Termine der Woche. Rechts leuchtet eine Kugel, die zeigt, was Jarvis gerade tut: wartet auf „Jarvis“, hört zu, denkt, spricht. Alles passt auf einen Bildschirm, ohne Scrollen: Mikro-Knopf, Schnellbefehle und eine Reihe Kacheln sind immer sichtbar, weitere Termine scrollen in ihrem Kasten. Jarvis' Antworten stehen hier nicht als Text, er spricht sie; nur eine Freigabe-Karte erscheint unter der Kugel, damit man sie antippen kann. Darunter stehen groß deine Frage und seine Antwort, dazu der Mikro-Knopf, ⌨ zum Tippen und ein paar Schnellbefehle. Unten zeigen Kacheln Solar, Speicher, Räume, Luft, Post, Schlaf und Technik (NAS, Pi, Internet). Antippen einer Kachel oder des Wetters öffnet ein Blatt mit allen Details: einzelne Batterien, Soll-Temperaturen, die neuesten Mails, Garmin-Werte, Zustand der Geräte. Beim Wetter steht für jeden Tag gleich, wann es regnet, wie wahrscheinlich und wie viel (z. B. „Regen 6–12 Uhr (30–100 %), 23–24 Uhr (18 %) · ~1,8 mm“). Als Regenstunde zählt jede Stunde ab 30 %, mit vorhergesagter Menge schon ab 10 %, in der Vorschau unter jedem Tag die Uhrzeiten. Das Blatt zeigt für heute und die nächsten vier Tage dieselbe Zeile und darunter die 24 Stunden als Balken. Passt nicht alles auf den Bildschirm, lässt sich die Seite scrollen. Im ⋯-Menü liegen Station, Neustart und der Weg zurück zur klassischen Ansicht mit Gedächtnis-Graph. **Layout pro Gerät:** In der klassischen Ansicht neben dem Namen JARVIS, im Raum-Display unter ⋯, wählt ein Auswahlfeld das Layout für genau dieses Gerät: *Raum-Display*, *Stark-HUD* oder *Klassisch mit Gedächtnis-Graph*. So bekommt das iPad am Bett ein ruhiges Display, ein Wandmonitor die Werkstatt-Optik, der Schreibtisch-PC die Kommandozentrale. Solange ein Gerät nichts gewählt hat, zeigt es *Sonnenlauf · Tag & Mond* – das ist überall der Standard, und die gespeicherte Wahl des Servers gilt vor allem, was die Seite lokal behalten hat. Zum Ansehen geht auch `?view=tablet`, `?view=stark` oder `?view=classic` (nicht aus einer Home-Bildschirm-App heraus, dort zählt die gespeicherte Wahl).
 
 **Stark-HUD:** Dieselben Teile wie das Raum-Display (Mikro, Antworten, Freigabe-Karten, Kacheln, Detailblätter) im Iron-Man-Stil: schwarzes Glas, Cyan, abgeschrägte Ecken, Raster und Wabenfeld. Oben eine Tagesleiste des Monats, links Uhr mit Sekunden, Wetter und Termine, in der Mitte ein Arc Reactor als Avatar, rechts der Maschinenraum als Instrumente: CPU, RAM, VRAM und Platte des PCs als Ringe, Netzwerk, Pi-hole, Energie und der Zustand von NAS, Containern und Internet. Der Reaktor glüht mit seiner Stimme, beim Zuhören wird er gold und Klammern schließen sich, beim Denken läuft ein Licht durch die Spulen, bei Problemen wird er rot. Im Hochformat steht der Reaktor oben, Tag und Systeme nebeneinander darunter. Im Hochformat stehen die Bereiche untereinander. Am PC lässt sich die Ansicht mit `?view=tablet` ansehen. Anders als am Handy ist das Mikrofon bei jedem Start an und hört auf „Jarvis“, auch nach einem Neustart. Ausschalten gilt nur bis zum nächsten Laden. Kommst du nach mehr als zwei Sekunden in die App zurück, lädt sie neu, weil iOS ihr im Hintergrund das Mikrofon wegnimmt. Will iOS einmal getippt werden, zeigt der ganze Bildschirm „Tippen, damit Jarvis zuhört“. Briefing und Meldungen verhalten sich wie auf dem Handy.
 
-**iPad als Station (Bildschirm und Mikrofon):** Für ein iPad, das fest an einem Platz steht. **🎙 Station** antippen: Das iPad zeigt die Kommandozentrale, der Bildschirm bleibt an, und das Mikrofon hört ab sofort auf „Jarvis …“. Die Antwort kommt aus dem iPad. Die Einstellung gilt nur für dieses Gerät und bleibt nach dem Neustart erhalten. Lädt die Seite neu (z. B. nach einem Jarvis-Neustart), will iOS manchmal einmal getippt werden. Dann zeigt der Bildschirm „Tippen, damit Jarvis zuhört“. Meldungen bleiben still, die liest der PC vor. Stehen PC-Mikrofon und iPad im selben Raum, antworten beide.
+**iPad als Station (Bildschirm und Mikrofon):** Für ein iPad, das fest an einem Platz steht. **🎙 Station** antippen: Das iPad zeigt die Kommandozentrale, der Bildschirm bleibt an, und das Mikrofon hört ab sofort auf „Jarvis …“. Die Antwort kommt aus dem iPad. Die Einstellung gilt nur für dieses Gerät und bleibt nach dem Neustart erhalten. Lädt die Seite neu (z. B. nach einem Jarvis-Neustart), will iOS manchmal einmal getippt werden. Dann zeigt der Bildschirm „Tippen, damit Jarvis zuhört“. Meldungen bleiben still, die liest der PC vor. Hören PC-Mikrofon und iPad denselben Satz, entscheidet der Raum: `config/home.json` → `mic_rooms` nennt pro Raum der Präsenzmelder das Gerät, dessen Mikrofon zählt (`{"Schlafzimmer": "iPad"}`, der Name aus der Geräte-Kopplung). Bin ich im Schlafzimmer, nimmt das iPad den Satz, der PC wartet nach seinem Satzende kurz (`JARVIS_MIC_HOLD_S`, 1,5 s), ob das iPad denselben Satz beendet hat (`JARVIS_MIC_SAME_S`, 3 s), und lässt ihn dann fallen („das iPad hört zu“ im Protokoll). Hört nur der PC etwas, etwa weil das iPad gesperrt ist, antwortet er nach der Wartezeit; in anderen Räumen und ohne verbundenes iPad bleibt alles wie bisher.
+
+**Antwort über Sonos:** Pro Gerät wählbar, wo Jarvis antwortet. Auf dem iPad unter ⋯ (am PC in der Werkzeugleiste) schaltet **🔈 Ton hier** auf **🔊 Sonos Schlafzimmer** und wieder zurück. Dann kommt jede Antwort auf eine Frage von diesem Gerät, getippt oder gesprochen, als Durchsage aus dem Sonos. Wie bei Alexa geht Musik auf dem Sonos schon beim „Jarvis“ bzw. beim Abschicken auf `JARVIS_SONOS_QUIET` (Standard 12 %), egal ob sie über Spotify, AirPlay oder die Sonos-App läuft. Nach der Antwort kommt die alte Lautstärke zurück, außer jemand hat inzwischen selbst am Regler gedreht. Der Sonos fängt schon mit dem ersten fertigen Satz an (etwa 1–2 Sekunden danach), alle weiteren Sätze laufen in dieselbe Durchsage hinein, Lücken überbrückt Stille. So fährt die Musik zwischen den Sätzen nicht hoch. Die Lautsprecher stehen in `JARVIS_SONOS` (`media_player.x=Name`, mehrere mit Komma), die Lautstärke in `JARVIS_SONOS_VOLUME` und während der Ruhezeit in `JARVIS_SONOS_NIGHT_VOLUME`. Der Sonos holt sich den Clip selbst vom PC über einen zweiten kleinen Server im Heimnetz (`JARVIS_SONOS_PORT`, Standard 8723). Klappt die Durchsage nicht, spricht das Gerät selbst. Meldungen von selbst liest weiter der PC vor.
+
+**Jarvis weiß, in welchem Raum ich bin:** Drei Präsenzmelder (SONOFF SNZB-06P24, Zigbee, 24 GHz) in Bad, Schlafzimmer und Wohnzimmer melden an Home Assistant. Dort setzt die Automation *„Jarvis: Wo ist Nutzer“* den Helfer `input_select.nutzer_raum` auf **Wohnzimmer**, **Schlafzimmer** (Bad und Schlafzimmer zählen als ein Raum, sie liegen nebeneinander) oder **Unbekannt**. Der zuletzt angesprungene Melder gewinnt. Sieht kein Melder jemanden (Schlaf, Gaming-Zimmer), bleibt der letzte Raum stehen; auf Unbekannt geht es nur, wenn `person.nutzer` nicht zu Hause ist. Jarvis liest den Helfer (`config/home.json` → `presence_room`, höchstens alle 10 s, `JARVIS_PRESENCE_TTL_S`) und: (1) der Ausgabe-Knopf hat eine weitere Stellung **🔊 Wo ich bin** – die Antwort kommt aus dem Lautsprecher des Raums, in dem ich gerade bin (Echo im Wohnzimmer, Sonos im Schlafzimmer), und aus dem Gerät selbst, wenn mich kein Melder sieht (etwa am PC im Gaming-Zimmer). Ein Gerät, das nie etwas gewählt hat, steht automatisch darauf; **🔈 Ton hier** bleibt als bewusste Wahl. (2) Das Modell bekommt im `<kontext>` den Aufenthaltsort, „Sag durch: …“ ohne Raum und „hol die Musik zu mir“ gehen in diesen Raum. (3) Ohne Jarvis und ohne PC: Die HA-Automation *„Jarvis: Musik wandert mit“* nimmt die Musik mit – läuft im alten Raum etwas und ich wechsle den Raum, geht sie per Spotify Connect auf den Lautsprecher dort (HA-Spotify-Integration `media_player.spotify_nutzer`, `select_source`; nahtlos, gleiche Stelle). Im Wohnzimmer ist das Ziel das Spotify-Gerät „Wohnzimmer“, das ist die Soundbar (`config/home.json` → `speakers.Wohnzimmer.spotify`); fehlt sie in Spotifys Geräteliste, wird es dreimal im Abstand von ein paar Sekunden versucht (`JARVIS_MUSIC_ROOM_TRIES`, `JARVIS_MUSIC_ROOM_PAUSE_S`), erst dann springt der schlechtere Echo Dot allein ein (`spotify_fallback`); die HA-Automation macht es genauso. Nie der Echo über Alexa-Befehle. (4) *„Jarvis: Vögel im Bad“*: Springt der Bad-Melder an und läuft gerade keine Musik, spielt der Sonos im Schlafzimmer nebenan Vogelgezwitscher in Schleife (lokale Datei `www/jarvis/voegel.ogg` in der HA-Konfiguration, 7 Minuten „Birdsong morning 01“ von Matutinho, Wikimedia Commons, CC BY-SA 4.0); vorher ein Sonos-Snapshot, nach dem Bad ein Restore, also wieder der Zustand davor. Läuft Musik, gewinnt die Musik; nachts (23–6 Uhr) bleiben die Vögel aus. (5) Alle diese Automationen schalten nur, wenn `person.nutzer` zu Hause ist – die Melder allein tun nichts; springt einer an, während das Handy seit 10 Minuten weg ist, kommt stattdessen eine Push-Nachricht aufs Handy (*„Jarvis: Bewegung zu Hause ohne Handy“*). (6) *„Jarvis: Gute Nacht“*: zwischen 22 und 3 Uhr, Wohnzimmer 10 Minuten leer und ich im Schlafzimmer oder Bad → Wohnzimmer-LED aus, der Sonos sagt kurz gute Nacht; die TV-Steckdose bleibt an, an ihr hängt die Soundbar. Morgens löst der erste Bad-Besuch das Morgen-Briefing aus, gesprochen in dem Raum, in dem ich bin. Bin ich abends nicht zu Hause, geht nichts an – eine Anwesenheits-Simulation mit der LED gab es kurz, sie ist auf Wunsch wieder raus. (7) *„Jarvis: Heizung folgt mir“*: nur Wohnzimmer und Schlafzimmer, das Gaming-Zimmer bleibt unangetastet. Bin ich in einem der beiden Räume und sein Raumsensor zeigt unter 17 °C, gehen die Kasa-Ventile dort an – immer mit 20 °C, meinem Standard; eine per Jarvis geänderte Temperatur gilt bis zum nächsten Einschalten. Bin ich 20 Minuten nicht mehr in dem Raum, gehen seine Ventile aus; ist das Handy 15 Minuten nicht zu Hause, gehen beide Räume aus. Schlafzimmer fest: täglich um 23 Uhr aus (bis 6 Uhr kein Nachheizen), um 6 Uhr an mit 20 °C, wenn ich zu Hause bin; wochentags bin ich meist bis 7:30 Uhr aus dem Haus, dann greift „Handy weg“. Der Schalter `input_boolean.jarvis_heizung_folgt_mir` setzt die Regel außer Kraft (Sommer, Besuch). Aus-und-wieder-an kostet nichts extra: Die Wärme, die ein Raum braucht, hängt an seiner Temperatur – jede Stunde kühler ist gespart, das Wiederaufheizen holt nur einen Teil davon zurück. (8) HA zählt die Zeit pro Raum (`sensor.zeit_wohnzimmer_7_tage`, `sensor.zeit_schlafzimmer_7_tage`, dazu heute und die Bad-Besuche), der Wochenrückblick bekommt daraus eine Zeile. Steht der Sonos im Schlafzimmer gerade nicht in Spotifys Geräteliste (nur solange er spielt), spielt stattdessen die Alexa im Sonos Era 100 denselben Titel über Spotify weiter und der alte pausiert; dann geht die Stelle in der Playlist verloren.
 
 Damit der Bildschirm anbleibt, braucht es iPadOS 18.4 oder neuer. Bei älteren Versionen *Einstellungen → Anzeige & Helligkeit → Automatische Sperre → Nie* setzen.
 
@@ -506,6 +652,15 @@ Gesperrt hört das iPad nicht zu, denn iOS schaltet das Mikrofon einer gesperrte
 **Nachtbild:** Solange der Sensor `station_night` in `config/home.json` an ist, wird die Station schwarz und zeigt nur noch eine kaum sichtbare Uhr. Standard ist `binary_sensor.ipad_focus` aus der Home-Assistant-App: Er ist an, solange auf dem iPad ein Fokus läuft, also auch der Schlaf-Fokus aus dem Schlafplan. Das Mikrofon hört weiter. Während eines Gesprächs scheint das HUD gedimmt durch, und Antippen zeigt es für 20 Sekunden. Die Hintergrundbeleuchtung kann eine Webseite nicht steuern. Dafür zwei Kurzbefehl-Automationen auf dem iPad anlegen: *Fokus Schlafen aktiviert → Helligkeit 0 %* und *deaktiviert → Helligkeit 60 %*. Im Schlaf-Fokus den *Ruhebildschirm* ausschalten, sonst sperrt iOS das iPad. Der Sensor kommt über die Abfrage der Dashboard-Werte, das Umschalten dauert also bis zu einer Minute.
 
 **Akku schonen mit einer smarten Steckdose:** Das Ladegerät hängt an einer Tapo-Steckdose (`switch.steckdose_ipad`). Die Home-Assistant-Automation *iPad-Station: Laden zwischen 30 und 95 %* schaltet sie ab 95 % aus und unter 30 % wieder an. Den Akkustand melden zwei Kurzbefehl-Automationen auf dem iPad (*Kurzbefehle → Automation → Batteriestand*: „steigt über 95 %“ bzw. „fällt unter 30 %“, *Sofort ausführen*, Aktion *Inhalte von URL abrufen*, Methode POST). Sie rufen die beiden Webhooks der Automation auf, die URLs stehen in Home Assistant in der Automation. Alternativ genügt die Home-Assistant-App auf dem iPad (`sensor.ipad_battery_level`). Bleibt die Steckdose zehn Stunden aus, schaltet sie zur Sicherheit wieder ein.
+
+### Handy: Ja und Nein von unterwegs
+
+Vorschläge, die unterwegs zählen (*„Ausschalten“* beim Verlassen, *„Vor dem Losfahren ausschalten“*), schickt Jarvis mit zwei Knöpfen aufs Handy (`JARVIS_PHONE_NOTIFY`, Home-Assistant-App). Ein Tipp auf **Ja, machen** gilt wie die Karte im HUD: Jarvis führt den Vorschlag aus, sagt es und schreibt es ins Audit (`card`, Quelle `phone`). Der Rückweg läuft über Home Assistant, einmalig einzurichten:
+
+1. *Einstellungen → Geräte & Dienste → Helfer → Text* anlegen: `input_text.jarvis_phone_action` (oder ein anderer Name in `JARVIS_PHONE_ACTION_ENTITY`).
+2. Eine Automation: Auslöser *Ereignis* `mobile_app_notification_action`; Aktion *input_text.set_value* auf den Helfer mit Wert `{{ trigger.event.data.action }}`.
+
+Jarvis liest den Helfer alle 30 Sekunden mit den anderen Zuständen, führt `JARVIS_YES_<id>` bzw. `JARVIS_NO_<id>` aus und leert ihn wieder. Nur Vorschläge, die Jarvis selbst angelegt hat und die noch offen sind, lassen sich so bestätigen; jeder Wert wird genau einmal verarbeitet.
 
 ---
 
@@ -528,22 +683,26 @@ Gesperrt hört das iPad nicht zu, denn iOS schaltet das Mikrofon einer gesperrte
 ├─ paths.py            macht die Ordner unter jarvis/ importierbar (Importnamen bleiben kurz)
 ├─ jarvis/
 │  ├─ core/            router · runtime · commands · events · scheduler · background · jarvis_profile ·
-│  │                   personality · context · tasks
+│  │                   personality · context · tasks · focus
 │  ├─ safety/          policy · privacy · audit · emergency · proposals
 │  ├─ tools/           jarvis_mcp (Werkzeug-Server) · desktop · infra · assistant · pc · lists · routines ·
-│  │                   devices · dashboard · commute · parcels · icloud_calendar · billing
+│  │                   devices · dashboard · commute · parcels · icloud_calendar · billing · paperless ·
+│  │                   unifi · jellyfin · phone_actions · power_costs
 │  ├─ memory/          memory · memory_tools · memory_intel · learning · skill_factory · answer_cache ·
-│  │                   reflection · docsearch
-│  ├─ voice/           voice · tts_chain · local_tts_server · wakeword · pronounce · vision
+│  │                   reflection · docsearch · episodes · selfcheck
+│  ├─ voice/           voice · tts_chain · local_tts_server · wakeword · pronounce · vision · daytime ·
+│  │                   voice_engine · voice_ws · voice_vad · voice_endpoint · voice_stt · voice_tts ·
+│  │                   voice_dsp · voice_wake · voice_state · voice_metrics · voice_config
 │  ├─ llm/             fallback_llm · resources
-│  └─ watch/           watchers · homelab_watch · monitoring · briefing · weekly_review · suggestions
-├─ ui/                 index.html · app.js · graph.js · styles.css · pair.html
+│  └─ watch/           watchers · homelab_watch · monitoring · briefing · weekly_review · suggestions ·
+│                      user_habits · wellbeing · departure · maintenance
+├─ ui/                 index.html · app.js · voice-client.js · graph.js · styles.css · pair.html
 ├─ scripts/            measure_tokens.py · lean_probe.py · mail_to_trash.py · router_report.py ·
 │                      install-autostart.ps1 · ocr_screen.ps1
 ├─ tests/              ein Testmodul pro Bereich, isolate.py zuerst (ohne Haus, Claude, Netz und Ton)
-├─ config/             *.example.json (eigene Dateien bleiben lokal)
-├─ CLAUDE.md · ARCHITECTURE.md · SECURITY.md
-├─ requirements.txt · requirements-tts.txt
+├─ config/             *.example.json (eigene Dateien bleiben lokal) · voice.yaml (Sprach-Engine)
+├─ CLAUDE.md · ARCHITECTURE.md · SECURITY.md · ROADMAP.md · BESTANDSAUFNAHME.md
+├─ requirements.txt · requirements-gpu.txt · requirements-windows.txt · requirements-tts.txt · requirements-dev.txt
 └─ start-jarvis.bat
 ```
 
@@ -575,11 +734,13 @@ set JARVIS_PORT=8721& set JARVIS_STATE=%TEMP%\state_test.json& .venv\Scripts\pyt
 | Symptom | Ursache / Lösung |
 |---|---|
 | Live-Button tut nichts | `F5`. Bei „Mikrofon blockiert“ in der Adressleiste das Mikrofon freigeben. |
-| Wird mitten im Satz abgeschnitten | `SILENCE_MS` / `UNFINISHED_HOLD_MS` in `ui/app.js` erhöhen |
-| Stockt beim Sprechen, ohne dass jemand reinredet | `BARGE_FACTOR` in `ui/app.js` erhöhen oder Kopfhörer verwenden |
+| Wird mitten im Satz abgeschnitten | `endpoint.base_ms` / `unfinished_extra_ms` in `config/voice.yaml` erhöhen (siehe Tuning-Protokoll); ohne Engine: `SILENCE_MS` in `ui/app.js` |
+| Stockt beim Sprechen, ohne dass jemand reinredet | `vad.barge_threshold` in `config/voice.yaml` erhöhen; ohne Engine: `BARGE_FACTOR` in `ui/app.js` |
+| HUD meldet keine Engine („Sprach-Engine aus“ im Startbanner) | Port 8724 belegt oder `websockets` fehlt: `pip install websockets pyyaml`; `engine.enabled` in `config/voice.yaml` |
 | Keine Stimme | Feld **STIMME** im Dashboard zeigt gesperrte Anbieter und den Grund |
 | GPU-Stimme startet nicht | `logs/local_tts.log`; der erste Start lädt ~3 GB |
 | Hoher Verbrauch | `logs/usage.jsonl` nach Route, Modell und Gruppen auswerten |
+| Was ist schiefgelaufen? | `logs/jarvis.log` (JSON-Zeilen, Warnungen und Fehler aller Module; `JARVIS_LOG_DEBUG=router` für ein Modul auf DEBUG) und `http://localhost:8720/metrics` (Zähler je Route, Karte, Job, Modul) |
 | Reagiert nicht auf „Jarvis“ | `JARVIS_WAKE` prüfen. Bei `oww` zeigt das Startbanner, ob openWakeWord läuft; sonst gilt die Text-Erkennung. `JARVIS_WAKE_THRESHOLD` senken. |
 | Meldungen nur angezeigt, nicht gesprochen | Ruhezeit (`JARVIS_QUIET_HOURS`) |
 | Notbetrieb meldet sich nicht | Tooltip auf „Brain“ in der Kopfzeile zeigt je Anbieter den Grund (Key fehlt, Limit bis …, Ollama aus). Ollama: `ollama pull qwen2.5:7b-instruct` |
@@ -591,7 +752,12 @@ set JARVIS_PORT=8721& set JARVIS_STATE=%TEMP%\state_test.json& .venv\Scripts\pyt
 
 ## Roadmap
 
+Der Plan je Ausbauphase steht in `ROADMAP.md`, die Bestandsaufnahme vom 02.11.2026 in `BESTANDSAUFNAHME.md`. Hier die Funktionsliste:
+
 - [x] Aktivierungswort („Jarvis …“) als Alternative zum Dauer-Mikrofon, Folgefragen ohne Aktivierungswort
+- [x] Sprach-Engine auf dem Server: Silero VAD, adaptives Satzende mit Partials, Unterbrechen in 150 ms, Weitersprechen am Satzanfang, Metriken für Grafana
+- [ ] Sprach-Engine für iPad/iPhone (WebSocket über `tailscale serve`) und Raum-Satellit mit openWakeWord
+- [ ] Echo-Unterdrückung für den Sonos mit Referenzsignal (speexdsp) im Alltag erproben
 - [x] Timer, Wecker, Erinnerungen und geplante Befehle
 - [x] Meldungen von selbst (Geräte fertig, Termine, Speicher, NAS, neue Geräte) mit Ruhezeiten
 - [x] Einkaufs- und To-do-Liste, Routinen per Sprache
@@ -606,12 +772,20 @@ set JARVIS_PORT=8721& set JARVIS_STATE=%TEMP%\state_test.json& .venv\Scripts\pyt
 - [x] PDF in der Dokumentensuche (pypdf), Bildbeschreibung auf Nachfrage mit Karte je Bild
 - [ ] Maus- und Tastatursteuerung (bewusst nicht gebaut; nur als eigene, streng kontrollierte Erweiterung)
 - [ ] Größeres lokales Modell nur im Notbetrieb (VRAM teilen mit der GPU-Stimme)
-- [ ] Zentrale Bedienung: Bildschirm, Raum-Mikrofone, Sprecher-Erkennung, Zugriff vom Handy
-- [ ] Fokus-Sitzungen mit Ablenkungs-Hinweisen
+- [ ] Zentrale Bedienung: Bildschirm, Raum-Mikrofone, Sprecher-Erkennung (bewusst ausgelassen: ein Nutzer)
+- [x] Zugriff vom Handy: Vorschläge mit Ja/Nein-Knöpfen, Antwort über Home Assistant
+- [x] Fokus-Sitzungen mit Ablenkungs-Hinweisen
 - [ ] Bildschirm- und Kamera-Kontext auf Anfrage
 - [ ] Mehrere Nutzerprofile und Raum-Satelliten (ESP32)
 - [ ] Linux/macOS-Startskripte
-- [ ] Weitere Werkzeuggruppen (Medienserver, Dokumente, Hypervisor, Netzwerk-Controller)
+- [x] Weitere Werkzeuggruppen: Paperless (Dokumente), UniFi (Netzwerk-Controller), Jellyfin (Medienserver)
+- [ ] Hypervisor (Proxmox)
+- [x] Episodisches Gedächtnis (Gespräche, Garmin, Meldungen und Ausfälle je Tag), Gewohnheiten des Users, Garmin als Auslöser, Vorbereitung vors Losfahren, Strombudget, Wartungskalender, Stimme nach Tageszeit, Rückfrage mit Gedächtnis, Selbstkontrolle, Token-Kachel, Routinen-Vorschau
+- [x] Lagebericht aus Uptime Kuma, Sicherheitszentrale und Energie-Kreislauf, mit Meldungen von selbst
+- [x] Energie-Coach: Sonnenüberschuss vorhersagen, verschiebbare Geräte vorschlagen, selten genutzte Steckdosen merken
+- [x] Stromkosten je Gerät und Standby, Check beim Verlassen der Wohnung, Wochenbericht fürs Heimnetz, Sicherheitsbefunde per Sprache
+- [x] Willkommen zurück, Unwetter-Warnungen, Gewohnheiten im Haus (Routinen-Vorschläge, zu lange an), Durchsagen in anderen Räumen, Fire TV per Sprache
+- [x] Antworten über den Echo, Morgen-Briefing im Wohnzimmer, Rückfragen beim Schalten (heller, wieder aus, im Schlafzimmer auch)
 - [x] Automatisierte Tests für die Stimmen-Kette
 
 ---

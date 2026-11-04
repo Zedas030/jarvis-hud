@@ -50,7 +50,7 @@ def _say(*options):
 GROUP_RULES = [
     ("home", r"\b(licht|lampe|led\b|steckdose|schalt|kühlschrank|spülmaschine|waschmaschine|drucker|3d|filament|ams\b|bambu|zelt|bett\b|heizung|thermostat|temperatur im|grad im|luftreiniger|"
              r"ventilator|szene|wohnzimmer|schlafzimmer|gaming|küche|boiler|smart ?home|home ?assistant|"
-             r"solar|akku|speicher|strom|watt|sensor|luft|feucht|echo|fire ?tv|fernseher|tv\b)"),
+             r"solar|akku|speicher|strom|watt|überschuss|energie-?coach|sensor|luft|feucht|echo|fire ?tv|fernseher|tv\b)"),
     ("mail", r"\b(mail|e-mail|postfach|posteingang|newsletter|nachricht von|geschrieben|gelesen)"),
     ("calendar", r"\b(termin|kalender|eintragen|trag\w* .*ein|erinner|verabredung|meeting|wann (ist|habe))"),
     # "Was steht heute noch an?" got memory only, and Jarvis said he could not see the calendar
@@ -67,6 +67,8 @@ GROUP_RULES = [
     ("homelab", r"\b(pi-?hole|werbung|blockier|grafana|prometheus|homelab|internet|geschwindigkeit|bandbreite|mbit|"
                 r"download|upload|datenvolumen|daten (heute|verbraucht)|wlan|mesh|auslastung|cpu|verlauf|spitze|"
                 r"am höchsten|am meisten)"),
+    ("homelab", r"\b(lagebericht|uptime|kuma|sicherheitszentrale|sicherheitsbefund|sicherheitslage|nulleinspeisung|"
+                r"energie-?kreislauf)"),
     ("health", r"\b(schlaf|geschlafen|schritte|puls|garmin|body ?battery|stress|fitness|training|lauf|"
                r"gegessen|abendessen|alkohol|bier\b|wein\b|rückblick|wochenrückblick)"),
     ("music", r"\b(musik|spotify|song|lied|playlist|album|abspielen)"),
@@ -103,6 +105,16 @@ GROUP_RULES = [
     ("updates", r"\b(update|upgrade|aktualisier|firmware|neue version|auf dem neuesten stand|veraltet)"),
     ("audit", r"\b(was hast du (heute|gestern)? ?(alles )?(gemacht|getan|geschaltet)|protokoll deiner|audit|"
               r"was hast du ausgeführt)"),
+    # looking back: the conversation log, Garmin days, notices and incidents joined by date
+    ("episodes", r"\b(letzte woche|vorletzte woche|neulich|kürzlich|letztens|weißt du noch|damals|vor \w+ (tagen|wochen)|"
+                 r"als ich .{0,40}\b(war|hatte|lag)\b|worüber haben wir|was (habe|hab) ich dich .{0,30}gefragt|"
+                 r"wie war .{0,30}(schlaf|verbrauch|stress|puls|nacht|tag) .{0,30}\b(als|am|letzte|vor)\b)"),
+    ("paperless", r"\b(paperless|archiv|unterlagen|rechnung|vertrag|versicherung|police|kündigung|bescheid|steuer|"
+                  r"gescannt|was zahle ich für|wann läuft .{0,30}(vertrag|versicherung|abo)|vertragsnummer|kundennummer)"),
+    ("unifi", r"\b(unifi|wer ist .{0,20}(im|in meinem) (wlan|netz)|welche geräte .{0,20}(im|am) (wlan|netz)|access ?point|"
+              r"wlan[- ]?clients?|empfang .{0,20}(wlan|gerät))"),
+    ("media", r"\b(jellyfin|plex|mediathek|serie|film|folge|staffel|weiter ?(schauen|gucken|sehen)|zuletzt (geschaut|gesehen|geguckt)|"
+              r"bibliothek|was gibt es neues (zum|an) (schauen|filmen|serien))"),
 ]
 # A short yes/no while a proposal is open: bring the proposal tools along.
 PROPOSAL_REPLY = re.compile(r"^\W*(ja|jo|klar|gerne?|ok(ay)?|mach( das)?|einverstanden|passt|nein|nee|lieber nicht|"
@@ -192,9 +204,14 @@ def _sun(n):
 
 
 def _weather(n):
-    golf = _has(n, "golf")
+    # Golf only as a weather question ("Kann ich morgen golfen?"); "Ich habe morgen eine Trainerstunde
+    # zum Golfen, was empfiehlst du?" or a question about new clubs is a conversation for the LLM.
+    golf = _has(n, "golf") and len(n.split()) <= 14 and not _has(n, "trainer", "stunde", "schläger", "empf",
+                                                                   "hältst", "tipp", "technik", "schwung", "handicap")
     if not (_has(n, "wetter", "regnet", "regen", "temperatur draußen", "wie warm", "wie kalt", "sonne scheint")
-            or (golf and _has(n, "kann ich", "taugt", "wetter", "lohnt", "geht", "spielen", "heute", "morgen"))):
+            or (golf and (_has(n, "kann ich", "taugt", "wetter", "golfwetter", "lohnt", "passt")
+                          or (_has(n, "geht", "spielen") and len(n.split()) <= 7)
+                          or (_has(n, "heute", "morgen") and len(n.split()) <= 4)))):
         return None
     if _has(n, "woche", "wochenende", "übermorgen", "nächste"):
         return None                              # longer outlook: let the LLM do it
@@ -308,12 +325,37 @@ MUSIC = [
 ]
 
 
+def _music_target(n):
+    """The room the music should go to, when a speaker room is named: "Musik vom Schlafzimmer ins Wohnzimmer",
+    "mach die Musik aufm Schlafzimmer im Wohnzimmer an". The room after "vom / aus dem / aufm / auf dem" is
+    where it plays now, so the other one is the target; with one room named, that is the target."""
+    import speakers
+    try:
+        rooms = speakers.rooms()
+    except Exception:  # noqa: BLE001
+        return None
+    found = sorted((m.start(), r) for r in rooms for m in re.finditer(r"\b" + re.escape(r.lower()) + r"\b", n))
+    if not found:
+        return None
+    targets = [r for pos, r in found
+               if not re.search(r"\b(vom|von|aus|aufm|auf dem|auf der|von dem|von der|aus dem|aus der) $", n[:pos])]
+    return targets[0] if targets else found[-1][1]
+
+
 def _music(n):
     if not _has(n, "musik", "spotify", "song", "lied", "titel", "track") and not re.search(
             r"\b(lauter|leiser)\b", n) or _has(n, "jarvis.*(lauter|leiser)", "stimme", "sprich"):
         return None
     if _has(n, "such", "spiel .* von", "spiele .* von", "playlist", "album"):
         return None                               # searching needs the LLM to pick the query
+    target = _music_target(n)
+    if target:
+        import jarvis_mcp
+        try:
+            text = jarvis_mcp._music({"action": "transfer", "room": target})
+        except Exception:  # noqa: BLE001
+            return None
+        return f"{text[:-1]}, {_sir()}." if _sir() and text.endswith(".") else text
     for pat, action, text in MUSIC:
         if re.search(pat, n):
             import jarvis_mcp
@@ -477,6 +519,8 @@ def _home(n):
     if _has(n, "wenn", "automati", "jeden", "täglich", "um \\d", "timer", "später", "warum", "ob ",
             "in \\w+ (sekunden?|minuten?|stunden?)\\b"):
         return None                                # schedules/conditions: scheduler or LLM
+    if _has(n, "musik\\b", "spotify\\b") and _music_target(n):
+        return None                                # "mach die Musik im Wohnzimmer an": the music, not a switch
     try:
         devs = _devices()
     except Exception:  # noqa: BLE001
@@ -496,7 +540,13 @@ def _home(n):
     elif not best or len(best) > 4:
         return None
     if len(best) > 1 and not hint and not all(d["dom"] == "light" for d in best):
-        return None                                # "mach Wohnzimmer an" with a lamp and a socket — ask the LLM
+        # "mach Wohnzimmer an" with a lamp and a socket: an answer the user gave once is kept
+        # (learning.choice); otherwise ask back locally and remember the answer — no model needed
+        chosen = learning.choice(n)
+        picked = [d for d in best if d["eid"] in chosen]
+        if not picked:
+            return _ask_choice(n, best)
+        best = picked
     service = "turn_on" if (on or pct or scene) and not off else "turn_off"
     # Only what keeps things alive is protected — a lamp called "LED PC" is just a lamp.
     if service == "turn_off" and any(d["dom"] != "light" and (PROTECTED_OFF.search(d["name"])
@@ -513,11 +563,105 @@ def _home(n):
         if not res.startswith("Erledigt"):
             return None
         done.append(d["name"])
+    _SWITCHED.update(devs=best, service=service, at=time.time())
     what = " und ".join(done)
     state = f"auf {pct.group(1)} Prozent" if pct else ("aktiviert" if best[0]["dom"] == "scene"
                                                          else "an" if service == "turn_on" else "aus")
     return _say(f"{what} ist {state}, {_sir()}.", f"Erledigt, {_sir()}. {what} {state}.") \
         .replace(" ist", " sind", 1 if len(done) > 1 else 0)
+
+
+# An ambiguous target ("mach Wohnzimmer an": a lamp and a socket) is asked back once; the
+# answer names one of them ("die Lampe", "beide") and is kept for that wording (learning.choice).
+CHOICE_S = 60
+_CHOICE = {"n": "", "devs": [], "at": 0.0}
+
+
+def _ask_choice(n, devs):
+    _CHOICE.update(n=n, devs=devs, at=time.time())
+    names = [d["name"] for d in devs]
+    return f"Meinen Sie {', '.join(names[:-1])} oder {names[-1]}, {_sir()}? Oder beide?".replace(", ?", "?")
+
+
+def _choice(n):
+    if time.time() - _CHOICE["at"] > CHOICE_S or not _CHOICE["devs"]:
+        return None
+    s = re.sub(r"\b(bitte|jarvis|sir|die|der|das|den|meine|ich meine|meinte)\b", " ", n).strip()
+    devs = _CHOICE["devs"]
+    if re.fullmatch(r"\s*(beide|alle|beides|alle beide)\s*", s):
+        picked = devs
+    else:
+        words = set(s.split())
+        picked = [d for d in devs if d["words"] & words]
+        if len(picked) != 1:
+            picked = [d for d in devs if _norm(d["name"]).strip() in s] or picked
+        if len(picked) != 1:
+            return None                            # not an answer to the question: on to the other handlers
+    import learning
+    learning.remember_choice(_CHOICE["n"], [d["eid"] for d in picked])
+    asked = _CHOICE["n"]
+    _CHOICE.update(n="", devs=[], at=0.0)
+    return _home(asked)
+
+
+# Follow-ups to the last switching, within FOLLOW_S: "heller", "dunkler", "auf 30 Prozent",
+# "wieder aus", "und im Schlafzimmer auch". Short words with no device in them, so they only
+# count right after Jarvis switched something; otherwise they go on to the LLM as before.
+FOLLOW_S = 120
+STEP_PCT = 25
+_SWITCHED = {"devs": [], "service": "", "at": 0.0}
+_ROOM_WORD = re.compile(r"\w*zimmer|küche|kueche|bad|flur|diele|büro|buero|keller|garten|balkon|links|rechts")
+_LEAD = r"(?:(?:und|jetzt|dann|doch|noch|bitte|mach|machs|mach es|mach sie|das|die|den|es|sie)\s+)*"
+
+
+def _followup(n):
+    s = re.sub(r"\s+(bitte|sir|jarvis)\b", "", n.strip())
+    if time.time() - _SWITCHED["at"] > FOLLOW_S or not _SWITCHED["devs"] or len(s.split()) > 6:
+        return None
+    devs = _SWITCHED["devs"]
+    lights = [d for d in devs if d["dom"] == "light"]
+    import jarvis_mcp
+
+    def send(targets, service, data=None):
+        for d in targets:
+            res = jarvis_mcp._home("home_control", {"entity_id": d["eid"], "service": service, "data": data or {}})
+            if not res.startswith(("Erledigt", "Gesendet")):
+                return False
+        _SWITCHED["at"] = time.time()
+        return True
+
+    what = " und ".join(d["name"] for d in (lights or devs))
+    m = re.fullmatch(_LEAD + r"(?:etwas|ein bisschen|ein wenig|viel|noch)?\s*(heller|dunkler)", s)
+    if m and lights:
+        step = STEP_PCT if m.group(1) == "heller" else -STEP_PCT
+        if send(lights, "turn_on", {"brightness_step_pct": step}):
+            return _say(f"{m.group(1).capitalize()}, {_sir()}.", f"{what} ist {m.group(1)}, {_sir()}.")
+        return None
+    m = re.fullmatch(_LEAD + r"(?:auf )?(\d{1,3}) ?(?:%|prozent)", s)
+    if m and lights:
+        pct = max(1, min(100, int(m.group(1))))
+        if send(lights, "turn_on", {"brightness_pct": pct}):
+            return f"{what} auf {pct} Prozent, {_sir()}."
+        return None
+    m = re.fullmatch(_LEAD + r"(?:wieder |doch )?(an|aus|ein)(?: machen| schalten)?", s)
+    if m:
+        service = "turn_off" if m.group(1) == "aus" else "turn_on"
+        if service == "turn_off" and any(d["dom"] != "light" and PROTECTED_OFF.search(d["name"] + " " + d["eid"])
+                                         for d in devs):
+            return None
+        if send(devs, service):
+            _SWITCHED["service"] = service
+            state = "an" if service == "turn_on" else "aus"
+            return f"{' und '.join(d['name'] for d in devs)} {'sind' if len(devs) > 1 else 'ist'} {state}, {_sir()}."
+        return None
+    m = re.fullmatch(_LEAD + r"(?:auch )?(?:im|in der|in|am|beim) ([a-zäöüß]+(?: [a-zäöüß]+)?) auch", s) \
+        or re.fullmatch(_LEAD + r"auch (?:im|in der|in|am|beim) ([a-zäöüß]+(?: [a-zäöüß]+)?)", s)
+    if m:
+        # the same kind of thing in the other room: "TV Schlafzimmer" -> "tv", then the new room
+        thing = " ".join(w for w in _norm(devs[0]["name"]).split() if not _ROOM_WORD.fullmatch(w))
+        state = "an" if _SWITCHED["service"] == "turn_on" else "aus"
+        return _home(f"{thing} {m.group(1)} {state}".strip())
+    return None
 
 
 # Some handlers need the original wording (what to remind of, what goes on the
@@ -544,6 +688,9 @@ def _routine(n):
     import routines
     if re.search(r"\b(welche|was für|zeig\w*|liste?)\b.*\broutinen\b", n):
         return routines.describe()
+    dry = routines.explain_request(_raw())
+    if dry:
+        return dry                                 # "Was passiert, wenn ich Gute Nacht sage?" — nothing runs
     r = routines.find(_raw())
     return routines.run(r, run_local) if r else None
 
@@ -581,6 +728,99 @@ def _report(n):
     return learning.spoken_report(7)
 
 
+_SHIFT = r"(spülmaschine|geschirrspüler|waschmaschine|trockner|boiler|drucker|druck|wäsche)"
+
+
+def _coach(n):
+    usage = re.search(r"\b(?:den|die|das)\s+(\w[\w-]*)\s+(?:nutze|benutze|brauche)\s+ich\s+(?:\w+\s+)?"
+                      r"(oft|häufig|regelmäßig|ständig|täglich|selten|kaum|nie)\b|"
+                      r"\b(?:ich\s+)?(?:nutze|benutze|brauche)\s+(?:ich\s+)?(?:den|die|das)\s+(\w[\w-]*)\s+(?:\w+\s+)?"
+                      r"(oft|häufig|regelmäßig|ständig|täglich|selten|kaum|nie)\b", n)
+    if usage:
+        word, how = (usage.group(1), usage.group(2)) if usage.group(1) else (usage.group(3), usage.group(4))
+        import energy_coach
+        return energy_coach.set_usage(word, how not in ("selten", "kaum", "nie"))
+    if not re.search(r"\b(energie-?coach|energie ?tipp|strom ?tipp|sonnenüberschuss|überschuss|sonnenstrom|"
+                     r"wann (soll|sollte|kann|könnte) ich .{0,40}" + _SHIFT + r"|"
+                     r"lohnt (es )?sich .{0,30}(" + _SHIFT[1:-1] + r"|strom|sonne)|"
+                     r"(" + _SHIFT[1:-1] + r") .{0,30}(jetzt|gerade|heute) .{0,15}(starten|anmachen|einschalten|laufen))", n):
+        return None
+    import energy_coach
+    return energy_coach.report()
+
+
+def _announce(n):
+    m = re.match(r"^\s*(?:jarvis[,\s]+)?(?:sag|sage|mach eine durchsage|durchsage)\s+(?:bitte\s+)?"
+                 r"(?:im|in der|ins|in die|in den)\s+([\wäöüß]+)\s*[:,]?\s*(?:dass\s+)?(.+?)\s*$", _raw(), re.I)
+    if not m:
+        return None
+    import speakers
+    if m.group(1).lower() not in (r.lower() for r in speakers.rooms()):
+        return None                                # not a room with a speaker: Claude decides
+    return speakers.announce(m.group(1), m.group(2))
+
+
+_TV_DO = [("pause", r"pause|anhalten|stopp"), ("weiter", r"weiter|fortsetzen|abspielen"),
+          ("lauter", r"lauter"), ("leiser", r"leiser"), ("stumm", r"stumm|ton aus"), ("laut", r"ton an|ton wieder"),
+          ("home", r"startseite|startbildschirm|home"), ("zurueck", r"zurück")]
+
+
+def _tv(n):
+    if not re.search(r"\b(fernseher|fire ?tv|glotze)\b", n):
+        return None
+    on_tv = r"\s+(?:auf|am)\s+(?:dem\s+)?(?:fernseher|fire ?tv)"
+    app = (re.search(r"\b(?:öffne|starte|zeig mir|mach)\s+(?:mal\s+)?([\wäöüß+.-]+(?: [\wäöüß+.-]+)?)" + on_tv, n)
+           or re.match(r"^\s*(?:jarvis\s+)?([\wäöüß+.-]+)" + on_tv + r"\s*$", n))
+    import speakers
+    if app and not re.fullmatch(r"(den|die|das|ton|es|was|etwas|\w+ (an|aus|lauter|leiser))", app.group(1)):
+        word = app.group(1)
+        raw = re.search(re.escape(word), _raw(), re.I)
+        return speakers.tv("app", raw.group(0) if raw else word)
+    for cmd, pat in _TV_DO:
+        if re.search(r"\b(" + pat + r")\b", n):
+            return speakers.tv(cmd)
+    return None                                    # "Fernseher an/aus" stays with the plug (_home)
+
+
+def _alerts(n):
+    if not re.search(r"\b(unwetter|wetterwarnung|sturmwarnung|gewitterwarnung|glättewarnung|hitzewarnung|"
+                     r"warnungen? (des|vom) (dwd|wetterdienst)|dwd)", n):
+        return None
+    import weather_alerts
+    return weather_alerts.current()
+
+
+def _costs(n):
+    if not re.search(r"\b(stromkosten|stromfresser|standby|leerlauf ?verbrauch|was kostet (mich )?.{0,30}(strom|im monat|pro monat|im jahr)|"
+                     r"wie ?viel strom (verbraucht|braucht|zieht|frisst)|stromverbrauch|strom ?budget|"
+                     r"(liege|bin|bleibe) ich .{0,20}(im|unter|über) .{0,10}(budget|rahmen|plan))", n):
+        return None
+    import power_costs
+    if _has(n, "standby", "leerlauf", "stromfresser"):
+        return power_costs.report(standby=True)
+    if _has(n, "budget", "im rahmen", "im plan"):
+        return power_costs.report(budget=True)
+    m = re.search(r"\b(?:kostet (?:mich )?|verbraucht |braucht |zieht |frisst )(?:der|die|das|mein\w*)\s+(\w[\w-]*)", n)
+    return power_costs.report(m.group(1) if m and m.group(1) not in ("strom", "haus", "wohnung") else "")
+
+
+def _situation(n):
+    if re.search(r"\b(sicherheits(prüfung|check|scan)|sicherheitszentrale)\b.{0,25}\b(starten|start|laufen|neu|jetzt|durchlaufen)\b|"
+                 r"\b(starte|mach) (eine |einen )?(neue |neuen )?sicherheits(prüfung|check|scan)", n):
+        import situation
+        return situation.run_scan()
+    m = re.search(r"\b(lagebericht|lage im (haus|netz|homelab)|wie ist die lage|läuft alles|alles im grünen bereich|"
+                  r"(uptime )?kuma|sicherheitszentrale|sicherheitslage|sicherheitsbefunde?|nulleinspeisung|"
+                  r"energie-?kreislauf)", n)
+    if not m or _has(n, "warum", "erklär", "einricht", "behe", "repar", "wie geht das"):
+        return None                                # why/fix questions need Claude, not the status line
+    word = m.group(1)
+    topic = ("kuma" if "kuma" in word else "sicherheit" if "sicherheit" in word
+             else "energie" if "nulleinspeisung" in word or "energie" in word else "alles")
+    import situation
+    return situation.report(topic)
+
+
 def _emergency(n):
     import emergency
     return emergency.handle(n, deny_cards=EMERGENCY_HOOKS.get("deny"), cancel=EMERGENCY_HOOKS.get("cancel"))
@@ -609,7 +849,54 @@ def _tasks(n):
     return tasks.handle(n)
 
 
-LOCAL_HANDLERS = [_emergency, _personality, _context, _tasks, _desktop, _routine, _timers, _lists, _pronounce, _report, _pc, _commute, _parcels, _printer, _home_state, _climate, _home,
+def _focus(n):
+    import focus
+    return focus.handle(n)
+
+
+def _daytime(n):
+    import daytime
+    return daytime.handle(n)
+
+
+def _episodes(n):
+    import episodes
+    return episodes.handle(n)
+
+
+def _wellbeing(n):
+    import wellbeing
+    return wellbeing.handle(n)
+
+
+def _maintenance(n):
+    import maintenance
+    return maintenance.handle(n)
+
+
+def _unifi(n):
+    import unifi
+    return unifi.handle(n)
+
+
+def _media(n):
+    import jellyfin
+    return jellyfin.handle(n)
+
+
+def _selfcheck(n):
+    import selfcheck
+    return selfcheck.handle(n)
+
+
+def _habits(n):
+    import user_habits
+    return user_habits.handle(n)
+
+
+LOCAL_HANDLERS = [_emergency, _choice, _personality, _focus, _daytime, _context, _tasks, _desktop, _routine, _timers, _lists, _pronounce,
+                  _report, _selfcheck, _habits, _episodes, _wellbeing, _maintenance, _situation, _coach, _costs, _announce, _tv, _alerts,
+                  _unifi, _media, _pc, _commute, _parcels, _printer, _followup, _home_state, _climate, _home,
                   _music, _time, _date, _sun, _weather, _solar, _nas, _pi]
 
 

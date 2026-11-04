@@ -52,6 +52,40 @@ download.avm.de) and smart-home firmware HA lists without an update entity (comp
 device of the same model in the house). Checking talks to version.home-assistant.io, download.avm.de and
 the image registries anonymously — it sends image names, nothing about the house.
 
+## Sonos clip server (`sonos.py`)
+
+With `JARVIS_SONOS` set, a second listener runs on the PC's LAN address (`JARVIS_SONOS_PORT`, default 8723),
+because a Sonos only plays what it fetches itself. It serves nothing but voice clips and the live voice stream of the
+current answer (which ends a few seconds after its last sentence): GET/HEAD only,
+a random 128-bit name per clip, gone after 10 minutes, and only to private addresses. It reads nothing and takes
+no commands. Which speaker a device uses is a per-device choice in `state.json` (`speech_outputs`) and only names
+from `JARVIS_SONOS` are accepted.
+
+Talking over him: once a voice has lasted ~0.4 s during his answer he pauses, and that clip is transcribed on the PC
+even when the device's own wake word did not hear "Jarvis" — the user is in a conversation with him then. Without his
+name it becomes a request only with real words, no TV/sport playing and not mostly his own words (his voice from the
+Sonos); otherwise he goes on and nothing is stored.
+
+## Voice engine (`voice_ws.py`, `voice_engine.py`)
+
+The engine listens on `127.0.0.1:8724` (`config/voice.yaml` → `engine.bind/port`). The first message of a
+connection must carry the HUD's per-launch token, otherwise the socket is closed; a paired device's cookie
+names the device. Microphone frames never leave the machine: Silero VAD and Whisper run locally, only the
+transcript goes where `/api/run` always sent it. The engine calls `/api/run`, `/api/cancel` and
+`/api/permission/answer` on the loopback with the same token, host and origin checks as the HUD. An
+interruption clip is transcribed without "Jarvis" only while he was speaking (the user is in a conversation);
+without real words, with a stop word or as his own echo nothing is stored. `engine.debug_audio` writes
+segments to `logs/voice_debug/` — off by default, local only.
+
+## Logs and metrics
+
+`logs/jarvis.log` (`jarvis_log.py`, JSON lines, 5 MB × 3) holds warnings and errors of every module with
+the exception text, never a request body, a mail or a password: modules log what failed, not what was
+said. The MCP server writes `logs/jarvis-mcp.log`. `GET /metrics` (`metrics.py`, no token, loopback
+only) exposes counts and durations: routes, tokens per model, cards by outcome, background jobs,
+stand-in cool-downs, HTTP status per API path, warnings per module, and today's tool calls by action
+class from the audit log — numbers and fixed label values, no text from the user.
+
 ## Confirmation cards
 
 - Shown in the HUD via Claude Code's `--permission-prompt-tool` (or `fallback_llm.run_tool` for the
@@ -60,6 +94,62 @@ the image registries anonymously — it sends image names, nothing about the hou
   and the consequence (`policy.describe`). Only "bestätigt"/"nein" by voice — a bare "ja" does not count.
 - Each card covers exactly one call; an earlier yes never authorises a later action.
 - Without an open HUD nobody can confirm, so the answer is no.
+- `pi_run` (one shell command on the Pi over ssh) is CONFIRM: the card shows the exact command. The code
+  refuses a short list of destructive commands (`rm -rf /`, `mkfs`, `dd` onto a device, fork bomb, `shred`,
+  `wipefs`) before the card; everything else is the user's decision on the card. 120 s limit, output cut.
+
+## Leaving home (`away_check.py`)
+
+When the person entity in Home Assistant has been away for `JARVIS_AWAY_MINUTES`, Jarvis reads what still runs (lights on, media playing, listed plugs above their wattage), pushes one message to the phone and stores one `switch_off` proposal. Nothing is switched until that proposal is accepted on a card; accepting goes through `home_control`, so blocked domains stay blocked. Only the time of the last handled leaving is kept (`state.json` → `away_checked`), never a log of comings and goings.
+
+Coming back after `JARVIS_WELCOME_MINUTES`: one spoken welcome from the notice log (`events.py` → `logs/notices.jsonl`, the last 300 of Jarvis' own announcements); the open `switch_off` proposal is dropped.
+
+## The phone as a card (`phone_actions.py`)
+
+A proposal that matters on the way (leaving home, leaving for an appointment) goes to the phone with
+two buttons. The answer never reaches Jarvis directly: the companion app fires an event in Home
+Assistant, a user-made automation writes it into a text helper, and Jarvis reads that helper with the
+other states. `JARVIS_YES_<id>` runs `proposals.accept` for exactly that id — only an open proposal
+Jarvis created himself, through the same code as the card (blocked domains stay blocked), audited as
+`card` with reason `phone`; `JARVIS_NO_<id>` declines. Every helper value is handled once (its value
+and `last_changed` are remembered) and the helper is emptied afterwards. Anything else in the helper is
+ignored. Whoever controls the phone or Home Assistant can confirm a proposal this way — the same trust
+as the HUD on a paired device.
+
+## Leaving for an appointment (`departure.py`)
+
+Like leaving home: nothing is switched. The proposal may also carry thermostats (`config/home.json` →
+`departure`) that `proposals.accept` sets to the away temperature through `home_control`, so the
+`climate_groups` restriction and the 5–30 °C range apply unchanged. A `climate_away` of 0 means
+"switch off": the proposal then calls `turn_off`, which `home_control` maps to `set_hvac_mode off`.
+
+## Ask-back choices (`learning.py` → `choices`)
+
+When a switching request fits a lamp and a socket alike, the router asks back instead of calling the
+model. The answer is kept for that wording in `config/learned.json` → `choices` without a card: the
+user said it himself, in the same breath. Choices only ever select among the devices the router had
+already matched and may switch; every protection (router, PC, fridge, blocked domains) still applies.
+`skill_list` shows them; deleting the entry removes the choice.
+
+## Focus sessions (`focus.py`)
+
+A session holds `say` notices (shown, not spoken) — alarms and `critical` notices still ring. The
+distraction check only reads the title of the active window on this PC, never its content, and
+nothing is stored beyond the minutes counted. The playlist is started through the Spotify account.
+
+## Other rooms and the TV (`speakers.py`)
+
+`announce` (LIMITED_WRITE) speaks text in a room from `config/home.json` → `speakers`: an Echo through `notify.alexa_media_*`, a Sonos through `tts.speak`. `tv_control` (LIMITED_WRITE) sends a command to the Fire TV's Alexa as if spoken there — so only fixed commands (pause, lauter, …) and app names reach it: letters, digits, spaces, at most 30 characters, never words like kaufen, bestellen, anrufen, Routine or Skill. Nothing can be bought or called through Jarvis. Both go through Home Assistant; the untrusted-content card applies as for any LIMITED_WRITE.
+
+A device's answers can be read aloud by an Echo instead (`alexa_voice.py`, chosen on the HUD's output button like a Sonos): the answer text goes to Amazon through `notify.alexa_media_*` (type tts) — the same text Jarvis would speak, nothing else. The morning briefing (`morning_echo.py`) only speaks, once a day, from fixed text; the follow-ups in the router ("heller", "wieder aus", "im Schlafzimmer auch") only act on what Jarvis switched in the last two minutes, and never switch protected devices off.
+
+## Weather warnings and habits
+
+`weather_alerts.py` asks api.brightsky.dev with the weather coordinates only. `house_habits.py` reads ten days of Home Assistant history for lights and the plugs in `away_check` (not `habits_ignore`); it only proposes routines (card) and mentions lights left on — it never switches.
+
+## Security findings (`situation.py`)
+
+`security_findings` reads the security centre's report (untrusted: device names come from DHCP). `security_accept` is CONFIRM: one finding, a reason of at least one sentence, 30/90/365 days — never open-ended (that stays on the website). `security_scan` only asks for a quick scan, which reads.
 
 ## Untrusted content
 

@@ -13,6 +13,11 @@ Kinds and what accepting does:
   reminder  a reminder → the scheduler in the HUD server
   idea      needs new code: only noted as wanted, Jarvis never changes his own code
   calendar  bookings found in mail (mail_events.py) -> into the calendar
+  switch_off  what still runs after the user left home (away_check.py) or before he leaves for an
+              appointment (departure.py) -> turned off through home_control; "climate" in the payload
+              sets thermostats to the away temperature
+  habit       a question the user asks at the same time of day (user_habits.py) -> a job that says
+              the answer by itself or fetches it into the cache beforehand
 
 Stored in its own file (JARVIS_PROPOSALS), not in state.json, because both the
 server and jarvis_mcp.py (a separate process) write it. Proposals expire after
@@ -28,7 +33,7 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 PATH = pathlib.Path(os.environ.get("JARVIS_PROPOSALS", ROOT / "logs" / "proposals.json"))
 DAYS = int(os.environ.get("JARVIS_PROPOSAL_DAYS", "7"))
-KINDS = ("rules", "routine", "reminder", "idea", "skill", "calendar")
+KINDS = ("rules", "routine", "reminder", "idea", "skill", "calendar", "switch_off", "habit")
 _LOCK = threading.Lock()
 
 
@@ -108,6 +113,13 @@ def describe(p):
         listed = mail_events.card_lines(pl.get("ids"))
         return "Diese Termine aus Ihren Mails eintragen:\n" + ("\n".join(f"• {t}" for t in listed)
                                                                or "(nicht mehr gefunden)")
+    if p["kind"] == "switch_off":
+        return "Ausschalten:\n" + "\n".join(f"• {label}" for label in pl.get("labels") or pl.get("entities") or [])
+    if p["kind"] == "habit":
+        import user_habits
+        when = user_habits._when(pl.get("weekdays") or range(7), pl.get("at", "08:00"))
+        return (f"{when.capitalize()}: „{pl.get('text', p['title'])}“ "
+                + ("von selbst sagen." if pl.get("mode") == "say" else "vorab holen, damit die Antwort sofort kommt."))
     if p["kind"] == "skill":
         import learning
         import skill_factory
@@ -154,6 +166,21 @@ def accept(pid, internal=None):
     elif p["kind"] == "calendar":
         import mail_events
         result = mail_events.add(pl.get("ids"))
+    elif p["kind"] == "switch_off":
+        import jarvis_mcp
+        # the same gate as every other switch: blocked domains stay blocked
+        parts = [jarvis_mcp._home("home_control", {"entity_id": e, "service": "turn_off"}) or ""
+                 for e in pl.get("entities") or []]
+        for e, temp in (pl.get("climate") or {}).items():     # only climate_groups entities pass _home
+            if float(temp) <= 0:                            # departure "climate_away": 0 = switch the thermostat off
+                parts.append(jarvis_mcp._home("home_control", {"entity_id": e, "service": "turn_off"}) or "")
+            else:
+                parts.append(jarvis_mcp._home("home_control", {"entity_id": e, "service": "set_temperature",
+                                                               "data": {"temperature": temp}}) or "")
+        result = " ".join(parts)
+    elif p["kind"] == "habit":
+        import user_habits
+        result = user_habits.add_job(pl)
     else:
         result = "Vorgemerkt."
     resolve(pid, "accepted")

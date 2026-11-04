@@ -81,8 +81,15 @@ def _prompt(items):
         lines.append(f"[{day} {t}] User: {user[:300]}\nJarvis: {reply[:400]}")
         if _CORRECTION.search(user):
             hints.append(f"[{day} {t}] {user[:120]}")
+    try:
+        import selfcheck
+        misses = selfcheck.hints()
+    except Exception:  # noqa: BLE001
+        misses = []
     return ("Gespräche seit der letzten Auswertung:\n\n" + "\n\n".join(lines) +
             ("\n\nMögliche Korrekturen des Users:\n" + "\n".join(hints) if hints else "") +
+            ("\n\nMögliche Fehlschläge (der User fragte sofort noch einmal, die erste Antwort passte wohl nicht):\n"
+             + "\n".join(misses) if misses else "") +
             "\n\nAntworte mit JSON: {\"gut\": [...], \"korrigiert\": [...], \"lehren\": [...]}\n"
             "- gut: was gut lief (höchstens 3)\n"
             "- korrigiert: was der User korrigiert hat und was richtig gewesen wäre (höchstens 3)\n"

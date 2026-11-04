@@ -77,6 +77,11 @@ def _energy(states):
             f"Solar gerade {solar:.0f} W, heute erzeugt {gen:.1f} kWh.")
 
 
+def _coach():
+    import energy_coach
+    return energy_coach.morning_line()
+
+
 BATTERY_LOW = int(os.environ.get("JARVIS_BATTERY_LOW", "25"))
 # The phone's own battery is noise at breakfast.
 BATTERY_IGNORE = {e.strip() for e in os.environ.get("JARVIS_BATTERY_IGNORE", ",".join(profile.ha("battery_ignore", []))).split(",")}
@@ -123,7 +128,7 @@ def morning_block():
         states = _ha_states()
     except Exception:  # noqa: BLE001
         pass
-    for part in (_weather, lambda: _energy(states), lambda: _batteries(states), _mail_count):
+    for part in (_weather, lambda: _energy(states), _coach, lambda: _batteries(states), _mail_count):
         try:
             text = part()
         except Exception:  # noqa: BLE001 — a dead source must not block the conversation
@@ -131,11 +136,23 @@ def morning_block():
         if text:
             lines.append("- " + text)
     lines.append("- Termine: siehe Kalender oben.")
+    gentle = _gentle_line()
     return ("## Morgenbriefing — erstes Gespräch heute\n"
-            "Beginne deine Antwort mit einem kurzen gesprochenen Morgenbriefing (drei bis vier Sätze): "
-            "Termine, Wetter mit Einschätzung, ob es zum Golfen taugt, Ladestand des Speichers, ungelesene Mails, "
-            "und fast leere Batterien, falls welche gemeldet sind. "
-            "Danach geh auf die Nachricht des Users ein.\n" + "\n".join(lines))
+            + ("Beginne mit einem sehr kurzen, ruhigen Morgenbriefing (zwei Sätze: Termine und Wetter), ohne "
+               "Pointe und ohne Vorschläge. " + gentle if gentle else
+               "Beginne deine Antwort mit einem kurzen gesprochenen Morgenbriefing (drei bis vier Sätze): "
+               "Termine, Wetter mit Einschätzung, ob es zum Golfen taugt, Ladestand des Speichers, ungelesene Mails, "
+               "und fast leere Batterien, falls welche gemeldet sind. ")
+            + "Danach geh auf die Nachricht des Users ein.\n" + "\n".join(lines))
+
+
+def _gentle_line():
+    """The wellbeing hint for a bad night, '' otherwise (never a reason to fail the briefing)."""
+    try:
+        import wellbeing
+        return wellbeing.hint()
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 # ── live stars ───────────────────────────────────
@@ -255,7 +272,7 @@ def briefing_facts():
         states = _ha_states()
     except Exception:  # noqa: BLE001
         pass
-    for part in (_weather, lambda: _energy(states), lambda: _batteries(states), _mail_count):
+    for part in (_weather, lambda: _energy(states), _coach, lambda: _batteries(states), _mail_count):
         try:
             text = part()
         except Exception:  # noqa: BLE001 — a dead source must not block the briefing
@@ -274,4 +291,7 @@ def briefing_facts():
             lines.append("- " + agenda.split("\n", 1)[-1].replace("\n", "; "))
     except Exception:  # noqa: BLE001
         pass
+    gentle = _gentle_line()
+    if gentle:
+        lines.append("- Hinweis: " + gentle + " Nur zwei Sätze: Termine und Wetter.")
     return "\n".join(lines)

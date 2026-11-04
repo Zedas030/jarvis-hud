@@ -95,7 +95,7 @@ function updateMicButton() {
   else if (Live.armed && typeof OnDevice !== 'undefined' && OnDevice.gate() && !Wake.awake()) { st = 'sleeping'; text = Ambience.hint(); }
   else if (Live.armed) { st = 'hearing'; text = 'Höre dich …'; }
   else if (Live.sending) { st = 'busy'; text = 'Verstehe …'; }
-  else if (Live.speaking) { st = 'speaking'; text = 'Spricht · „Jarvis“ unterbricht'; }
+  else if (Live.speaking) { st = 'speaking'; text = (typeof VoiceClient !== 'undefined' && VoiceClient.on) ? 'Spricht · reinreden unterbricht' : 'Spricht · „Jarvis“ unterbricht'; }
   else if (running) { st = 'busy'; text = briefingActive ? 'Briefing · reden bricht ab' : 'Denkt …'; }
   else if (Ringing.on) { st = 'speaking'; text = 'Klingelt · reden = aus'; }
   else if (!Wake.awake()) { st = 'sleeping'; text = Ambience.hint(); }
@@ -500,6 +500,7 @@ async function loadStatus() {
   // Capabilities first — the mic and voice depend on these.
   window.__serverVoice = s.server_voice;
   window.__serverSTT = s.server_stt;
+  window.__voiceEngine = s.voice_engine || null;   // the server-side engine (voice-client.js) replaces Live when it runs
   safely(function () { setText('#pGateway', s.remote ? 'remote' : 'online :' + location.port); });
   safely(function () { setText('#pBrain', s.runtime === 'claude' ? (s.version || 'Claude CLI') : 'MOCK'); });
   safely(function () { setText('#pVoice', s.voice_name || (s.server_voice ? 'Fish Audio' : 'browser')); });
@@ -515,10 +516,12 @@ async function loadStatus() {
   safely(function () { if (s.listener) window.__listener = s.listener; });
   safely(function () { if (s.wake) Wake.configure(s.wake); });
   safely(function () { Ambience.house(s.ambience); });
+  safely(function () { Output.update(s.sonos); });
   safely(function () {
     window.__quiet = !!s.quiet;
     if (s.persona) { window.__persona = s.persona; if (!running) $('#toneNow').textContent = s.persona; }
     if (typeof s.night_volume === 'number') window.__nightVolume = s.night_volume;
+    if (typeof s.voice_factor === 'number') window.__voiceFactor = s.voice_factor;
   });
   safely(function () { if (s.timers) Timers.set(s.timers); });
   safely(function () {
@@ -640,8 +643,14 @@ function speakable(text) {
 async function transmit(message, opts) {
   message = (message || '').trim();
   if (!message) return;
-  if (running) { log('note', 'BUSY', 'still working — "' + message.slice(0, 36) + '" not sent'); return; }
   opts = opts || {};
+  if (typeof VoiceClient !== 'undefined' && VoiceClient.on && VoiceClient.ready) {
+    // the engine answers and speaks; its events come back through VoiceClient.onEvent
+    bubble('me', message);
+    VoiceClient.send(message, !!opts.typed, opts.speak !== false);
+    return;
+  }
+  if (running) { log('note', 'BUSY', 'still working — "' + message.slice(0, 36) + '" not sent'); return; }
   running = true;
   interruptSpeech();   // a new question ends whatever he was still saying
   speechReset();
@@ -652,6 +661,8 @@ async function transmit(message, opts) {
   if (graph) graph.setActivity(1);
   $('#toneNow').textContent = window.__persona || '—';
   typedRun = !!opts.typed;
+  // typed with a Sonos answering: music down now, as with "Jarvis" — the answer comes out of the room
+  if (typedRun && streamSpeak && Output.target) MusicHold.hold();
   setVoiceState('THINKING', 'hot');
   bubble('me', message);
   answerBubble = bubble('jarvis', '');
@@ -701,6 +712,7 @@ async function transmit(message, opts) {
 /* Stop talking and drop the rest of the answer (Escape, or talking over him).
    running is cleared right away so live mode can record the interruption. */
 function cancelRun() {
+  if (typeof VoiceClient !== 'undefined' && VoiceClient.on) { VoiceClient.stopAll('Abbruch'); running = false; return; }
   interruptSpeech();
   streamSpeak = false;
   if (activeCtl) activeCtl.abort();
@@ -849,8 +861,16 @@ function approvalBeep() {
 var stopSpeaking = null;
 
 function interruptSpeech() {
+  if (typeof VoiceClient !== 'undefined' && VoiceClient.on) {
+    if (!Live.speaking && !running) return false;
+    VoiceClient.stopAll('unterbrochen');
+    return true;
+  }
   if (!stopSpeaking && !Speech.active) return false;
   Speech.cancelled = true;
+  if (Speech.active || Speech.paused) sonosHalt(false);   // the Sonos stops too, and nothing waits there
+  Speech.paused = false;
+  if (Speech.onResume) { var go = Speech.onResume; Speech.onResume = null; go(); }
   // sentences already requested: stop their download, the provider need not finish them
   Speech.queue.forEach(function (it) { it.blob.then(function (v) { if (v && v.cancel) v.cancel(); }); });
   Speech.queue = [];
@@ -997,16 +1017,22 @@ var currentAudio = null;
   });
 })();
 
-/* What actually comes out: the slider, softer during the quiet hours (JARVIS_NIGHT_VOLUME). */
+/* What actually comes out: the slider, softer during the quiet hours (JARVIS_NIGHT_VOLUME), and a
+   little softer late in the evening or after a bad night (server: voice_factor). */
 function outVolume() {
-  return voiceVolume * (window.__quiet ? (window.__nightVolume == null ? 0.5 : window.__nightVolume) : 1);
+  var factor = typeof window.__voiceFactor === 'number' ? window.__voiceFactor : 1;
+  return voiceVolume * (window.__quiet ? (window.__nightVolume == null ? 0.5 : window.__nightVolume) : 1) * factor;
 }
 
 /* Spotify quieter while he talks (server: pc.duck). Released a moment after the
-   last sentence, so the music does not pump between sentences. */
+   last sentence, so the music does not pump between sentences. pc.duck only reaches the
+   Spotify app on this PC, so every utterance also holds the account's playing device
+   (spotify.hold) — his own notices too, not just answers after "Jarvis". MusicHold lets go
+   by itself once he is done; a hold already running for an answer is simply kept. */
 var Duck = { on: false, timer: null };
 function duckMusic(on) {
   clearTimeout(Duck.timer);
+  if (on) MusicHold.hold();
   var send = function (v) {
     if (Duck.on === v) return;
     Duck.on = v;
@@ -1143,6 +1169,7 @@ function playStream(vs) {
 /* Whatever fetchVoice produced: a finished blob, a stream, or a stream in a format
    MediaSource cannot take (the local voice sends wav) — that one is collected first. */
 function playVoice(v) {
+  if (v.sonos) return waitSonos(v);
   if (v instanceof Blob) return playBlob(v);
   if (v.mime === 'audio/mpeg') return playStream(v);
   return new Promise(function (resolve) {
@@ -1150,6 +1177,16 @@ function playVoice(v) {
     v.notify = check;
     check();
   }).then(function () { return playBlob(new Blob(v.chunks, { type: v.mime })); });
+}
+
+/* The speaker plays on its own; the HUD only keeps "speaking" until it is done, so the mic
+   does not open on top of the answer. Stop ends the wait, not the announcement. */
+function waitSonos(v) {
+  return new Promise(function (resolve) {
+    var t = setTimeout(done, Math.max(0, v.until - performance.now()));
+    function done() { clearTimeout(t); stopSpeaking = null; resolve(); }
+    stopSpeaking = done;
+  });
 }
 
 /* rescue (optional): hands back the whole clip as a Blob, for the AudioContext path above */
@@ -1211,11 +1248,12 @@ function playUrl(url, setup, onFinish, rescue) {
    after the whole answer: every finished sentence is sent to /api/speak right
    away (requests overlap with Claude still writing), and the clips play back
    in order. */
-var Speech = { queue: [], upTo: 0, active: false, cancelled: false, waiters: [] };
+var Speech = { queue: [], upTo: 0, active: false, cancelled: false, waiters: [], chain: Promise.resolve() };
 var MIN_CHUNK = 28;   // don't vocalise tiny fragments on their own
 
 function speechReset() {
-  Speech.queue = []; Speech.upTo = 0; Speech.cancelled = false;
+  Speech.queue = []; Speech.upTo = 0; Speech.cancelled = false; Speech.chain = Promise.resolve();
+  Live.echo = 0; Live.echoSince = 0;
 }
 
 /* Asks for the clip at once and resolves when the first bytes are there: with
@@ -1229,6 +1267,14 @@ function fetchVoice(text) {
     body: JSON.stringify({ text: text, stream: CAN_STREAM })
   }).then(function (res) {
     if (!res.ok) return null;
+    // a Sonos speaks for this device: the server answers with how long, not with sound
+    if ((res.headers.get('content-type') || '').indexOf('application/json') === 0) {
+      // "seconds" counts from this answer: the wait for the sentence may start later
+      return res.json().then(function (j) {
+        if (!j || !j.sonos) return null;
+        return { sonos: j.sonos, held: !!j.held, until: performance.now() + (Number(j.seconds) || 0) * 1000 };
+      });
+    }
     if (!CAN_STREAM || !res.body) return res.blob();
     var reader = res.body.getReader();
     var vs = { mime: (res.headers.get('content-type') || '').split(';')[0].trim(), chunks: [], done: false, notify: null,
@@ -1278,8 +1324,54 @@ function feedSpeech(full, final) {
 function queueSpeech(text) {
   text = text.trim();
   if (!stripTones(text)) return;
-  Speech.queue.push({ text: text, blob: fetchVoice(text) });
+  Speech.queue.push({ text: text, blob: askVoice(text) });
   playSpeechQueue();
+}
+
+/* A Sonos plays one stream that every sentence is appended to (sonos.py): they must arrive in order,
+   so each asks once the one before is in. The device's own clips may overlap. */
+function askVoice(text) {
+  if (!Output.target) return fetchVoice(text);
+  var blob = Speech.chain.then(function () { return fetchVoice(text); });
+  Speech.chain = blob.catch(function () {});
+  return blob;
+}
+
+/* ── talking over him ─────────────────────────
+   He pauses as soon as someone talks over him for a moment (Barge), and goes on with the sentence he
+   was in when nothing came of it — silence, a cough, an "mhm", his own voice from the speaker. Words
+   are the next request. On a Sonos the announcement stops and further sentences wait (sonos.stop). */
+function sonosHalt(hold) {
+  if (!Output.target) return Promise.resolve();
+  return fetch('/api/speak/stop', { method: 'POST', headers: headers({ 'content-type': 'application/json' }),
+    body: JSON.stringify({ hold: !!hold }) }).catch(function () {});
+}
+
+function pauseSpeech() {
+  if (!Speech.active || Speech.paused || Speech.cancelled) return false;
+  Speech.paused = true;
+  Speech.pausedAt = performance.now();
+  sonosHalt(true);
+  if (stopSpeaking) { var stop = stopSpeaking; stopSpeaking = null; stop(); }
+  log('note', 'VOICE', 'Pause — ich höre');
+  var at = Speech.pausedAt;   // a clip that never comes back (recorder broke) must not keep him silent
+  setTimeout(function () {
+    if (Speech.paused && Speech.pausedAt === at && !Barge.rec && !Barge.busy) resumeSpeech();
+  }, BARGE_MAX_PAUSED_MS + 10000);
+  return true;
+}
+
+function resumeSpeech() {
+  if (!Speech.paused) return;
+  Speech.paused = false;
+  // the Sonos threw away what it had; here only the interrupted clip is gone
+  if (Output.target) Speech.chain = Speech.chain.then(function () { return sonosHalt(false); });
+  Speech.queue.forEach(function (it) {
+    if (Output.target || it.again) { it.blob = askVoice(it.text); it.again = false; }
+  });
+  log('note', 'VOICE', 'weiter');
+  var go = Speech.onResume; Speech.onResume = null;
+  if (go) go();
 }
 
 async function playSpeechQueue() {
@@ -1293,8 +1385,17 @@ async function playSpeechQueue() {
       var item = Speech.queue.shift();
       var voice = await item.blob;
       if (Speech.cancelled) { if (voice && voice.cancel) voice.cancel(); break; }
-      if (voice) await playVoice(voice);
-      else await speakBrowser(item.text);
+      if (!Speech.paused && !(voice && voice.held)) {
+        if (voice) await playVoice(voice);
+        else await speakBrowser(item.text);
+      }
+      if (Speech.paused || (voice && voice.held)) {
+        // cut off (or kept back on the Sonos): this sentence again from its start once he goes on
+        item.again = true;
+        Speech.queue.unshift(item);
+        if (Speech.paused) await new Promise(function (resolve) { Speech.onResume = resolve; });
+        else { await new Promise(function (r) { setTimeout(r, 300); }); item.blob = askVoice(item.text); }
+      }
     }
   } finally {
     Speech.active = false;
@@ -1318,6 +1419,7 @@ function speechDrained() {
 /* Resolves when playback actually FINISHES, not when it starts — live mode
    needs that to know when it is safe to listen again. */
 async function speak(text) {
+  if (typeof VoiceClient !== 'undefined' && VoiceClient.on && VoiceClient.ready) return VoiceClient.say(text);
   setVoiceState('SPEAKING', 'hot');
   Live.speaking = true;
   duckMusic(true);
@@ -1347,6 +1449,45 @@ async function speak(text) {
     if (!Live.armed) setVoiceState(Live.on ? 'LISTENING' : 'IDLE', Live.on ? 'hot' : '');
   }
 }
+
+/* ── where this device's answers sound ───────
+   Per device, kept by the server (sonos.py): the iPad itself, or a Sonos in the house. The button
+   steps through them; it stays hidden while no speaker is set up (JARVIS_SONOS). */
+var Output = {
+  target: '', label: '', speakers: [],
+  update: function (o) {
+    if (!o) return;
+    Output.speakers = o.speakers || [];
+    Output.target = o.output || '';
+    Output.label = o.output_label || '';
+    Output.render();
+  },
+  render: function () {
+    var btn = $('#btnOutput');
+    if (!btn) return;
+    btn.hidden = !Output.speakers.length;
+    btn.textContent = Output.target ? '🔊 ' + Output.label : '🔈 Ton hier';
+    btn.classList.toggle('on', !!Output.target);
+  },
+  next: function () {
+    var ids = [''].concat(Output.speakers.map(function (sp) { return sp.id; }));
+    var target = ids[(ids.indexOf(Output.target) + 1) % ids.length];
+    fetch('/api/output', {
+      method: 'POST', headers: headers({ 'content-type': 'application/json' }),
+      body: JSON.stringify({ target: target })
+    }).then(function (res) { return res.ok ? res.json() : null; }).then(function (j) {
+      if (!j) return log('note', 'VOICE', 'Ausgabe nicht umgestellt');
+      Output.target = j.output || ''; Output.label = j.output_label || '';
+      Output.render();
+      log('note', 'VOICE', Output.target ? 'Antworten dieses Geräts kommen aus ' + Output.label : 'Antworten kommen wieder aus diesem Gerät');
+    }).catch(function () { log('note', 'VOICE', 'Ausgabe nicht umgestellt'); });
+  },
+  init: function () {
+    var btn = $('#btnOutput');
+    if (btn) btn.onclick = Output.next;
+    Output.render();
+  }
+};
 
 /* ── sound in the room ───────────────────────
    Music, a match or the TV talk all the time, and every "Jarvis"-like sound in them used to
@@ -1421,6 +1562,7 @@ var Wake = {
   heard: function () {
     Wake.lastHeard = performance.now();
     if (!Live.on) return;
+    if (typeof VoiceClient !== 'undefined' && VoiceClient.on) { VoiceClient.wakeHeard(); wakeChime(); return; }
     if (Live.speaking || Speech.active || Ringing.on) { interruptSpeech(); Ringing.stop(); }
     MusicHold.hold();
     Wake.open(Wake.cfg.window_s || 7);
@@ -1636,6 +1778,14 @@ var BARGE_AMBIENT = 2.2;   // ...and this much louder than steady background (TV
 var BARGE_SILENCE_MS = 550;   // a pause this long ends the clip — "Jarvis" alone is short
 var BARGE_MAX_MS = 6000;      // longer than this without a pause: check what is there
 var BARGE_STOP_ONLY = /^\W*(stopp?|halt|ruhe|still|sei (mal )?still|schon gut|danke|genug|warte|moment|pause)\W*$/i;
+var PAUSE_MS = 400;              // talking over him this long pauses him (shorter: a cough, an "mhm")
+var BARGE_SILENCE_PAUSED_MS = 1000;   // paused, he waits a little longer for the first word
+var BARGE_MAX_PAUSED_MS = 15000;      // ...and lets a whole request through
+var BARGE_FILLER = /^\W*(m+h*m+|h+m+|ä+h*m*|aha|okay|ok|genau|ach so|alles klar)\W*$/i;
+// On a Sonos the mic hears him as well (echo cancellation only knows the device's own speaker):
+var ECHO_FACTOR = 1.8;           // a voice must be this much louder than his loudest recent moment
+var ECHO_DECAY = 0.996;          // per frame (~16 ms): that moment fades over a few seconds
+var ECHO_WARMUP_MS = 1200;       // his first words from the Sonos teach the level, nobody barges in before
 var BRIEFING_BARGE_FACTOR = 1.6;  // while the briefing is being prepared, normal speech is enough
 var PTT_HOLD_MS = 350;     // hold the Live button this long = push-to-talk
 // Background music: the threshold follows a slow average of the room level, so
@@ -1732,8 +1882,8 @@ var Cap = {
 /* What the wake word on a phone or iPad did, in logs/wake_device.log on the PC: the HUD log
    on the iPad is out of reach when "Jarvis" is not heard. Scores and lengths only, no words. */
 var WakeLog = {
-  send: function (text) {
-    if (!window.__remote) return;
+  send: function (text, always) {
+    if (!window.__remote && !always) return;
     fetch('/api/wakelog', { method: 'POST', headers: headers({ 'content-type': 'application/json' }),
       body: JSON.stringify({ text: text }) }).catch(function () {});
   }
@@ -1860,6 +2010,9 @@ var Live = {
   async enable() {
     if (Live.on) return;
     if (!window.__serverSTT) await loadStatus();   // status may simply not be loaded yet
+    if (typeof VoiceClient !== 'undefined' && VoiceClient.wanted()) {
+      if (await VoiceClient.start()) { updateMicButton(); return; }
+    }
     if (!window.__serverSTT) {
       micProblem = 'blocked';
       $('#btnMic').title = 'Der Server meldet keine Spracherkennung — Jarvis-Fenster prüfen bzw. neu starten.';
@@ -2010,8 +2163,16 @@ var Live = {
       var lvl = Live.level();
       Live.meter(lvl);
       var t = performance.now();
+      BargeLog.frame(lvl, t);
       if (Barge.rec) { Barge.track(lvl, t); return; }
-      if (lvl > bargeLevel()) {
+      if (Output.target && !Speech.paused) {
+        var limit = bargeNow();
+        if (!Live.echoSince && lvl > bargeLevel()) Live.echoSince = t;
+        var warming = Live.echoSince && t - Live.echoSince < ECHO_WARMUP_MS;
+        Live.echo = warming || lvl <= limit ? Math.max(lvl, (Live.echo || 0) * ECHO_DECAY) : (Live.echo || 0) * ECHO_DECAY;
+        if (warming) return;
+      }
+      if (lvl > bargeNow()) {
         // Record from the first loud frame — waiting first would cut "Jar" off "Jarvis".
         if (!Ringing.on) { Barge.start(t); return; }
         if (!Live.bargeSince) Live.bargeSince = t;
@@ -2024,6 +2185,7 @@ var Live = {
       }
       return;
     }
+    BargeLog.answerDone();
     Live.bargeSince = 0;
     // While thinking, only listen for "I wasn't finished": if he talks again
     // shortly after a sentence was sent, drop that run and record the rest —
@@ -2251,6 +2413,7 @@ var Live = {
   },
 
   disable() {
+    if (typeof VoiceClient !== 'undefined' && VoiceClient.on) VoiceClient.stop();
     Live.on = false;
     Live.armed = false;
     Live.ptt = false;
@@ -2274,9 +2437,47 @@ var Live = {
 
 /* Scale the quiet-room threshold, not the live one: with TV or music on the
    live threshold already sits above the background. */
+/* With a Sonos answering, also above his own voice as the mic hears it from the room. */
+function bargeNow() {
+  return Output.target ? Math.max(bargeLevel(), (Live.echo || 0) * ECHO_FACTOR) : bargeLevel();
+}
+
+/* The clip is mostly words he is saying himself: the Sonos, not the user. */
+function echoOf(text) {
+  var said = stripTones(answerText || '').toLowerCase();
+  var words = (text.toLowerCase().match(/\p{L}{3,}/gu) || []);
+  if (!words.length) return false;
+  var hits = words.filter(function (w) { return said.indexOf(w) >= 0; }).length;
+  return hits / words.length >= 0.6;
+}
+
 function bargeLevel() {
   return Math.max(Live.base * BARGE_FACTOR, Live.ambient * BARGE_AMBIENT, BARGE_MIN);
 }
+
+/* What talking over him looked like, for logs/wake_device.log (one line per answer that someone tried
+   to interrupt, one per checked clip): the loudest moment against the bar, and what Whisper heard.
+   The numbers are what the thresholds above get tuned with. */
+var BargeLog = {
+  st: null,
+  frame: function (lvl, t) {
+    var s = BargeLog.st || (BargeLog.st = { since: t, peak: 0, bar: 0, over: 0, clips: 0, drops: 0 });
+    if (lvl > s.peak) { s.peak = lvl; s.bar = bargeNow(); }
+    if (lvl > bargeNow()) s.over++;
+  },
+  answerDone: function () {
+    var s = BargeLog.st;
+    BargeLog.st = null;
+    if (!s || !(s.clips || s.drops || s.peak > s.bar * 0.5)) return;
+    BargeLog.send('Antwort ' + ((performance.now() - s.since) / 1000).toFixed(1) + ' s · lautester Moment '
+      + s.peak.toFixed(3) + ', Hürde ' + s.bar.toFixed(3) + ' (Raum ' + Live.base.toFixed(3) + ', Hintergrund '
+      + Live.ambient.toFixed(3) + (Output.target ? ', Echo ' + (Live.echo || 0).toFixed(3) : '') + ') · '
+      + s.clips + ' Clips geprüft, ' + s.drops + ' kurze Laute');
+  },
+  send: function (text) {
+    WakeLog.send('Unterbrechen: ' + text + (Output.target ? ' [' + Output.label + ']' : ''), true);
+  }
+};
 
 /* Barge-in by name: talking over JARVIS records a clip while he keeps talking.
    "Jarvis" in it ends his answer (and whatever followed is the new request);
@@ -2309,16 +2510,21 @@ var Barge = {
   },
 
   track(lvl, t) {
-    if (lvl > bargeLevel()) Barge.lastVoice = t;
-    var cut = t - Barge.since > BARGE_MAX_MS;
-    if (cut || t - Barge.lastVoice > BARGE_SILENCE_MS) {
-      if (Barge.lastVoice - Barge.since <= BARGE_MS) return Barge.drop();   // a blip, not speech: nothing to check
+    if (lvl > bargeNow()) Barge.lastVoice = t;
+    if (!Speech.paused && Barge.lastVoice - Barge.since > PAUSE_MS) pauseSpeech();
+    var cut = t - Barge.since > (Speech.paused ? BARGE_MAX_PAUSED_MS : BARGE_MAX_MS);
+    if (cut || t - Barge.lastVoice > (Speech.paused ? BARGE_SILENCE_PAUSED_MS : BARGE_SILENCE_MS)) {
+      if (Barge.lastVoice - Barge.since <= BARGE_MS) {   // a blip, not speech: nothing to check
+        if (BargeLog.st) BargeLog.st.drops++;
+        return Barge.drop();
+      }
+      if (BargeLog.st) BargeLog.st.clips++;
       var r = Barge.rec;
       Barge.rec = null;
       Barge.cut = cut;
       Barge.busy = true;
       if (r.take) return Barge.check(Cap.end(r.take, true), cut);
-      try { r.stop(); } catch (e) { Barge.busy = false; }
+      try { r.stop(); } catch (e) { Barge.busy = false; if (Speech.paused) resumeSpeech(); }
     }
   },
 
@@ -2326,14 +2532,21 @@ var Barge = {
     var r = Barge.rec;
     Barge.rec = null;
     Barge.busy = false;
+    if (Speech.paused) resumeSpeech();   // nothing will be checked: he must not wait for good
     if (r && r.take) { Cap.end(r.take, false); return; }
     try { if (r && r.state === 'recording') r.stop(); } catch (e) {}
   },
 
   async check(blob, cut) {
     var text = '';
+    var paused = Speech.paused;   // he stopped for it: whatever was said is checked, "Jarvis" or not
     // talking over him without "Jarvis" heard on the device: nothing to check on the PC
-    if (OnDevice.gate() && Math.max(Wake.lastHeard, OnDevice.faintAt) < performance.now() - 4000) { Barge.busy = false; return; }
+    if (!paused && OnDevice.gate() && Math.max(Wake.lastHeard, OnDevice.faintAt) < performance.now() - 4000
+        && OnDevice.peak(Barge.since - PREROLL_MS) < OnDevice.SHORT_FLOOR) {
+      BargeLog.send('nicht geprüft, das Gerät hörte kein „Jarvis“ (Wert ' + OnDevice.peak(Barge.since - PREROLL_MS).toFixed(3) + ')');
+      Barge.busy = false;
+      return;
+    }
     try {
       var res = await fetch('/api/listen', {
         method: 'POST', headers: headers({ 'content-type': blob.type || 'audio/webm' }), body: blob
@@ -2342,15 +2555,20 @@ var Barge = {
       if (res.ok) text = (data && data.text || '').trim();
     } catch (e) { /* unreadable clip: he simply keeps talking */ }
     Barge.busy = false;
-    if (!WAKE_ANY_RE.test(text)) {
-      return;   // not for him: dropped unlogged, he never stopped talking
+    var named = WAKE_ANY_RE.test(text);
+    BargeLog.send('gehört „' + text.slice(0, 80) + '“ → ' + (named ? 'Name erkannt, unterbrochen' : paused ? 'ohne Namen, in der Pause' : 'ohne Namen, weiter'));
+    var rest = named ? Wake.check(text, true).text : text.trim();
+    var words = rest.replace(/[^\p{L}\p{N}]/gu, '').length >= 2 && !BARGE_FILLER.test(rest);
+    // Without his name it counts only when he paused for it, with real words, no TV talking and not his own voice.
+    if (!named && (!paused || !words || /^(tv|sport)$/.test(Ambience.kind()) || echoOf(text))) {
+      if (paused) resumeSpeech();   // nothing for him: he goes on where he was
+      return;
     }
     log('note', 'VOICE', 'heard: "' + text + '"');
     interruptSpeech();
     if (running) cancelRun();
     // "Jarvis, wie wird das Wetter?" in one breath is the next request; a clip cut
     // off mid-sentence or a bare "Jarvis" / "Jarvis, stopp" just opens the mic.
-    var rest = Wake.check(text, true).text;
     if (!cut && !BARGE_STOP_ONLY.test(rest) && rest.replace(/[^\p{L}\p{N}]/gu, '').length >= 2) {
       Live.lastSent = { text: rest, at: performance.now() };
       await transmit(rest);
@@ -2386,6 +2604,11 @@ async function toggleLive() {
 
 async function startPTT() {
   if (!Live.on) { await Live.enable(); if (!Live.on) return; }
+  if (typeof VoiceClient !== 'undefined' && VoiceClient.on) {
+    Live.ptt = true; VoiceClient.ptt(true); setVoiceState('HEARING', 'hot'); updateMicButton();
+    log('note', 'VOICE', 'Push-to-Talk — loslassen zum Senden');
+    return;
+  }
   await Live.unlock();
   if (Live.speaking || Speech.active) interruptSpeech();
   if (running) cancelRun();
@@ -2399,6 +2622,7 @@ async function startPTT() {
 function stopPTT() {
   if (!Live.ptt) return;
   Live.ptt = false;
+  if (typeof VoiceClient !== 'undefined' && VoiceClient.on) { VoiceClient.ptt(false); updateMicButton(); return; }
   Live.pttSend = true;          // released button = sentence is over, send without waiting
   if (Live.armed) Live.finish();
   updateMicButton();
@@ -2625,6 +2849,7 @@ window.addEventListener('DOMContentLoaded', function () {
   };
   setupMic();
   Station.init();
+  Output.init();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
   setupDevices();
   setVoiceState('IDLE', '');

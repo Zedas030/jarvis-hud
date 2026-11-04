@@ -13,7 +13,10 @@ import tempfile
 
 _GUARDED = ("commands", "memory", "lists", "routines", "learning", "pronounce", "pc", "scheduler", "server",
             "proposals", "weekly_review", "homelab_watch", "suggestions", "reflection", "audit", "memory_tools",
-            "emergency", "personality", "desktop", "infra", "assistant", "mail_events", "shipments", "spotify")
+            "emergency", "personality", "desktop", "infra", "assistant", "mail_events", "shipments", "spotify",
+            "sonos", "energy_coach", "away_check", "homelab_review", "events", "house_habits", "weather_alerts",
+            "alexa_voice", "morning_echo", "user_habits", "wellbeing", "maintenance", "focus", "selfcheck", "daytime",
+            "episodes", "departure", "phone_actions")
 _early = [m for m in _GUARDED if m in sys.modules and "isolate" not in sys.modules]
 if _early:
     raise RuntimeError(f"tests/isolate.py must be imported before {', '.join(_early)} — real data at risk")
@@ -26,7 +29,7 @@ os.environ.update(JARVIS_STATE=str(TMP / "state.json"), JARVIS_VAULT=str(TMP / "
                   JARVIS_APPS=str(TMP / "apps.json"), JARVIS_PROPOSALS=str(TMP / "proposals.json"),
                   JARVIS_HEALTH_DATA=str(TMP / "health.json"), JARVIS_HOMELAB_CONFIG=str(TMP / "homelab.json"),
                   JARVIS_HOMELAB_BASELINE=str(TMP / "baseline.json"), JARVIS_WORK_TERMS="Contoso",
-                  JARVIS_AUDIT_LOG=str(TMP / "audit.jsonl"), JARVIS_BACKUP_DIR=str(TMP / "backups"),
+                  JARVIS_AUDIT_LOG=str(TMP / "audit.jsonl"), JARVIS_LOG_FILE=str(TMP / "jarvis.log"), JARVIS_BACKUP_DIR=str(TMP / "backups"),
                   JARVIS_PROFILES=str(TMP / "profiles.json"), JARVIS_WORKSPACES=str(TMP / "workspaces.json"),
                   JARVIS_SCRIPTS=str(TMP / "scripts.json"), JARVIS_FILE_ROOTS=str(TMP / "files"),
                   JARVIS_PERM_URL="http://127.0.0.1:9/api/permission/request",
@@ -34,9 +37,16 @@ os.environ.update(JARVIS_STATE=str(TMP / "state.json"), JARVIS_VAULT=str(TMP / "
                   JARVIS_DOC_INDEX=str(TMP / "docindex.sqlite"), JARVIS_DOC_ROOTS="",
                   JARVIS_MAIL_EVENTS=str(TMP / "mail_events.json"), JARVIS_MAIL_EVENTS_DAILY="0",
                   JARVIS_SHIPMENTS_FILE=str(TMP / "shipments.json"), JARVIS_SHIPMENTS="0", DHL_API_KEY="", TRACK17_API_KEY="",
-                  JARVIS_WAKE_LOG=str(TMP / "wake_device.log"),
+                  JARVIS_WAKE_LOG=str(TMP / "wake_device.log"), JARVIS_ENERGY_COACH="0", JARVIS_HOMELAB_REVIEW="0", JARVIS_HABITS="0", JARVIS_WEATHER_ALERTS="0",
+                  JARVIS_NOTICES=str(TMP / "notices.jsonl"), JARVIS_POWER_PRICE="0.30",
+                  JARVIS_ENERGY_COACH_STATE=str(TMP / "energy_coach.json"),
+                  JARVIS_ENERGY_COACH_CONFIG=str(TMP / "energy_coach_config.json"),
                   JARVIS_SPOTIFY_CLIENT_ID="", JARVIS_SPOTIFY_TOKEN=str(TMP / "spotify_token.json"),
-                  JARVIS_SPOTIFY_HELD=str(TMP / "spotify_held.json"), JARVIS_SPOTIFY_LOG=str(TMP / "spotify.log"))
+                  JARVIS_SPOTIFY_HELD=str(TMP / "spotify_held.json"), JARVIS_SPOTIFY_LOG=str(TMP / "spotify.log"),
+                  JARVIS_SELFCHECK=str(TMP / "selfcheck.jsonl"), JARVIS_USER_HABITS="0", JARVIS_WELLBEING="0",
+                  JARVIS_MAINTENANCE="0", JARVIS_POWER_BUDGET_EUR="0", JARVIS_WHISPER_HOURS="22-7",
+                  PAPERLESS_URL="", PAPERLESS_TOKEN="", UNIFI_URL="", UNIFI_API_KEY="", UNIFI_USER="", UNIFI_PASSWORD="",
+                  JELLYFIN_URL="", JELLYFIN_API_KEY="", JELLYFIN_USER="")
 # The user's logins never reach a test: server.py and jarvis_mcp.py load .env with setdefault,
 # so the empty values set here win. Before, the draft tests ran against the real mailboxes'
 # settings and a router test logged in to the real NAS. A test that needs one brings a fake.

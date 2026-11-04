@@ -10,6 +10,8 @@ Proactive notices — Jarvis speaks up by himself. Plain rules, 0 tokens.
   nas          a disk not healthy or the volume over 90 % — once a day
   network      a new device in the WLAN (from the network watchdog in briefing.py)
   printer      "Der 3D-Druck ist fertig", failed, paused for a reason, an error (printer.py)
+  away         after leaving home: what still runs goes to the phone and becomes a proposal (away_check.py)
+  morning      the first light/TV/Echo in the living room in the morning: the Echo briefs (morning_echo.py)
 
 Every notice is published on the event bus; the HUD speaks it, or only shows
 it during the quiet hours (JARVIS_QUIET_HOURS). Each one comes once per key
@@ -20,9 +22,11 @@ import os
 import threading
 import time
 
+import away_check
 import commands
 import events
 import jarvis_profile as profile
+import morning_echo
 
 EVERY = int(os.environ.get("JARVIS_WATCH_SECONDS", "30"))
 EVENT_LEAD_MIN = int(os.environ.get("JARVIS_EVENT_LEAD_MIN", "15"))
@@ -115,6 +119,14 @@ def calendar(now=None):
                  f"Sir, in {max(1, round(mins))} Minuten: {e.get('title', 'ein Termin')}{where}.", kind="calendar")
 
 
+def departure_prep(states, now=None):
+    """Half an hour before leaving for an appointment: what still runs at home, as a prepared proposal."""
+    import departure
+    if not _CAL["events"]:
+        return None
+    return departure.check(_CAL["events"], states, now or dt.datetime.now(), once)
+
+
 LEAVE_WARN_MIN = int(os.environ.get("JARVIS_LEAVE_WARN_MIN", "5"))
 _DRIVE = {}
 
@@ -176,6 +188,23 @@ def nas():
         once("nas_full", f"Sir, das NAS ist zu {s['used_pct']} Prozent voll.", kind="systems")
 
 
+# ── the phone's answer, the power budget ─────────────────────
+def phone_answers(states):
+    """A Ja/Nein tapped on the phone comes back through a Home Assistant helper (phone_actions.py)."""
+    import phone_actions
+    if states:
+        phone_actions.poll(states)
+
+
+def power_budget(states):
+    """After 18 h, once a day: the month's projection against the budget (power_costs.py)."""
+    import power_costs
+    if states and dt.datetime.now().hour >= 18:
+        text = power_costs.budget_notice({s["entity_id"]: s for s in states})
+        if text:
+            once("power_budget", text, kind="energy")
+
+
 # ── 3D printer ───────────────────────────────────────────────
 def printer_watch(states):
     import printer
@@ -195,8 +224,10 @@ def start():
                 states = briefing._ha_states()
             except Exception:  # noqa: BLE001 — HA restarting
                 pass
-            for check in (lambda: appliances(states), calendar, lambda: storage(states), nas, parcel_today,
-                          lambda: printer_watch(states)):
+            for check in (lambda: appliances(states), calendar, lambda: departure_prep(states), lambda: storage(states),
+                          nas, parcel_today, lambda: printer_watch(states), lambda: away_check.check(states),
+                          lambda: morning_echo.check(states), lambda: phone_answers(states),
+                          lambda: power_budget(states)):
                 try:
                     check()
                 except Exception as e:  # noqa: BLE001 — one dead source must not silence the rest

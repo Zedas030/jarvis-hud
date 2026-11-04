@@ -84,7 +84,7 @@ class Updates(unittest.TestCase):
 
     def test_report_only_targets_run_nothing(self):
         with mock.patch.object(updates, "_pi") as pi, mock.patch.object(updates, "_ha") as ha:
-            for target in ("pi:docker:homeassistant", "fritz:Hier Key eintragen", "fw:tp-link-p110"):
+            for target in ("pi:docker:homeassistant", "fritz:10.0.0.2", "fw:tp-link-p110"):
                 self.assertIn("nicht", updates.install(target), target)
         pi.assert_not_called()
         ha.assert_not_called()

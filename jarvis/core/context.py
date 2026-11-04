@@ -101,6 +101,13 @@ def _warnungen():
     n = len(proposals.pending())
     if n:
         out.append({"severity": "info", "text": f"{n} Vorschlag/Vorschläge warten auf Sie"})
+    try:
+        import focus
+        if focus.active():
+            until = time.strftime("%H:%M", time.localtime(focus.state()["until"]))
+            out.append({"severity": "info", "text": f"Fokus-Sitzung bis {until}: Meldungen werden zurückgehalten"})
+    except Exception:  # noqa: BLE001
+        pass
     return out
 
 

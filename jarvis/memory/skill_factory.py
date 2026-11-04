@@ -156,4 +156,6 @@ def listing():
     for k, v in sorted((data.get("drafts") or {}).items()):
         out.append(f"Entwurf ({v.get('seen', 1)}×{', vorgeschlagen' if v.get('proposed') else ''}): "
                    f"„{v.get('example', k)}“ → {', '.join(v.get('entities', []))}")
+    for k, v in sorted((data.get("choices") or {}).items()):
+        out.append(f"Rückfrage beantwortet ({v.get('at', '?')}): „{v.get('example', k)}“ → {', '.join(v.get('entities', []))}")
     return "\n".join(out) or "Noch nichts gelernt."

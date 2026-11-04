@@ -35,7 +35,7 @@ class Classes(unittest.TestCase):
             self.assertEqual(sorted(tools - set(policy.CLASSES)), [], group)
 
     def test_cards_where_they_belong(self):
-        for t in ("calendar_add", "memory_forget", "proposal_accept", "rule_remove", "mail_draft", "script_run"):
+        for t in ("calendar_add", "memory_forget", "proposal_accept", "rule_remove", "mail_draft", "script_run", "pi_run"):
             self.assertNotIn(t, runtime.NO_CONFIRM, t)
         for t in ("memory_search", "home_control", "list_add"):
             self.assertIn(t, runtime.NO_CONFIRM, t)

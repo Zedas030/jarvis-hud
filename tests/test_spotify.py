@@ -133,7 +133,7 @@ class RoundedLoudPlayer(LoudPlayer):
         if path.startswith("/me/player/volume"):
             self.calls.append((method, "/me/player/volume"))
             requested = int(path.split("volume_percent=")[1].split("&")[0])
-            self.volume = max(0, requested - 1) if requested == spotify.QUIET_PCT else requested
+            self.volume = max(0, requested - 1) if requested == spotify.quiet_target(60) else requested
             return 204, None
         return super().__call__(method, path, retry)
 
@@ -156,7 +156,7 @@ class Quiet(unittest.TestCase):
     def test_quiet_not_paused_and_back(self):
         self.assertTrue(spotify.hold("PC"))
         self.assertTrue(self.player.playing)
-        self.assertEqual(self.player.volume, spotify.QUIET_PCT)
+        self.assertEqual(self.player.volume, spotify.quiet_target(60))
         self.assertNotIn(("PUT", "/me/player/pause"), self.player.calls)
         self.assertTrue(spotify.release("PC"))
         self.assertEqual(self.player.volume, 60)
@@ -171,8 +171,8 @@ class Quiet(unittest.TestCase):
     def test_one_percent_rounding_still_restores_old_volume(self):
         self.player = spotify._api = RoundedLoudPlayer()
         self.assertTrue(spotify.hold("PC"))
-        self.assertEqual(self.player.volume, spotify.QUIET_PCT - 1)
-        self.assertEqual(spotify._HELD["quiet"], spotify.QUIET_PCT)
+        self.assertEqual(self.player.volume, spotify.quiet_target(60) - 1)
+        self.assertEqual(spotify._HELD["quiet"], spotify.quiet_target(60))
         self.assertTrue(spotify.release("PC"))
         self.assertEqual(self.player.volume, 60)
 
@@ -222,6 +222,31 @@ class Quiet(unittest.TestCase):
         self.assertTrue(spotify.release())
         self.assertTrue(self.player.playing)
 
+    def test_low_volume_is_still_turned_down(self):
+        # 15 % was the living room speaker's normal level, below the old fixed 20 %: nothing happened
+        self.player.volume = 15
+        self.assertTrue(spotify.hold("PC"))
+        self.assertEqual(self.player.volume, spotify.quiet_target(15))
+        self.assertLess(self.player.volume, 15)
+        self.assertTrue(spotify.release("PC"))
+        self.assertEqual(self.player.volume, 15)
+
+    def test_loud_music_is_capped(self):
+        self.player.volume = 90
+        spotify.hold("PC")
+        self.assertEqual(self.player.volume, spotify.QUIET_PCT)
+
+    def test_very_quiet_music_is_left_alone(self):
+        self.player.volume = 1
+        self.assertFalse(spotify.hold("PC"))
+        self.assertEqual(self.player.volume, 1)
+
+    def test_target(self):
+        self.assertEqual(spotify.quiet_target(15), 4)
+        self.assertEqual(spotify.quiet_target(60), 18)
+        self.assertEqual(spotify.quiet_target(100), spotify.QUIET_PCT)
+        self.assertEqual(spotify.quiet_target(2), 1)
+
     def test_pause_mode_still_pauses(self):
         spotify.HOLD_MODE = "pause"
         spotify.hold()
@@ -231,3 +256,110 @@ class Quiet(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Transfer(unittest.TestCase):
+    """The music into another room: Spotify Connect, device found by its name."""
+
+    DEVICES = [{"id": "echo", "name": "Nutzer' Echo Dot", "type": "Speaker", "is_active": False},
+               {"id": "wz", "name": "Wohnzimmer", "type": "Unknown", "is_active": False},
+               {"id": "pc", "name": "NUTZER", "type": "Computer", "is_active": False}]
+
+    def setUp(self):
+        self.saved = (spotify._api, spotify.CLIENT_ID)
+        spotify.CLIENT_ID = "test"
+        spotify.save_token({"refresh_token": "r"})
+        spotify.forget()
+        self.calls = []
+        spotify._api = self.api
+
+    def tearDown(self):
+        spotify._api, spotify.CLIENT_ID = self.saved
+        spotify.forget()
+
+    def api(self, method, path, retry=True, body=None):
+        self.calls.append((method, path.split("?")[0], body))
+        if path == "/me/player/devices":
+            return 200, {"devices": list(self.DEVICES)}
+        if path == "/me/player":                  # the Sonos plays, but Spotify leaves it out of the device list
+            return 200, {"is_playing": True, "device": {"id": "sz", "name": "Schlafzimmer"}}
+        return 204, None
+
+    def test_active_device_missing_from_the_list_is_still_known(self):
+        self.assertEqual([d["name"] for d in spotify.devices()][-1], "Schlafzimmer")
+        self.assertEqual(spotify.find_device("schlafzimmer")["id"], "sz")
+
+    def test_exact_name_beats_substring(self):
+        self.assertEqual(spotify.find_device("Wohnzimmer")["id"], "wz")
+        self.assertEqual(spotify.find_device("Echo")["id"], "echo")
+        self.assertIsNone(spotify.find_device("Bad"))
+
+    def test_transfer_moves_and_plays(self):
+        self.assertEqual(spotify.transfer("Wohnzimmer"), (True, "Wohnzimmer"))
+        self.assertIn(("PUT", "/me/player", {"device_ids": ["wz"], "play": True}), self.calls)
+
+    def test_unknown_device_names_the_reachable_ones(self):
+        ok, text = spotify.transfer("Bad")
+        self.assertFalse(ok)
+        self.assertIn("Wohnzimmer", text)
+        self.assertFalse([c for c in self.calls if c[:2] == ("PUT", "/me/player")])
+
+    def test_wake_word_hold_is_forgotten_and_old_room_gets_its_volume_back(self):
+        spotify._HELD.update(device="sz", at=1.0, volume=40, quiet=12)
+        self.assertTrue(spotify.transfer("Wohnzimmer")[0])
+        self.assertIn(("PUT", "/me/player/volume", None), self.calls)
+        self.assertIsNone(spotify._HELD["device"])
+
+
+class RoomViaHomeAssistant(unittest.TestCase):
+    """A Sonos that Spotify does not list right now gets the playlist through Home Assistant."""
+
+    def setUp(self):
+        import jarvis_mcp
+        import speakers
+        from unittest import mock
+        self.saved = (spotify._api, spotify.CLIENT_ID)
+        spotify.CLIENT_ID = "test"
+        spotify.save_token({"refresh_token": "r"})
+        self.calls, self.ha = [], []
+        spotify._api = self.api
+        self.patches = [
+            mock.patch.object(speakers, "_cfg", return_value=({"Schlafzimmer": {"player": "media_player.sz"},
+                                                               "Wohnzimmer": {"notify": "notify.echo"}}, None)),
+            mock.patch.object(jarvis_mcp, "_ha", side_effect=lambda path, body=None: self.ha.append((path, body)))]
+        for p in self.patches:
+            p.start()
+        self.music = jarvis_mcp._music
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        spotify._api, spotify.CLIENT_ID = self.saved
+        spotify.forget()
+
+    def api(self, method, path, retry=True, body=None):
+        self.calls.append((method, path.split("?")[0], body))
+        if path == "/me/player/devices":
+            return 200, {"devices": [{"id": "wz", "name": "Wohnzimmer"}]}
+        if path == "/me/player":
+            return 200, {"is_playing": True, "device": {"id": "wz", "name": "Wohnzimmer"},
+                         "context": {"uri": "spotify:user:spotify:playlist:37i9"}, "item": {"uri": "spotify:track:t1"}}
+        return 204, None
+
+    def test_listed_device_goes_through_spotify_connect(self):
+        text = self.music({"action": "transfer", "room": "Wohnzimmer"})
+        self.assertEqual(text, "Die Musik läuft jetzt im Wohnzimmer.")
+        self.assertEqual(self.ha, [])
+
+    def test_unlisted_sonos_gets_the_playlist_from_home_assistant(self):
+        text = self.music({"action": "transfer", "room": "Schlafzimmer"})
+        self.assertIn("im Schlafzimmer", text)
+        self.assertEqual(self.ha, [("/api/services/media_player/play_media",
+                                    {"entity_id": "media_player.sz", "media_content_type": "music",
+                                     "media_content_id": "spotify:playlist:37i9", "enqueue": "replace"})])
+        self.assertIn(("PUT", "/me/player/pause", None), self.calls)      # not playing twice
+
+    def test_unknown_room_without_player_is_refused(self):
+        text = self.music({"action": "transfer", "room": "Bad"})
+        self.assertIn("kennt kein Gerät", text)
+        self.assertEqual(self.ha, [])

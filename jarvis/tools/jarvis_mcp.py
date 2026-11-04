@@ -12,8 +12,10 @@ for every turn via --mcp-config. Two tools:
 """
 import json
 import os
+import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -21,6 +23,9 @@ HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, HERE)
 import paths  # noqa: E402,F401 — puts the jarvis/<group> folders on sys.path (this runs as its own process)
 import hostos  # noqa: E402
+import jarvis_log
+
+log = jarvis_log.get(__name__)
 _env = os.path.join(HERE, ".env")
 if os.path.exists(_env):   # calendar credentials etc. — read directly, never via argv
     for _line in open(_env, encoding="utf-8"):
@@ -98,8 +103,18 @@ TOOLS += [
         "name": "pi_status",
         "description": ("Health of the user's Raspberry Pi / home server: uptime, CPU temperature, "
                         "load, memory, disk, service states. Read-only, no confirmation needed. "
-                        "For anything else on the Pi use ssh via Bash/PowerShell — that needs his confirmation."),
+                        "For anything else on the Pi use pi_run."),
         "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "pi_run",
+        "description": ("Run one shell command on the user's Raspberry Pi / home server over ssh (e.g. "
+                        "'docker ps', 'sudo systemctl restart pihole-FTL', 'tail -n 50 /var/log/syslog'). Shows a "
+                        "confirmation card with the command; explain in German first what you are about to do and why, "
+                        "`begruendung` = that explanation. Prefer harmless, reversible commands; output is truncated."),
+        "inputSchema": {"type": "object",
+                        "properties": {"command": {"type": "string"}, "begruendung": {"type": "string"}},
+                        "required": ["command", "begruendung"]},
     },
 ]
 
@@ -157,6 +172,11 @@ TOOLS += [
 
 TOOLS += [
     {
+        "name": "weather_alerts",
+        "description": "Official warnings of the Deutscher Wetterdienst for here (storm, thunderstorm, ice, heat) in force now.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "weather",
         "description": ("Weather forecast (Open-Meteo) for the user's home or any `place` (city name). Per day: sky, "
                         "min/max temperature, rain probability and amount, wind, UV index, sunshine hours, sunrise "
@@ -175,12 +195,16 @@ TOOLS += [
         "name": "music",
         "description": ("Control the user's Spotify: play/pause/next/previous reach whatever device plays "
                         "(phone on the speaker, PC) when the Spotify login is set up, else the PC's media keys. "
-                        "`action`: play, pause, play_pause, next, previous, volume_up, volume_down, mute, or search "
-                        "(opens Spotify with `query` searched — he picks/plays from there). "
-                        "Starts Spotify first if it is not running. Harmless, no confirmation needed."),
+                        "`action`: play, pause, play_pause, next, previous, volume_up, volume_down, mute, search "
+                        "(opens Spotify with `query` searched — he picks/plays from there), or transfer "
+                        "(`room` = Wohnzimmer, Schlafzimmer, ... or a Spotify device name such as PC: the "
+                        "music moves to that room's speaker and plays on there — 'Musik vom Schlafzimmer ins "
+                        "Wohnzimmer', 'mach die Musik im Wohnzimmer an'; without `room`: the room the presence "
+                        "sensors see the user in, 'hol die Musik zu mir'). Starts Spotify first if it is not "
+                        "running. Harmless, no confirmation needed."),
         "inputSchema": {
             "type": "object",
-            "properties": {"action": {"type": "string"}, "query": {"type": "string"}},
+            "properties": {"action": {"type": "string"}, "query": {"type": "string"}, "room": {"type": "string"}},
             "required": ["action"],
         },
     },
@@ -552,6 +576,37 @@ TOOLS += [
         "description": "Pi-hole: queries and share blocked (24 h), filter on/off, top blocked domains, busiest devices.",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "security_findings",
+        "description": ("Open findings of the security centre on the Pi with their ids, why they matter, what to do "
+                        "and how long it takes; plus the accepted exceptions."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "security_accept",
+        "description": ("Accept one open finding as a reasoned exception (always a confirmation card): `id` from "
+                        "security_findings, `grund` = one German sentence why it is acceptable, `tage` 30, 90 or 365. "
+                        "Explain in German first, `begruendung`. Prefer 30 days for findings that cover a whole device."),
+        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "grund": {"type": "string"},
+                                                         "tage": {"type": "integer", "enum": [30, 90, 365]},
+                                                         "begruendung": {"type": "string"}},
+                        "required": ["id", "grund", "tage", "begruendung"]},
+    },
+    {
+        "name": "security_scan",
+        "description": "Start a quick scan of the security centre (about 15 s, read-only on the Pi).",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "homelab_report",
+        "description": ("Lagebericht from the Pi: Uptime Kuma (which services are down, since when), the ORBIT "
+                        "security centre (score, open findings by severity) and the zero-feed-in energy loop "
+                        "(automations and data in Home Assistant). `topic` alles | kuma | sicherheit | energie; "
+                        "`detail` true lists more findings."),
+        "inputSchema": {"type": "object", "properties": {
+            "topic": {"type": "string", "enum": ["alles", "kuma", "sicherheit", "energie"]},
+            "detail": {"type": "boolean"}}},
+    },
 ]
 
 TOOLS += [
@@ -599,6 +654,44 @@ TOOLS += [
         "name": "home_check",
         "description": "Home Assistant health: unavailable devices, low batteries, temperature/humidity sensors silent for a day.",
         "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "energy_coach",
+        "description": ("Energy coach: storage charge, solar now, house load, when today/tomorrow solar is left "
+                        "over once the battery is full, and which shiftable appliances fit (rarely used plugs are "
+                        "never suggested). Read only — it never switches anything."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "announce",
+        "description": ("Speak an announcement in a room (\"Sag im Wohnzimmer: Essen ist fertig\"): `raum` = room "
+                        "name from config/home.json speakers, `text` = what to say, in German. Without `raum` "
+                        "(or `raum` = hier) the room the presence sensors see the user in."),
+        "inputSchema": {"type": "object", "properties": {"raum": {"type": "string"}, "text": {"type": "string"}},
+                        "required": ["text"]},
+    },
+    {
+        "name": "tv_control",
+        "description": ("Fire TV through Alexa: `befehl` an, aus, pause, weiter, lauter, leiser, stumm, laut, zurueck, "
+                        "home, or app with `app` = the app's name (e.g. Netflix, YouTube, ARD Mediathek)."),
+        "inputSchema": {"type": "object", "properties": {
+            "befehl": {"type": "string", "enum": ["an", "aus", "pause", "weiter", "lauter", "leiser", "stumm", "laut",
+                                                  "zurueck", "home", "app"]},
+            "app": {"type": "string"}}, "required": ["befehl"]},
+    },
+    {
+        "name": "power_costs",
+        "description": ("Electricity costs: the house and the biggest plugs this month with the projection for the "
+                        "whole month; `geraet` = one plug (e.g. 'PC'); `standby` true = which plugs draw power while "
+                        "idle and what that costs a year. Price from JARVIS_POWER_PRICE."),
+        "inputSchema": {"type": "object", "properties": {"geraet": {"type": "string"}, "standby": {"type": "boolean"}}},
+    },
+    {
+        "name": "energy_device_usage",
+        "description": ("Remember how often the user uses a plug, for the energy coach: `geraet` = plug name "
+                        "(e.g. 'Boiler'), `oft` = true (suggest it again) or false (rarely used, never suggest)."),
+        "inputSchema": {"type": "object", "properties": {"geraet": {"type": "string"}, "oft": {"type": "boolean"}},
+                        "required": ["geraet", "oft"]},
     },
     {
         "name": "phone_notify",
@@ -687,6 +780,62 @@ TOOLS += [
 ]
 
 
+TOOLS += [
+    {
+        "name": "memory_timeline",
+        "description": ("What happened on which day, from every dated source joined by date: the conversation log "
+                        "(what the user asked and what Jarvis answered), Garmin (sleep, steps, stress, Body Battery, "
+                        "logged meals), Jarvis' own notices, homelab incidents, storage levels. `start`/`end` as "
+                        "YYYY-MM-DD (default: the last `days`, 7), `query`: words that the conversation must mention "
+                        "('Drucker', 'krank'). Use for 'letzte Woche', 'neulich', 'als ich … war'. Read-only."),
+        "inputSchema": {"type": "object", "properties": {"start": {"type": "string"}, "end": {"type": "string"},
+                                                         "query": {"type": "string"}, "days": {"type": "integer"}}},
+    },
+    {
+        "name": "maintenance_status",
+        "description": ("Maintenance calendar of the homelab: TLS certificates about to expire, Docker images on the "
+                        "Pi older than their limit, the age of the last NAS backup, disks not normal. Read-only."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "paperless_search",
+        "description": ("Full-text search in the user's document archive (Paperless-ngx: scanned letters, contracts, "
+                        "insurance, invoices). `query`: words. Returns documents with number, title, correspondent, "
+                        "date, tags and the matching passage. Read-only."),
+        "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+    },
+    {
+        "name": "paperless_read",
+        "description": "The text of one archived document by its number (`id` from paperless_search), shortened. Read-only.",
+        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+    },
+    {
+        "name": "unifi_status",
+        "description": ("UniFi network controller, read-only: `topic` clients (who is connected, per WLAN, weak "
+                        "signals), geraete (access points, switches, gateway: online or not) or alles."),
+        "inputSchema": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["clients", "geraete", "alles"]}}},
+    },
+    {
+        "name": "media_recent",
+        "description": ("Jellyfin media library: what plays right now, what the user started and did not finish "
+                        "(with number and percentage), what came in lately. Read-only."),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "media_search",
+        "description": "Find films, series and episodes in the Jellyfin library by `query`. Read-only.",
+        "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+    },
+    {
+        "name": "media_play",
+        "description": ("Play something from Jellyfin on a device running the Jellyfin app: `item` = number from "
+                        "media_recent/media_search or a title (empty = continue the last thing), `device` = part of "
+                        "the device name (default: the TV). No confirmation needed."),
+        "inputSchema": {"type": "object", "properties": {"item": {"type": "string"}, "device": {"type": "string"}}},
+    },
+]
+
+
 # Which tools each group brings. The router in the server picks the groups per
 # request and passes them in JARVIS_TOOL_GROUPS, so a question about the weather
 # does not carry the definitions of mail, NAS and calendar tools along.
@@ -694,18 +843,22 @@ GROUPS = {
     "memory": {"memory_search", "memory_read", "memory_save"},
     "web": {"web_fetch", "open_website"},
     "calendar": {"calendar_events", "calendar_add", "mail_events_scan", "mail_events_add", "mail_events_undo"},
-    "home": {"home_states", "home_control", "home_check"},
-    "weather": {"weather"},
+    "home": {"home_states", "home_control", "home_check", "energy_coach", "energy_device_usage", "power_costs", "announce", "tv_control"},
+    "weather": {"weather", "weather_alerts"},
     "music": {"music"},
-    "systems": {"pi_status", "nas_status", "network_devices", "pc_status", "net_diagnose", "backup_status",
-                "resource_status", "forecast_status"},
-    "health": {"garmin_health", "health_log"},
+    "systems": {"pi_status", "pi_run", "nas_status", "network_devices", "pc_status", "net_diagnose", "backup_status",
+                "resource_status", "forecast_status", "maintenance_status"},
+    "health": {"garmin_health", "health_log", "memory_timeline"},
+    "episodes": {"memory_timeline"},
+    "paperless": {"paperless_search", "paperless_read"},
+    "unifi": {"unifi_status"},
+    "media": {"media_recent", "media_search", "media_play"},
     "timers": {"reminder_add", "reminder_list", "reminder_cancel"},
     "lists": {"list_read", "list_add", "list_remove"},
     "routines": {"routine_list", "routine_save", "routine_delete", "home_states"},
     "proposals": {"proposal_list", "proposal_accept", "proposal_decline", "rule_remove", "skill_list", "skill_undo"},
     "memory_admin": {"memory_overview", "memory_why", "memory_forget", "memory_export", "memory_save", "memory_search",
-                     "memory_review"},
+                     "memory_review", "memory_timeline"},
     "audit": {"audit_today"},
     "phone": {"phone_notify"},
     "mail": {"mail_inbox", "mail_mark_read", "mail_draft", "mail_events_scan", "mail_events_add",
@@ -720,7 +873,8 @@ GROUPS = {
     "screen": {"screen_read", "screen_describe"},
     "scripts": {"script_list", "script_run"},
     "updates": {"updates_check", "update_install", "update_status"},
-    "homelab": {"homelab_status", "metrics_query", "pihole_status"},
+    "homelab": {"homelab_status", "metrics_query", "pihole_status", "homelab_report", "security_findings",
+                "security_accept", "security_scan", "maintenance_status"},
 }
 ACTIVE_GROUPS = [g.strip() for g in os.environ.get("JARVIS_TOOL_GROUPS", "").split(",") if g.strip()]
 # Hard cap per tool result — results are sent again with every later API call of the turn.
@@ -863,6 +1017,68 @@ def _spotify_running():
     return "Spotify.exe" in out.stdout
 
 
+MUSIC_ROOM_TRIES = int(os.environ.get("JARVIS_MUSIC_ROOM_TRIES", "3") or 3)       # attempts before the fallback speaker
+MUSIC_ROOM_PAUSE_S = float(os.environ.get("JARVIS_MUSIC_ROOM_PAUSE_S", "3") or 3)   # seconds between the attempts
+
+
+def _music_room(room):
+    """The music into another room: Spotify Connect moves the playback to that room's speaker.
+    No room given: the one the presence sensors see the user in."""
+    import speakers
+    import spotify
+    if not room:
+        import whereabouts
+        room = whereabouts.room()
+    if not room:
+        return "In welchen Raum soll die Musik?"
+    if not spotify.configured():
+        return "Dafür brauche ich das Spotify-Login (README → Spotify), die Medientasten erreichen nur den PC."
+    name, device, player = speakers.spotify_device(room)
+    ok, text = spotify.transfer(device or room)     # an unknown room may still be a device name ("PC")
+    fallback = speakers.spotify_fallback(room) if name else ""
+    for _ in range(MUSIC_ROOM_TRIES - 1):
+        # the soundbar drops out of Spotify's list now and then and is back a moment later: ask again
+        # before settling for the worse speaker (same rule as the HA automation "Musik wandert mit")
+        if ok or not fallback or not text.startswith("Spotify kennt kein Gerät"):
+            break
+        time.sleep(MUSIC_ROOM_PAUSE_S)
+        ok, text = spotify.transfer(device)
+    if not ok and fallback and text.startswith("Spotify kennt kein Gerät"):
+        ok, text = spotify.transfer(fallback)
+        if ok:
+            return (f"„{device}“ ist für Spotify gerade nicht erreichbar, die Musik läuft ersatzweise auf "
+                    f"„{text}“ im {name}.")
+    via_ha = False
+    if not ok and player and text.startswith("Spotify kennt kein Gerät"):
+        ok, text, via_ha = _music_room_ha(player), "", True
+        if not ok:
+            return f"Der Lautsprecher im {name} ist für Spotify gerade nicht erreichbar, und auch über Home Assistant hat es nicht geklappt."
+    if not ok:
+        return text
+    where = name or text
+    article = "in der" if where.lower().endswith("e") else "im"    # Küche, Diele / Wohnzimmer, Bad, Flur
+    if not name:
+        return f"Die Musik läuft jetzt auf „{text}“."
+    return f"Die Musik läuft jetzt {article} {where}." + (" Dort fängt die Playlist von vorne an." if via_ha else "")
+
+
+def _music_room_ha(player):
+    """The way round Spotify Connect: the Sonos gets the playlist (else the track) through Home Assistant and
+    plays it itself, the old device is paused. The position in the playlist is lost — Sonos starts it anew."""
+    import spotify
+    ctx, track, _ = spotify.now_playing()
+    uri = ctx if ctx.startswith(("spotify:playlist:", "spotify:album:", "spotify:artist:")) else track
+    if not uri:
+        return False
+    try:
+        _ha("/api/services/media_player/play_media",
+            {"entity_id": player, "media_content_type": "music", "media_content_id": uri, "enqueue": "replace"})
+    except Exception:  # noqa: BLE001 — HA down or the Sonos has no Spotify account linked
+        return False
+    spotify.pause_active()
+    return True
+
+
 def _music(args):
     import ctypes
     import time
@@ -875,6 +1091,9 @@ def _music(args):
         hostos.open_target("spotify:search:" + urllib.parse.quote(q))
         return f"Spotify zeigt die Suche nach „{q}“."
     import spotify
+    room = " ".join(str(args.get("room") or "").split())
+    if action in ("transfer", "move", "room") or (room and action in ("play", "play_pause")):
+        return _music_room(room)
     if action in ("play", "pause", "play_pause", "next", "previous"):
         if spotify.control(action):
             return f"Erledigt: {action}."
@@ -1330,6 +1549,39 @@ def _pi_status():
     return out.stdout.strip()[:4000]
 
 
+# Commands pi_run refuses whatever the card said: these are not "a command on the Pi" but its end.
+_PI_RUN_FORBIDDEN = re.compile(r"(rm\s+(-\w*\s+)*-\w*[rR]\w*\s+/(\s|$|\*)|mkfs|dd\s.*of=/dev/|:\(\)\s*\{|"
+                               r">\s*/dev/(sd|mmcblk)|shred|wipefs)")
+
+
+def _pi_run(command):
+    cmd = " ".join(str(command or "").split())
+    if not cmd:
+        return "Kein Befehl angegeben."
+    if not PI_HOST:
+        return "Pi nicht konfiguriert: JARVIS_PI_HOST fehlt in .env."
+    if _PI_RUN_FORBIDDEN.search(cmd):
+        return f"Abgelehnt: '{cmd[:80]}' würde den Pi zerstören — das führe ich grundsätzlich nicht aus."
+    try:
+        out = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6", f"{PI_USER}@{PI_HOST}", cmd],
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+                             **hostos.QUIET)
+    except subprocess.TimeoutExpired:
+        return f"Zeitüberschreitung: '{cmd[:80]}' lief länger als 120 s (läuft eventuell noch weiter)."
+    text = (out.stdout or "").strip()
+    err = (out.stderr or "").strip()
+    if out.returncode == 255 and not text:
+        return f"Pi nicht erreichbar ({PI_USER}@{PI_HOST}): {err[:300]}"
+    parts = [f"exit {out.returncode}"]
+    if text:
+        parts.append(text[:3500])
+    if err:
+        parts.append("stderr: " + err[:800])
+    if not text and not err:
+        parts.append("(keine Ausgabe)")
+    return "\n".join(parts)
+
+
 def _calendar(name, args):
     import datetime as dt
     import icloud_calendar as cal
@@ -1468,6 +1720,19 @@ def call_tool(name, args):
         text = _mail(args)
     elif name == "mail_mark_read":
         text = _mail_mark(args)
+    elif name in ("announce", "tv_control"):
+        try:
+            import speakers
+            text = (speakers.announce(args.get("raum"), args.get("text")) if name == "announce"
+                    else speakers.tv(args.get("befehl"), args.get("app") or ""))
+        except Exception as e:  # noqa: BLE001
+            text = f"Fehler: {e}"
+    elif name == "weather_alerts":
+        try:
+            import weather_alerts
+            text = weather_alerts.current()
+        except Exception as e:  # noqa: BLE001
+            text = f"Wetterwarnungen-Fehler: {e}"
     elif name == "weather":
         try:
             text = _weather(args)
@@ -1480,9 +1745,10 @@ def call_tool(name, args):
             text = f"Fehler: {e}"
     elif name in ("home_states", "home_control"):
         text = _home(name, args)
-    elif name in ("network_devices", "pi_status"):
+    elif name in ("network_devices", "pi_status", "pi_run"):
         try:
-            text = _network_devices() if name == "network_devices" else _pi_status()
+            text = {"network_devices": _network_devices, "pi_status": _pi_status,
+                    "pi_run": lambda: _pi_run(args.get("command"))}[name]()
         except Exception as e:  # noqa: BLE001
             text = f"Fehler: {e}"
     elif name == "web_fetch":
@@ -1547,6 +1813,13 @@ def call_tool(name, args):
                     "plan_check": lambda: a.plan_check(args.get("title"), args.get("step"))}[name]()
         except Exception as e:  # noqa: BLE001
             text = f"Fehler: {e}"
+    elif name in ("energy_coach", "energy_device_usage"):
+        try:
+            import energy_coach
+            text = (energy_coach.report() if name == "energy_coach"
+                    else energy_coach.set_usage(args.get("geraet") or "", bool(args.get("oft"))))
+        except Exception as e:  # noqa: BLE001
+            text = f"Energie-Coach-Fehler: {e}"
     elif name in ("pc_status", "net_diagnose", "backup_status", "home_check", "phone_notify"):
         try:
             import infra
@@ -1579,6 +1852,25 @@ def call_tool(name, args):
                     "pihole_status": homelab.pihole}[name]()
         except Exception as e:  # noqa: BLE001
             text = f"Homelab-Fehler: {e}"
+    elif name in ("security_findings", "security_accept", "security_scan"):
+        try:
+            import situation
+            text = {"security_findings": situation.open_findings, "security_scan": situation.run_scan,
+                    "security_accept": lambda: situation.accept(args.get("id"), args.get("grund"), args.get("tage"))}[name]()
+        except Exception as e:  # noqa: BLE001
+            text = f"Sicherheitszentrale-Fehler: {e}"
+    elif name == "power_costs":
+        try:
+            import power_costs
+            text = power_costs.report(args.get("geraet") or "", bool(args.get("standby")))
+        except Exception as e:  # noqa: BLE001
+            text = f"Stromkosten-Fehler: {e}"
+    elif name == "homelab_report":
+        try:
+            import situation
+            text = situation.report(args.get("topic") or "alles", bool(args.get("detail")))
+        except Exception as e:  # noqa: BLE001
+            text = f"Lagebericht-Fehler: {e}"
     elif name in ("updates_check", "update_install", "update_status"):
         try:
             import updates
@@ -1659,6 +1951,38 @@ def call_tool(name, args):
             text = _memory(name, args)
         except Exception as e:  # noqa: BLE001
             text = f"Gedächtnis-Fehler: {e}"
+    elif name == "memory_timeline":
+        try:
+            import episodes
+            text = episodes.describe(args.get("start"), args.get("end"), args.get("query") or "", args.get("days"))
+        except Exception as e:  # noqa: BLE001
+            text = f"Fehler: {e}"
+    elif name == "maintenance_status":
+        try:
+            import maintenance
+            text = maintenance.describe()
+        except Exception as e:  # noqa: BLE001
+            text = f"Wartungs-Fehler: {e}"
+    elif name in ("paperless_search", "paperless_read"):
+        try:
+            import paperless
+            text = paperless.search(args.get("query")) if name == "paperless_search" else paperless.read(args.get("id"))
+        except Exception as e:  # noqa: BLE001
+            text = f"Paperless-Fehler: {e}"
+    elif name == "unifi_status":
+        try:
+            import unifi
+            text = unifi.describe(args.get("topic") or "clients")
+        except Exception as e:  # noqa: BLE001
+            text = f"UniFi-Fehler: {e}"
+    elif name in ("media_recent", "media_search", "media_play"):
+        try:
+            import jellyfin
+            text = {"media_recent": jellyfin.describe_recent,
+                    "media_search": lambda: jellyfin.describe_search(args.get("query") or ""),
+                    "media_play": lambda: jellyfin.play(args.get("item") or "", args.get("device") or "")}[name]()
+        except Exception as e:  # noqa: BLE001
+            text = f"Jellyfin-Fehler: {e}"
     else:
         return None
     return text
@@ -1700,6 +2024,7 @@ def handle_call(name, args):
 
 
 def main():
+    jarvis_log.setup("jarvis-mcp", console=False)     # its own file: one MCP process per request
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -1720,7 +2045,11 @@ def main():
         elif method == "tools/call":
             params = msg.get("params") or {}
             name, args = params.get("name"), params.get("arguments") or {}
-            text = handle_call(name, args)
+            try:
+                text = handle_call(name, args)
+            except Exception as e:  # noqa: BLE001 — before, one broken tool took the whole MCP process down
+                log.exception("tool %s failed: %s", name, str(e)[:200])
+                text = f"Fehler im Werkzeug {name}: {str(e)[:200]}"
             if text is None:
                 _reply(mid, error=f"unknown tool {name}")
                 continue

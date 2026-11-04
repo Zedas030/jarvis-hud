@@ -15,13 +15,22 @@ spoken. Alarms always ring — that is what they are for.
 
 Events published while no HUD is connected wait a while and are delivered on
 the next connect, so an alarm does not vanish because the tab was reloading.
+
+Every `say` and `alarm` is also appended to a small notice log (JARVIS_NOTICES,
+logs/notices.jsonl, the last NOTICES_KEEP), because the event list itself only
+lasts half an hour — "Willkommen zurück" sums up what came while the user was out.
 """
 import datetime as dt
 import itertools
+import json
 import os
+import pathlib
 import threading
 import time
 
+ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
+NOTICES = pathlib.Path(os.environ.get("JARVIS_NOTICES", ROOT / "logs" / "notices.jsonl"))
+NOTICES_KEEP = 300
 QUIET_HOURS = os.environ.get("JARVIS_QUIET_HOURS", "22-7").strip()
 KEEP_S = 1800                       # how long an undelivered event waits for a HUD
 DEDUP_S = int(os.environ.get("JARVIS_DEDUP_SECONDS", "1800"))       # same message again within: dropped
@@ -62,6 +71,16 @@ def publish(etype, text="", priority="normal", **extra):
     ev = dict(extra, t=etype, text=text, priority=priority, at=time.time())
     if etype == "say" and priority != "alarm" and quiet_now():
         ev["silent"] = True
+    if etype == "say" and priority not in ("alarm", "critical"):
+        try:                                    # a focus session holds notices; a bad night keeps the soft ones quiet
+            import focus
+            import wellbeing
+            if focus.hold(text):
+                ev.update(silent=True, held=True)
+            elif wellbeing.soft(ev):
+                ev["silent"] = True
+        except Exception:  # noqa: BLE001
+            pass
     if etype == "say" and priority != "alarm":
         same = extra.get("key") or _norm(text)
         with _COND:
@@ -82,7 +101,29 @@ def publish(etype, text="", priority="normal", **extra):
         while _LOG and _LOG[0]["at"] < cutoff:
             _LOG.pop(0)
         _COND.notify_all()
+        if etype in ("say", "alarm") and text:
+            _note(ev)
     return ev
+
+
+def _note(ev):
+    try:
+        lines = NOTICES.read_text(encoding="utf-8").splitlines() if NOTICES.exists() else []
+        lines = (lines + [json.dumps({"at": ev["at"], "kind": ev.get("kind") or ev["t"], "text": ev["text"]},
+                                     ensure_ascii=False)])[-NOTICES_KEEP:]
+        NOTICES.parent.mkdir(parents=True, exist_ok=True)
+        NOTICES.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        pass                                   # the log is a convenience, never a reason to lose the event
+
+
+def notices_since(ts):
+    """[{at, kind, text}] of what Jarvis announced since `ts` (epoch seconds), oldest first."""
+    try:
+        rows = [json.loads(ln) for ln in NOTICES.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if r.get("at", 0) >= ts]
 
 
 def _norm(text):

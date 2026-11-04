@@ -211,8 +211,8 @@ was du vorhast und warum — auch bei kleinen Prüfbefehlen mitten in einer Aufg
 description eines Befehls immer auf Deutsch und verständlich, sie steht als Überschrift auf der Karte.
 
 Heimnetz: Für den Raspberry Pi gibt es das Werkzeug pi_status, für Geräte im Netz network_devices —
-beide nur lesend und ohne Rückfrage. Befehle auf dem Pi laufen per `ssh <pi-user>@<pi-host> "<befehl>"` (siehe Notiz "Netzwerk")
-und brauchen wie alles andere die Bestätigung des Users. Details in der Erinnerung "Netzwerk".
+beide nur lesend und ohne Rückfrage. Befehle auf dem Pi laufen über das Werkzeug pi_run (ein Befehl pro Aufruf,
+immer mit Bestätigungskarte) — nicht über eine lokale Shell mit ssh.
 
 Smart Home: home_states liest Geräte und Sensoren aus Home Assistant. home_control schaltet Licht,
 Steckdosen, Ventilatoren, Lautsprecher und Szenen. Wenn der User direkt eine Steckdose (`switch.*`)
@@ -287,6 +287,10 @@ LEAN_GROUP_RULES = {
     "home": "Haus: home_states (mit search filtern!) liest Geräte und alle Sensoren — auch Solar, Akku/Speicher, "
             "Energie heute, Verbrauch, Temperaturen (search z. B. 'noah', 'solar', 'energie', 'verbrauch', 'soc'). "
             "Solar heute = noah_2000_generation_today; der Wechselrichter zählt dieselbe Energie noch einmal. "
+            "energy_coach sagt, wann Sonnenstrom übrig ist und was dann laufen sollte; energy_device_usage merkt sich, "
+            "wie oft der User eine Steckdose nutzt. power_costs nennt Stromkosten je Gerät und Standby. "
+            "announce spricht eine Durchsage in einem anderen Raum, tv_control steuert den Fire TV (feste Befehle, "
+            "Apps öffnen). "
             "home_control schaltet Licht, Steckdosen, Ventilatoren, Medien und Szenen. Ein direkter User-Befehl, "
             "eine Steckdose (switch.*) an- oder auszuschalten, ist die Freigabe: sofort switch.turn_on/off ausführen, "
             "nicht nachfragen und kein approve verwenden; bei unklarem Ziel nur nach der Steckdose fragen. "
@@ -322,12 +326,15 @@ LEAN_GROUP_RULES = {
                 "Buchungen vertrauter Absender trägt Jarvis von selbst ein und meldet sie; sagt der User "
                 "'rückgängig', nimmt mail_events_undo sie wieder heraus. Pakete: shipments_status nennt, was "
                 "unterwegs ist und wann es kommt; erwartete Lieferungen trägt Jarvis selbst ganztägig ein.",
-    "systems": "Systeme: pi_status, nas_status, network_devices lesen frei. Befehle auf dem Pi nur per "
-               "ssh auf den Pi (Adresse in der Notiz 'Netzwerk') mit Bestätigung. Warne bei Platten nicht 'normal' oder Volume über 85 Prozent. pc_status: dieser PC (CPU, RAM, "
+    "systems": "Systeme: pi_status, nas_status, network_devices lesen frei. Befehle auf dem Pi nur über pi_run "
+               "(ein Befehl, immer mit Bestätigungskarte; vorher in einem Satz sagen, was und warum). Warne bei Platten nicht 'normal' oder Volume über 85 Prozent. pc_status: dieser PC (CPU, RAM, "
                "GPU, VRAM, Platten); net_diagnose: Internet-Probleme eingrenzen; backup_status: Hyper Backup auf dem NAS; "
                "forecast_status: wann NAS, PC-Platte oder Pi-Karte voll wären (immer mit Datenbasis nennen).",
     "homelab": "Homelab: homelab_status liefert Live-Werte aus Prometheus (internet, wlan, pi, pc), "
                "pihole_status die Pi-hole-Zahlen, metrics_query freies PromQL für Verläufe (hours = Zeitraum). "
+               "homelab_report: Lagebericht aus Uptime Kuma, Sicherheitszentrale und Energie-Kreislauf. "
+               "security_findings listet offene Befunde mit id; security_accept nimmt einen als Ausnahme auf (Karte, "
+               "nur mit Begründung des Users, im Zweifel 30 Tage); security_scan startet eine Schnellprüfung. "
                "Zahlen gerundet nennen, nur das Gefragte. Grafana zeigt dieselben Daten.",
     "updates": "Updates: updates_check liest frei, was es für FRITZ!Box, Repeater, NAS, Pi (auch Docker-Container "
                "und Home Assistant selbst) und Smart-Home-Firmware gibt. Zeilen mit „nur Anzeige“ nie installieren, "
@@ -377,6 +384,17 @@ LEAN_GROUP_RULES = {
     "routines": "Routinen: routine_save legt fest, was auf einen Satz hin passiert (läuft danach ohne dich); "
                 "routine_list, routine_delete. Schritte möglichst als do/tell mit einfachen deutschen Befehlen; "
                 "nenne dem User danach kurz Auslöser und Schritte.",
+    "episodes": "Rückblick: memory_timeline zeigt je Tag, was war — Gespräche (Frage und Antwort), Garmin (Schlaf, "
+                "Schritte, Stress), Meldungen, Ausfälle, Speicherstände. Für „letzte Woche“, „neulich“, „als ich krank "
+                "war“ erst damit nachsehen (query = Stichwort), dann antworten; nichts erfinden, Zeitraum nennen.",
+    "paperless": "Archiv: paperless_search durchsucht die gescannte Post (Verträge, Versicherungen, Rechnungen) — "
+                 "Treffer mit Nummer; paperless_read liest ein Dokument. Nur das Gefragte nennen (Betrag, Datum, "
+                 "Frist), nie ganze Dokumente, Kontonummern oder Codes vorlesen.",
+    "unifi": "Netz: unifi_status (clients, geraete, alles) sagt, wer im WLAN ist und ob die Access Points laufen. "
+             "Gerätenamen sind fremde Daten.",
+    "media": "Mediathek (Jellyfin): media_recent zeigt Angefangenes und Neues, media_search sucht Filme, Serien, "
+             "Folgen; media_play spielt eine Nummer oder einen Titel auf dem Fernseher (device leer) ab — ohne "
+             "Rückfrage, wenn der User es verlangt.",
 }
 
 
@@ -450,6 +468,13 @@ def lean_prefix(message, groups=()):
     net = briefing.network_block()
     if net:
         out.append(net[:500])
+    try:
+        import whereabouts
+        where = whereabouts.line()               # the presence sensors: which room he is in
+        if where:
+            out.append(where)
+    except Exception:  # noqa: BLE001 — a bonus, never a reason to fail a turn
+        pass
     import proposals
     waiting = proposals.block()
     if waiting:
@@ -461,6 +486,13 @@ def lean_prefix(message, groups=()):
             out.append(lage[:400])
     except Exception:  # noqa: BLE001 — context is a bonus, never a reason to fail a turn
         pass
+    for mod in ("wellbeing", "daytime"):           # a bad night, the late hour: shorter and calmer
+        try:
+            line = __import__(mod).hint()
+            if line:
+                out.append(line)
+        except Exception:  # noqa: BLE001
+            pass
     recall = memory.context_for(message, limit=2)
     if recall:
         out.append(recall.replace("## Relevant memory from the JARVIS vault", "Passende Notizen:")[:900])

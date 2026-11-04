@@ -101,6 +101,25 @@ def observe(message, tool_calls):
     return k
 
 
+def choice(n):
+    """Entities the user picked once when this wording was ambiguous ("die Lampe"), or []."""
+    k = key(n)
+    return list((load().get("choices") or {}).get(k, {}).get("entities", [])) if k else []
+
+
+def remember_choice(n, entities):
+    """The user's answer to "Meinen Sie A oder B?" — kept for the wording, no card needed: he said it."""
+    k = key(n)
+    if not k or not entities:
+        return False
+    data = dict(load())
+    choices = dict(data.get("choices") or {})
+    choices[k] = {"entities": sorted(entities), "example": (n or "").strip()[:80], "at": time.strftime("%Y-%m-%d")}
+    data["choices"] = choices
+    _save(data)
+    return True
+
+
 def forget(k):
     data = dict(load())
     al = dict(data.get("aliases") or {})
@@ -158,4 +177,11 @@ def spoken_report(days=7):
     if r["repeat"]:
         m, c, _ = r["repeat"][0]
         text += f" Am teuersten wiederholt: „{m}“, {c} mal."
+    try:
+        import selfcheck
+        n = len(selfcheck.misses(days))
+        if n:
+            text += f" {n} Mal mussten Sie gleich nochmal fragen — Details mit „Wie gut warst du?“."
+    except Exception:  # noqa: BLE001
+        pass
     return text

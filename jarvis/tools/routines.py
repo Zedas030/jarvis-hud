@@ -143,6 +143,68 @@ def describe():
     return "Routinen: " + "; ".join(f"{r.get('name')} (sagen Sie: {(r.get('triggers') or ['?'])[0]})" for r in rs) + "."
 
 
+# ── dry run: what a routine would do, without doing it ───────
+_SERVICE_WORDS = {"turn_on": "an", "turn_off": "aus", "toggle": "umschalten", "media_play": "abspielen",
+                  "media_pause": "pausieren", "media_stop": "stoppen"}
+
+
+def _entity_names():
+    try:
+        import briefing
+        return {s["entity_id"]: ((s.get("attributes") or {}).get("friendly_name") or s["entity_id"])
+                for s in briefing._ha_states()}
+    except Exception:  # noqa: BLE001 — without the house the ids will do
+        return {}
+
+
+def explain(routine, names=None):
+    """Spoken list of the steps, nothing runs. names: entity_id → friendly name."""
+    names = _entity_names() if names is None else names
+    steps = []
+    for s in routine.get("steps") or []:
+        if "say" in s:
+            steps.append(f"ich sage „{s['say']}“")
+        elif "wait" in s:
+            steps.append(f"ich warte {s['wait']} Sekunden")
+        elif "ha" in s:
+            dom, _, svc = str(s["ha"]).partition(".")
+            what = ("alle Lichter" if s.get("entity_id") == "all" and dom == "light" else
+                    "alle Lautsprecher" if s.get("entity_id") == "all" else names.get(s.get("entity_id"), s.get("entity_id")))
+            verb = _SERVICE_WORDS.get(svc, svc.replace("_", " "))
+            extra = ""
+            if (s.get("data") or {}).get("brightness_pct") is not None:
+                extra = f" auf {s['data']['brightness_pct']} Prozent"
+            steps.append(f"{what}{extra} {verb}" if verb in ("an", "aus") else f"{what} {verb}{extra}")
+        elif "do" in s:
+            steps.append(f"Befehl „{s['do']}“")
+        elif "tell" in s:
+            steps.append(f"ich beantworte „{s['tell']}“")
+    name = routine.get("name", "die Routine")
+    trig = ", ".join(f"„{t}“" for t in (routine.get("triggers") or [])[:3])
+    if not steps:
+        return f"{name} hat keine Schritte, Sir."
+    return (f"Bei {trig or name} passiert Folgendes, in dieser Reihenfolge: " + "; ".join(steps)
+            + ". Das war nur die Vorschau — nichts davon habe ich gerade getan.")
+
+
+_EXPLAIN = re.compile(r"\b(?:was (?:passiert|machst du|tust du|würde passieren|läuft ab),? wenn ich (?P<phrase>.+?) sage|"
+                      r"was (?:macht|tut|bedeutet|steckt hinter) (?:die |der )?routine (?P<name>.+?)|"
+                      r"(?:erklär|zeig|beschreib)\w* (?:mir )?(?:mal )?(?:die |der )?routine (?P<name2>.+?)|"
+                      r"vorschau (?:für |von )?(?:die |der )?routine (?P<name3>.+?))\s*[?.!]*$", re.I)
+
+
+def explain_request(raw):
+    """'Was passiert, wenn ich Gute Nacht sage?' → the dry run, or None if this is no such question."""
+    m = _EXPLAIN.search((raw or "").strip())
+    if not m:
+        return None
+    phrase = (m.group("phrase") or m.group("name") or m.group("name2") or m.group("name3") or "").strip(" „“\"'")
+    r = find(phrase) or next((x for x in load() if _norm(x.get("name")) == _norm(phrase)), None)
+    if not r:
+        return f"Eine Routine „{phrase}“ kenne ich nicht, Sir. {describe()}"
+    return explain(r)
+
+
 # ── for the LLM tools ────────────────────────────────────────
 def tool(name, args):
     data = list(load())

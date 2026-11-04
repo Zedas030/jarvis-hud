@@ -25,8 +25,6 @@ import urllib.request
 import hostos
 
 PHONE = os.environ.get("JARVIS_PHONE_NOTIFY", "").strip()
-# ping target for "is the internet there" — a public, always-on host
-INTERNET_HOST = os.environ.get("JARVIS_INTERNET_HOST", "Hier Key eintragen").strip()
 PHONE_LEVEL = os.environ.get("JARVIS_PHONE_PUSH", "critical").strip().lower()   # critical | all | off
 
 
@@ -168,8 +166,8 @@ def net_diagnose():
     else:
         rows.append("Router: kein Standard-Gateway gefunden")
         verdict = "Der PC hat gerade keine Netzwerkverbindung."
-    lost, ms = ping(INTERNET_HOST)
-    rows.append(f"Internet ({INTERNET_HOST}): " + (f"{ms:.0f} ms, {lost} % Verlust" if ms is not None else "nicht erreichbar"))
+    lost, ms = ping("1.1.1.1")
+    rows.append("Internet (1.1.1.1): " + (f"{ms:.0f} ms, {lost} % Verlust" if ms is not None else "nicht erreichbar"))
     if not verdict and (ms is None or lost >= 34):
         verdict = "Das Heimnetz ist in Ordnung, aber das Internet dahinter nicht — Router-Internetverbindung oder Anbieter."
     elif not verdict and ms > 80:
@@ -268,13 +266,16 @@ def home_check(states=None, now=None):
 
 # ── phone ────────────────────────────────────────────────────
 
-def phone_notify(text, title="Jarvis"):
-    """Push via the HA companion app. Returns German text."""
+def phone_notify(text, title="Jarvis", actions=None):
+    """Push via the HA companion app. `actions`: [{action, title}] buttons (phone_actions.py). Returns German text."""
     if not PHONE or not PHONE.startswith("notify."):
         return "Handy-Benachrichtigung nicht eingerichtet (JARVIS_PHONE_NOTIFY, z. B. notify.mobile_app_iphone)."
     import jarvis_mcp as j
+    body = {"title": title, "message": (text or "")[:500]}
+    if actions:
+        body["data"] = {"actions": [{"action": a["action"], "title": a["title"]} for a in actions][:3]}
     try:
-        j._ha(f"/api/services/notify/{PHONE.split('.', 1)[1]}", {"title": title, "message": (text or "")[:500]})
+        j._ha(f"/api/services/notify/{PHONE.split('.', 1)[1]}", body)
     except Exception as e:  # noqa: BLE001
         return f"Handy nicht erreichbar: {e}"
     return "Ans Handy geschickt."

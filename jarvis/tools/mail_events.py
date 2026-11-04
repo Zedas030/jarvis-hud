@@ -249,11 +249,13 @@ def _save(d):
     os.replace(tmp, PATH)
 
 
-def scan(hours=None, mails=None):
+def scan(hours=None, mails=None, now=None):
+    # `now` is for tests with dated fixtures; live callers leave it empty
     import icloud_calendar as cal
+    now = now or dt.datetime.now()
     mails = _mails(hours) if mails is None else mails
-    existing = cal.events(dt.date.today(), 62) if cal.configured() else []
-    found = candidates(mails, existing)
+    existing = cal.events(now.date(), 62) if cal.configured() else []
+    found = candidates(mails, existing, now=now)
     d = _load()
     d.update(found=found, at=time.time())
     _save(d)
@@ -358,7 +360,7 @@ def check(now=None, mails=None):
     now = now or dt.datetime.now()
     if not DAILY_HOUR <= now.hour < QUIET_FROM:
         return
-    found = scan(mails=mails)
+    found = scan(mails=mails, now=now)
     withdraw_stale(found)
     d = _load()
     done_before = set(d.get("offered", [])) | set(d.get("added", []))

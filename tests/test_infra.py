@@ -18,9 +18,9 @@ import infra              # noqa: E402
 import jarvis_mcp         # noqa: E402
 import router             # noqa: E402
 
-PING_DE = """Ping wird ausgeführt für internet.example mit 32 Bytes Daten:
-Antwort von internet.example: Bytes=32 Zeit=18ms TTL=57
-Antwort von internet.example: Bytes=32 Zeit=20ms TTL=57
+PING_DE = """Ping wird ausgeführt für 1.1.1.1 mit 32 Bytes Daten:
+Antwort von 1.1.1.1: Bytes=32 Zeit=18ms TTL=57
+Antwort von 1.1.1.1: Bytes=32 Zeit=20ms TTL=57
 Zeitüberschreitung der Anforderung.
 """
 
@@ -42,7 +42,7 @@ class Patch:
 class Pc(unittest.TestCase):
     def test_ping_parse(self):
         with Patch(infra, _run=lambda cmd, timeout=10: (0, PING_DE)):
-            self.assertEqual(infra.ping("internet.example"), (33, 19.0))
+            self.assertEqual(infra.ping("1.1.1.1"), (33, 19.0))
 
     def test_gpu_parse(self):
         with Patch(infra, _run=lambda cmd, timeout=10: (0, "NVIDIA GeForce RTX 5080, 78, 14503, 16303, 46\n")):
@@ -57,8 +57,8 @@ class Pc(unittest.TestCase):
 
 
 class Net(unittest.TestCase):
-    def diag(self, gw="router.example", router=(0, 3), internet=(0, 15), dns=40, http=100):
-        pings = {gw: router, infra.INTERNET_HOST: internet}
+    def diag(self, gw="192.0.2.1", router=(0, 3), internet=(0, 15), dns=40, http=100):
+        pings = {gw: router, "1.1.1.1": internet}
         with Patch(infra, gateway=lambda: gw, ping=lambda h, count=3: pings[h], _dns=lambda: dns, _http=lambda: http):
             return infra.net_diagnose()
 

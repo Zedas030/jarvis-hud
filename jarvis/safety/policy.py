@@ -36,9 +36,14 @@ CLASSES = {
     "mail_inbox": READ, "mail_mark_read": LIMITED_WRITE, "mail_draft": CONFIRM,
     # home and systems
     "home_states": READ, "home_control": LIMITED_WRITE, "home_check": READ,  # untrusted-content guard still applies
-    "homelab_status": READ, "metrics_query": READ, "pihole_status": READ,   # Prometheus / Pi-hole, read only
+    "energy_coach": READ, "energy_device_usage": LIMITED_WRITE,   # the coach only advises; usage is a note
+    "homelab_status": READ, "metrics_query": READ, "pihole_status": READ, "homelab_report": READ,
+    "security_findings": READ, "security_scan": LIMITED_WRITE, "security_accept": CONFIRM,   # an exception hides a risk
+    "power_costs": READ, "weather_alerts": READ,
+    "announce": LIMITED_WRITE, "tv_control": LIMITED_WRITE,   # a voice in a room, a fixed TV command   # Prometheus / Pi-hole, read only
     "updates_check": READ, "update_status": READ, "update_install": CONFIRM,   # installing restarts devices
-    "pi_status": READ, "nas_status": READ, "network_devices": READ, "net_diagnose": READ,
+    "pi_status": READ, "pi_run": CONFIRM,   # pi_run = ssh: every command a card
+    "nas_status": READ, "network_devices": READ, "net_diagnose": READ,
     "pc_status": READ, "backup_status": READ, "resource_status": READ, "forecast_status": READ,
     "weather": READ, "music": LIMITED_WRITE, "garmin_health": READ, "health_log": LIMITED_WRITE,
     # timers, lists, routines
@@ -59,10 +64,17 @@ CLASSES = {
     "research_save": LIMITED_WRITE, "phone_notify": LIMITED_WRITE, "day_prep": READ,
     "watch_add": LIMITED_WRITE, "watch_list": READ, "watch_remove": LIMITED_WRITE,
     "plan_create": LIMITED_WRITE, "plan_list": READ, "plan_check": LIMITED_WRITE,
+    # episodes, maintenance, archive, network, media
+    "memory_timeline": READ, "maintenance_status": READ,
+    "paperless_search": READ, "paperless_read": READ,     # scanned post: written by others
+    "unifi_status": READ,                                 # client names come from DHCP
+    "media_recent": READ, "media_search": READ, "media_play": LIMITED_WRITE,   # a film on the TV, nothing more
 }
 # Content written by others: wrapped as data, and taints the request.
 UNTRUSTED = {"web_fetch", "mail_inbox", "mail_events_scan", "shipments_status", "calendar_events", "file_read", "clipboard_read", "screen_read", "day_prep",
-             "context_snapshot", "doc_search", "screen_describe"}
+             "context_snapshot", "doc_search", "screen_describe",
+             "homelab_report", "security_findings",   # device names in security findings come from DHCP
+             "paperless_search", "paperless_read", "unifi_status", "media_recent", "media_search"}
 # Home Assistant domains Jarvis never touches, whatever the model asks for.
 BLOCKED_HA_DOMAINS = {"lock", "alarm_control_panel", "camera", "siren", "valve", "update", "button"}
 
@@ -116,10 +128,13 @@ _EFFECT = {
     "memory_forget": ("Erinnerung vergessen", "Gedächtnis", "Der Eintrag wandert in den Papierkorb (30 Tage wiederherstellbar)."),
     "mail_draft": ("Mail-Entwurf anlegen", "Ordner Entwürfe in Ihrem Postfach", "Nur ein Entwurf — gesendet wird nichts."),
     "script_run": ("Freigegebenes Skript ausführen", "Ihr PC", "Nur ein Skript aus Ihrer Freigabeliste, mit Zeitlimit."),
+    "pi_run": ("Befehl auf dem Pi ausführen", "Raspberry Pi (ssh)", "Läuft genau einmal auf dem Pi; Ausgabe kommt gekürzt zurück."),
     "update_install": ("Update installieren", "das Gerät im Ziel", "Das Gerät kann dabei kurz neu starten oder aussetzen."),
     "screen_describe": ("Bildschirmfoto an Claude schicken", "das aktive Fenster (oder der ganze Bildschirm)",
                         "Das Bild geht einmalig an Anthropic und wird danach gelöscht; kein Klick, keine Eingabe."),
     "proposal_accept": ("Vorschlag umsetzen", "Jarvis' Einstellungen", "Siehe unten."),
+    "security_accept": ("Sicherheitsbefund als Ausnahme akzeptieren", "Sicherheitszentrale auf dem Pi",
+                        "Der Befund zählt bis zum Ablauf nicht mehr; zurücknehmen im ORBIT Monitor → Ausnahmen."),
     "rule_remove": ("Gelernte Regel streichen", "Notiz Vorlieben", "Jarvis befolgt die Regel danach nicht mehr."),
     "skill_undo": ("Gelernte Router-Regel zurücknehmen", "config/learned.json",
                    "Vorherige Version oder keine Regel; die Änderung steht in der Historie."),

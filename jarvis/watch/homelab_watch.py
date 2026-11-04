@@ -19,6 +19,9 @@ When it reports:
     of hourly samples also clear outliers from the device's normal values
   - at most JARVIS_HOMELAB_MAX_PER_DAY (2) messages per incident and day
 
+  Uptime Kuma, the security centre on the Pi and the energy loop: situation.py
+                    (config/homelab.json: kuma_skip, kuma_critical, security_announce, energy)
+
 New devices on the WLAN are still reported by the existing watchdog (briefing.py).
 """
 import json
@@ -34,6 +37,9 @@ import background
 import commands
 import events
 import hostos
+import jarvis_log
+
+log = jarvis_log.get(__name__)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 CONFIG = pathlib.Path(os.environ.get("JARVIS_HOMELAB_CONFIG", ROOT / "config" / "homelab.json"))
@@ -294,18 +300,18 @@ def check(cfg=None):
     cfg = cfg or config()
     metrics, findings = {}, []
     for fn in (check_ha, lambda: check_pi(metrics), lambda: check_nas(metrics), lambda: check_devices(cfg),
-               lambda: check_pc(metrics), check_backup):
+               lambda: check_pc(metrics), check_backup, lambda: check_situation(cfg)):
         try:
             findings += fn()
         except Exception as e:  # noqa: BLE001 — one dead source must not silence the rest
-            print(f"  homelab_watch: {e}", flush=True)
+            log.warning("%s", str(e)[:300], exc_info=True)
     findings += value_findings({k: v for k, v in metrics.items() if k != "nas_used"}, cfg["limits"])
     try:
         import monitoring
         monitoring.record(metrics)
         findings += monitoring.forecast_findings()
     except Exception as e:  # noqa: BLE001
-        print(f"  homelab_watch: Prognose: {e}", flush=True)
+        log.warning("Prognose: %s", e)
     import infra
     for text in process(findings):
         events.publish("say", sir(text), kind="homelab", key=f"homelab:{_norm_key(text)}",
@@ -318,6 +324,12 @@ def check_pc(metrics):
     import infra
     metrics.update({k: v for k, v in infra.pc_metrics().items() if k in ("pc_gpu_temp", "pc_disk")})
     return []
+
+
+def check_situation(cfg):
+    """Uptime Kuma, the Pi's security centre and the energy loop (situation.py)."""
+    import situation
+    return situation.findings(cfg)
 
 
 _BACKUP = {"day": "", "finding": None}

@@ -20,6 +20,10 @@ import time
 
 import commands
 import hostos
+import metrics
+import jarvis_log
+
+log = jarvis_log.get(__name__)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 MODEL = os.environ.get("JARVIS_BACKGROUND_MODEL", "haiku").strip()
@@ -93,13 +97,13 @@ def ask(job, system, prompt, tools=""):
                 _log(job, MODEL, usage, prompt, text, int((time.time() - t0) * 1000))
                 return text
             except (RuntimeError, OSError, subprocess.TimeoutExpired) as e:
-                print(f"  {job}: Claude nicht verfügbar ({e})" + ("" if tools else ", versuche Ersatz"), flush=True)
+                log.warning("%s: Claude nicht verfügbar (%s)%s", job, e, "" if tools else ", versuche Ersatz")
         if tools:
             return None
         try:
             text, usage, who = _chain(system, prompt)
         except Exception as e:  # noqa: BLE001
-            print(f"  {job}: kein Modell verfügbar ({e})", flush=True)
+            log.warning("%s: kein Modell verfügbar (%s)", job, e)
             return None
         _log(job, f"fallback:{who}", usage, prompt, text, int((time.time() - t0) * 1000))
         return text
@@ -149,11 +153,15 @@ def loop(name, every, step, pausable=True):
     def run():
         time.sleep(30)
         while True:
+            t0 = time.time()
             try:
                 import emergency
                 if not (pausable and emergency.paused()):
                     step()
+                    metrics.counter("job_runs_total", job=name)
+                    metrics.observe("job_ms", (time.time() - t0) * 1000, job=name)
             except Exception as e:  # noqa: BLE001
-                print(f"  {name}: {e}", flush=True)
+                metrics.counter("job_errors_total", job=name)
+                log.warning("%s: %s", name, str(e)[:300], exc_info=True)
             time.sleep(every)
     threading.Thread(target=run, daemon=True, name=name).start()
