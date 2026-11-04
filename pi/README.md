@@ -1,7 +1,7 @@
 # Raspberry Pi: Monitoring und Doku
 
-Stand der beiden statischen Seiten, die der Raspberry Pi (nginx) im Heimnetz ausliefert und die das HUD
-oben rechts verlinkt. Beide Kopien sind anonymisiert (Adressen, MAC-Adressen, Seriennummern, Tailnet,
+Hier liegen (im veröffentlichten Stand auf GitHub) die beiden statischen Seiten, die der Raspberry Pi (nginx) im Heimnetz ausliefert und die das HUD
+oben rechts verlinkt. Die Kopien werden beim Snapshot vom Pi geholt und anonymisiert (Adressen, MAC-Adressen, Seriennummern, Tailnet,
 Benutzername durch Platzhalter ersetzt).
 
 | Ordner | Auf dem Pi | Port | Inhalt |

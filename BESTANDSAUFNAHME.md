@@ -51,7 +51,7 @@ Browser-HUD / iPad / iPhone              server.py (ThreadingHTTPServer, 127.0.0
   `scheduler.py` (1 s), 17 Jobs. Hintergrundjobs ändern nichts selbst, sie legen Vorschläge an (`proposals.py`);
   zwei bewusste Ausnahmen (Buchungen vertrauter Absender, Lieferungen).
 - **Sprache**: seit 02.11. Server-Engine (Silero VAD, Whisper-Partials, satzweise TTS, Barge-in 150 ms,
-  `config/voice.yaml`, `/metrics`). Details und Messwerte in `VOICE-ANALYSE.md` und README.
+  `config/voice.yaml`, `/metrics`). Details und Messwerte in `VOICE-ANALYSE.md` und `docs/sprache.md`.
 - **Plattform**: Windows-Teile hinter `hostos.py` begonnen (`PORTING.md` listet jede Stelle); PC-Steuerung
   (`pc.py`, `desktop.py`, `vision.py`, `overlay.py`) ist echt Windows; Autostart per `.bat` und Aufgabenplanung.
 
@@ -69,7 +69,7 @@ Browser-HUD / iPad / iPhone              server.py (ThreadingHTTPServer, 127.0.0
 | **pycaw, comtypes** | `pc.py`, `desktop.py` | **nein** | nur Windows: in `requirements-windows.txt` |
 | openwakeword, sounddevice, speexdsp | optional | nein (dokumentiert) | ok als Extras |
 | torch, chatterbox (`.venv-tts`) | GPU-Stimme | `requirements-tts.txt` | bleibt getrennt |
-| Node.js + `@anthropic-ai/claude-code` | Gehirn | README | ok |
+| Node.js + `@anthropic-ai/claude-code` | Gehirn | docs/installation.md | ok |
 
 Vorschlag: `requirements.txt` (Kern, läuft auf CPU überall), `requirements-gpu.txt`, `requirements-windows.txt`,
 `requirements-tts.txt` (bleibt), `requirements-dev.txt` (coverage, ruff). Keine neue Laufzeitabhängigkeit nötig.

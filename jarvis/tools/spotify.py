@@ -13,7 +13,7 @@ the Web API (Spotify Connect). Two jobs:
 The media keys in jarvis_mcp only reach Spotify on this PC; with this module set up the music tool uses
 the Web API instead and falls back to the keys when it fails.
 
-One-time setup (README, "Spotify"): an app on developer.spotify.com with the redirect URI below, its
+One-time setup (docs/installation.md, "Konfiguration" → Spotify): an app on developer.spotify.com with the redirect URI below, its
 Client ID in JARVIS_SPOTIFY_CLIENT_ID, then  .venv\\Scripts\\python.exe scripts\\spotify_login.py
 Needs Premium (a family plan member is fine): Spotify refuses playback control for free accounts.
 """

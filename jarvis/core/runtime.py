@@ -30,7 +30,7 @@ WORKDIR = os.path.expanduser(os.environ.get("JARVIS_WORKDIR", os.getcwd()))
 # bypassPermissions by default: a headless `claude -p` can't surface a permission
 # prompt, so any gated tool (MCP connectors, web search) would silently fail
 # otherwise. This also lets JARVIS take unattended actions (send/delete/shell) —
-# see the Security notes in README. Set JARVIS_PERMISSION=acceptEdits to narrow it.
+# see docs/sicherheit.md and SECURITY.md. Set JARVIS_PERMISSION=acceptEdits to narrow it.
 PERMISSION = os.environ.get("JARVIS_PERMISSION", "acceptEdits").strip()
 # Tools JARVIS may use without a prompt. No Bash: a voice-driven assistant should
 # not run shell commands because something in the room said so. acceptEdits keeps

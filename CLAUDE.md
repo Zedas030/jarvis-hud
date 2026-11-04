@@ -13,7 +13,7 @@ start-jarvis.bat                                            # supervisor + serve
 ```
 
 A running Jarvis restarts itself when its code changes. For a throwaway instance use another
-port and state file (see README, "Entwicklung und Diagnose"); `JARVIS_RUNTIME=mock` avoids Claude calls.
+port and state file (see `docs/installation.md`, "Entwicklung und Diagnose"); `JARVIS_RUNTIME=mock` avoids Claude calls.
 
 ## Conventions
 
@@ -44,4 +44,4 @@ port and state file (see README, "Entwicklung und Diagnose"); `JARVIS_RUNTIME=mo
 - Jarvis never edits his own code at runtime.
 - Never set `ANTHROPIC_API_KEY`; personal data lives only in `.env`, `config/*.json` (not the
   examples), `vault/`, `logs/`, `backups/`, `state.json` — all ignored by git.
-- Publishing to GitHub: see the sanitized snapshot flow (branch `clean`, English README). Never push `main`.
+- Publishing to GitHub: see the sanitized snapshot flow (branch `clean`). Never push `main`.

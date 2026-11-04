@@ -2,7 +2,7 @@
 
 Status je Phase der Vorgabe vom 02.11.2026. Deutsch, weil es der Arbeitsplan des Nutzers ist. Die Analyse
 steht in `BESTANDSAUFNAHME.md` (Phase 0), die Sprachpipeline in `VOICE-ANALYSE.md`, der Server-Umzug in
-`UMBAU-SERVER.md`. Die Liste der kleinen Haken im README bleibt die Funktionsliste; hier steht der Plan.
+`UMBAU-SERVER.md`. Die Liste der kleinen Haken in `docs/funktionen.md` bleibt die Funktionsliste; hier steht der Plan.
 
 Legende: ✅ fertig · 🔄 in Arbeit · ⏸ wartet auf Freigabe · ⬜ offen
 

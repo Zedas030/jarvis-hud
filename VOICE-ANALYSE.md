@@ -1,6 +1,6 @@
 # Analyse Sprachpipeline: Zuhören, Unterbrechen, Weitersprechen
 
-> Umgesetzt am 02.11.2026 (Branch `feat/voice-engine`): P0–P4 aus Abschnitt 5 sind gebaut, siehe README →
+> Umgesetzt am 02.11.2026 (Branch `feat/voice-engine`): P0–P4 aus Abschnitt 5 sind gebaut, siehe `docs/sprache.md` →
 > „Sprach-Engine“. Offen bleiben die iPad-Anbindung über `tailscale serve`, der Raum-Satellit und die
 > Erprobung der Sonos-Echo-Unterdrückung mit Referenzsignal.
 
@@ -110,7 +110,7 @@ Zeit bis zum ersten vollständigen Satz aus Claude, der dritte die TTS-Erstlaten
 
 ### 3.4 Struktur
 - Kein expliziter Zustand, kein Log der Zustandswechsel. Fehler sind nur mit Konsole im Browser nachvollziehbar.
-- Alle Schwellwerte sind Konstanten in `app.js`; die README empfiehlt, dort zu editieren.
+- Alle Schwellwerte sind Konstanten in `app.js`; `docs/sprache.md` empfiehlt, dort zu editieren.
 - Die Logik hängt am Browser-Tab (iOS-Audio-Unlock, Hintergrund-Drosselung, pro Gerät andere Pegel).
 - Für den 24/7-Linux-Server ohne Mikrofon ist die Trennung Browser = Ohr, Server = Hirn grundsätzlich
   richtig, aber AEC, VAD und Endpointing gehören dann auf die Seite, die das Referenzsignal und die
@@ -215,7 +215,7 @@ Sonos: Stream kappen plus `volume_set` parallel; Fortsetzen hängt die Sätze ab
   weiter), als `logs/voice_metrics.jsonl` und `/metrics` im Prometheus-Textformat (Standardbibliothek).
 - Testskripte mit WAV-Fixtures: Denkpause im Satz, Unterbrechung mit Frage, Backchannel, Husten,
   Stopp, Unterbrechung ohne Folgeäußerung; laufen offline gegen die Engine ohne Mikrofon.
-- Tuning-Protokoll in der README: welche Werte bei „zu früh“ / „zu spät“ / „stockt“ / „hört nicht“.
+- Tuning-Protokoll in `docs/sprache.md`: welche Werte bei „zu früh“ / „zu spät“ / „stockt“ / „hört nicht“.
 
 ## 6. Neue Abhängigkeiten (Vorschlag, noch nicht installiert)
 

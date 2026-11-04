@@ -1032,7 +1032,7 @@ def _music_room(room):
     if not room:
         return "In welchen Raum soll die Musik?"
     if not spotify.configured():
-        return "Dafür brauche ich das Spotify-Login (README → Spotify), die Medientasten erreichen nur den PC."
+        return "Dafür brauche ich das Spotify-Login (docs/installation.md → Konfiguration → Spotify), die Medientasten erreichen nur den PC."
     name, device, player = speakers.spotify_device(room)
     ok, text = spotify.transfer(device or room)     # an unknown room may still be a device name ("PC")
     fallback = speakers.spotify_fallback(room) if name else ""

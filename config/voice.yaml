@@ -1,7 +1,7 @@
 # Jarvis voice engine — every threshold and timeout of listening, turn-taking, barge-in and speaking.
 # Loaded by jarvis/voice/voice_config.py (JARVIS_VOICE_CONFIG points elsewhere). Values here are the
 # defaults the code falls back to when a key is missing, so deleting a line is always safe.
-# Tuning: see README → "Sprach-Engine" → "Tuning-Protokoll".
+# Tuning: see docs/sprache.md → "Sprach-Engine" → "Tuning-Protokoll".
 
 engine:
   enabled: true            # false: the HUD keeps the old browser-only pipeline (ui/app.js)

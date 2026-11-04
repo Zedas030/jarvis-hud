@@ -114,7 +114,7 @@ Schritte 2 und 3 aus `PORTING.md`, plus Zugriff. Jeder Punkt einzeln testbar, Ja
 3. Letzte PowerShell-Aufrufe (`router.py`, `infra.py`, `jarvis_mcp.py`) hinter `hostos`: Gateway, Nachbarn,
    Prozessliste (psutil), Skripte.
 4. `JARVIS_TRUSTED_IPS` für `LOCAL_ONLY` (siehe oben), mit Test.
-5. `start-jarvis.sh` und `deploy/jarvis.service` ins Repo, `README` um Linux-Pfade ergänzen.
+5. `start-jarvis.sh` und `deploy/jarvis.service` ins Repo, `docs/installation.md` um Linux-Pfade ergänzen.
 6. Messen, bevor umgestellt wird: Latenz einer typischen Spracheingabe heute (GPU) als Referenz. Dafür
    `WHISPER_LOCAL_DEVICE=cpu` einmal am PC setzen und dieselben Sätze sprechen. Liegt `small` auf dem
    i7-8700 über etwa 2,5 s, fällt die Entscheidung für Groq-Whisper oder die A2000 schon hier.
@@ -241,5 +241,5 @@ Erst wenn alles grün ist, wird der PC-Jarvis abgeschaltet.
 
 Nach Phase 4 gehören in die Pi-Doku (`/var/www/raspi-doku/index.html`): der neue Server unter „Dienste im
 Detail“ (IP, Ports 8720/8721/8740, systemd-Unit, Backup-Ziel), ein Eintrag unter „Änderungen“, der Kuma-Monitor.
-In diesem Repo: `README.md` (Schnellstart Linux), `ARCHITECTURE.md` (`pc_backend`, PC-Agent), `SECURITY.md`
+In diesem Repo: `docs/installation.md` (Schnellstart Linux), `ARCHITECTURE.md` (`pc_backend`, PC-Agent), `SECURITY.md`
 (`JARVIS_TRUSTED_IPS`, Agent-Token), `.env.example`.

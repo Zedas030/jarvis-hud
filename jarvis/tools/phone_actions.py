@@ -10,7 +10,7 @@ confirmed on the way, not only at the HUD.
                                     (audit "card", source phone), JARVIS_NO_<id> declines it;
                                     then the helper is emptied again.
 
-Home Assistant needs one helper and one automation (README, "Handy"):
+Home Assistant needs one helper and one automation (docs/bedienung.md, "Handy"):
   input_text.jarvis_phone_action
   automation: trigger event mobile_app_notification_action →
               input_text.set_value entity jarvis_phone_action value "{{ trigger.event.data.action }}"
