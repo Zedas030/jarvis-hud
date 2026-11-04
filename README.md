@@ -18,8 +18,25 @@ JARVIS ist ein selbst gehosteter Sprachassistent im Stil des Iron-Man-Computers.
 
 Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine API-Abrechnung pro Token. Damit das Kontingent lange reicht, beantwortet ein **lokaler Intent-Router** einfache Befehle komplett ohne LLM. Alles andere läuft als **schlanker, zustandsloser Aufruf** mit eigenem Kurz-Prompt und nur den Werkzeugen, die die Anfrage wirklich braucht.
 
+## Screenshots
+
+Alle Bilder stammen aus einer Instanz mit Beispielkonfiguration (`JARVIS_RUNTIME=mock`, nur die `*.example.json`) und aus den anonymisierten Kopien der Pi-Seiten unter `pi/`. Es sind keine persönlichen Daten darauf.
+
+**HUD am PC** – Ansicht „Sonnenlauf“ mit Tagesverlauf, Wetter, Terminen und den Schnellbefehlen:
+
+![Jarvis-HUD, Ansicht Sonnenlauf](docs/screenshots/hud.png)
+
+**ORBIT Monitor auf dem Raspberry Pi** (Port 8092) – Geräteinventar mit Live-Status aus der FRITZ!Box; das HUD verlinkt die Seite oben rechts:
+
+![ORBIT Monitor, Geräteseite](docs/screenshots/monitoring.png)
+
+**Pi-Dokumentation** (Port 8091) – Übersicht mit Hardware, Diensten und dem Abschnitt zu Jarvis:
+
+![Pi-Dokumentation, Übersicht](docs/screenshots/doku.png)
+
 ## Inhalt
 
+- [Screenshots](#screenshots)
 - [Highlights](#highlights)
 - [Was alles möglich ist](#was-alles-möglich-ist)
 - [Architektur](#architektur)
