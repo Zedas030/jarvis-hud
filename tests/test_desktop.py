@@ -41,52 +41,52 @@ class Windows(unittest.TestCase):
         self.assertIsNone(desktop.find_window("steam"))
 
     def test_local_voice_commands(self):
-        r = router.route("Spotify nach rechts")
+        r = router.route("Spotify to the right")
         self.assertEqual(r["kind"], "local")
-        self.assertEqual(self.placed, [(101, "rechts", 1)])
+        self.assertEqual(self.placed, [(101, "right", 1)])
         self.placed.clear()
-        router.route("Browser links und Code rechts auf Monitor 2")
-        self.assertEqual(self.placed, [(102, "links", 1), (103, "rechts", 2)])
+        router.route("Browser left and Code right on monitor 2")
+        self.assertEqual(self.placed, [(102, "left", 1), (103, "right", 2)])
 
     def test_unknown_app_goes_to_llm(self):
-        self.assertEqual(router.route("Steam nach rechts")["kind"], "llm")
+        self.assertEqual(router.route("Steam to the right")["kind"], "llm")
         self.assertEqual(self.placed, [])
 
     def test_tool(self):
-        out = jarvis_mcp.call_tool("window_arrange", {"app": "spotify", "position": "voll", "monitor": 2})
-        self.assertIn("im Vollbild auf Monitor 2", out)
-        self.assertIn("kenne ich nicht", desktop.arrange("spotify", "diagonal"))
+        out = jarvis_mcp.call_tool("window_arrange", {"app": "spotify", "position": "full", "monitor": 2})
+        self.assertIn("full screen on monitor 2", out)
+        self.assertIn("I do not know this position", desktop.arrange("spotify", "diagonal"))
 
 
 class Files(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         root = desktop.FILE_ROOTS[0]
-        (root / "Urlaub").mkdir(parents=True, exist_ok=True)
-        (root / "Urlaub" / "Packliste Mallorca.md").write_text("- Sonnencreme\n- Golfschläger\n", encoding="utf-8")
-        (root / "Kunde Contoso Angebot.txt").write_text("Angebot für den Kunden", encoding="utf-8")
-        with zipfile.ZipFile(root / "Brief.docx", "w") as z:
-            z.writestr("word/document.xml", "<w:document><w:body><w:p><w:r><w:t>Hallo Anna,</w:t></w:r></w:p>"
-                                            "<w:p><w:r><w:t>bis Sonntag.</w:t></w:r></w:p></w:body></w:document>")
-        (TMP / "outside.txt").write_text("geheim", encoding="utf-8")
+        (root / "Holiday").mkdir(parents=True, exist_ok=True)
+        (root / "Holiday" / "Packing list Mallorca.md").write_text("- Sun cream\n- Golf clubs\n", encoding="utf-8")
+        (root / "Customer Contoso offer.txt").write_text("Offer for the customer", encoding="utf-8")
+        with zipfile.ZipFile(root / "Letter.docx", "w") as z:
+            z.writestr("word/document.xml", "<w:document><w:body><w:p><w:r><w:t>Hello Anna,</w:t></w:r></w:p>"
+                                            "<w:p><w:r><w:t>see you Sunday.</w:t></w:r></w:p></w:body></w:document>")
+        (TMP / "outside.txt").write_text("secret", encoding="utf-8")
 
     def test_search(self):
-        out = desktop.search("packliste")
-        self.assertIn("Packliste Mallorca.md", out)
-        self.assertNotIn("Contoso", desktop.search("angebot"))          # work stays out
+        out = desktop.search("packing list")
+        self.assertIn("Packing list Mallorca.md", out)
+        self.assertNotIn("Contoso", desktop.search("offer"))          # work stays out
 
     def test_read(self):
-        out = desktop.read(str(desktop.FILE_ROOTS[0] / "Urlaub" / "Packliste Mallorca.md"))
-        self.assertIn("Golfschläger", out)
-        self.assertEqual(desktop.read(str(desktop.FILE_ROOTS[0] / "Brief.docx")).strip(), "Hallo Anna,\nbis Sonntag.")
-        self.assertIn("Abgelehnt", desktop.read(str(TMP / "outside.txt")))
-        self.assertIn("Abgelehnt", desktop.read(str(desktop.FILE_ROOTS[0] / ".." / "outside.txt")))
-        self.assertIn("Arbeit", desktop.read(str(desktop.FILE_ROOTS[0] / "Kunde Contoso Angebot.txt")))
+        out = desktop.read(str(desktop.FILE_ROOTS[0] / "Holiday" / "Packing list Mallorca.md"))
+        self.assertIn("Golf clubs", out)
+        self.assertEqual(desktop.read(str(desktop.FILE_ROOTS[0] / "Letter.docx")).strip(), "Hello Anna,\nsee you Sunday.")
+        self.assertIn("Refused", desktop.read(str(TMP / "outside.txt")))
+        self.assertIn("Refused", desktop.read(str(desktop.FILE_ROOTS[0] / ".." / "outside.txt")))
+        self.assertIn("work", desktop.read(str(desktop.FILE_ROOTS[0] / "Customer Contoso offer.txt")))
 
     def test_file_content_is_untrusted(self):
         jarvis_mcp.TAINTED.update(on=False, by="")
-        out = jarvis_mcp.handle_call("file_read", {"path": str(desktop.FILE_ROOTS[0] / "Urlaub" / "Packliste Mallorca.md")})
-        self.assertTrue(out.startswith("«FREMDE DATEN aus file_read"))
+        out = jarvis_mcp.handle_call("file_read", {"path": str(desktop.FILE_ROOTS[0] / "Holiday" / "Packing list Mallorca.md")})
+        self.assertTrue(out.startswith("«THIRD-PARTY DATA from file_read"))
         self.assertTrue(jarvis_mcp.TAINTED["on"])
         jarvis_mcp.TAINTED.update(on=False, by="")
 
@@ -99,45 +99,45 @@ class Screen(unittest.TestCase):
                         "Add-Type -AssemblyName System.Drawing; $b=New-Object System.Drawing.Bitmap 700,120; "
                         "$g=[System.Drawing.Graphics]::FromImage($b); $g.Clear([System.Drawing.Color]::White); "
                         "$f=New-Object System.Drawing.Font('Segoe UI',26); "
-                        "$g.DrawString('Build fehlgeschlagen',$f,[System.Drawing.Brushes]::Black,10,30); "
+                        "$g.DrawString('Build failed',$f,[System.Drawing.Brushes]::Black,10,30); "
                         f"$b.Save('{img}')"], check=True, timeout=60)
         out = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                               str(desktop.OCR_PS), "-ImagePath", str(img)],
                              capture_output=True, text=True, encoding="utf-8", timeout=60).stdout
-        self.assertIn("Build fehlgeschlagen", out)
+        self.assertIn("Build failed", out)
 
     def test_sensitive_window_refused(self):
         old_w, old_fg = desktop.windows, desktop._foreground_title
         desktop.windows = lambda: WINS
         desktop._foreground_title = lambda: (104, "KeePassXC")
         try:
-            self.assertIn("Abgelehnt", desktop.screen_text())
+            self.assertIn("Refused", desktop.screen_text())
             desktop._foreground_title = lambda: (101, "Spotify Premium")
-            self.assertIn("Abgelehnt", desktop.screen_text(whole=True))   # KeePass is visible somewhere
+            self.assertIn("Refused", desktop.screen_text(whole=True))   # KeePass is visible somewhere
         finally:
             desktop.windows, desktop._foreground_title = old_w, old_fg
 
     def test_only_routed_on_request(self):
-        self.assertIn("screen", router.llm_route("Was steht in der Fehlermeldung auf meinem Bildschirm?")["groups"])
-        self.assertNotIn("screen", router.llm_route("Erklär mir, wie Wetterfronten entstehen")["groups"])
+        self.assertIn("screen", router.llm_route("What does the error message on my screen say?")["groups"])
+        self.assertNotIn("screen", router.llm_route("Explain to me how weather fronts form")["groups"])
 
 
 class Scripts(unittest.TestCase):
     def setUp(self):
-        script = TMP / "hallo.bat"
-        script.write_text("@echo Hallo von Jarvis\r\n", encoding="utf-8")
-        desktop.SCRIPTS.write_text(json.dumps({"hallo": {"path": str(script), "beschreibung": "Test", "timeout": 20}}),
+        script = TMP / "hello.bat"
+        script.write_text("@echo Hello from Jarvis\r\n", encoding="utf-8")
+        desktop.SCRIPTS.write_text(json.dumps({"hello": {"path": str(script), "description": "Test", "timeout": 20}}),
                                    encoding="utf-8")
 
     def test_only_allowed(self):
-        self.assertIn("hallo: Test", desktop.script_list())
-        self.assertEqual(desktop.script_run("format c"), "Dieses Skript ist nicht freigegeben.")
+        self.assertIn("hello: Test", desktop.script_list())
+        self.assertEqual(desktop.script_run("format c"), "This script is not allowed.")
 
     @unittest.skipUnless(os.name == "nt", "cmd.exe")
     def test_run(self):
-        out = desktop.script_run("hallo")
-        self.assertIn("hallo fertig", out)
-        self.assertIn("Hallo von Jarvis", out)
+        out = desktop.script_run("hello")
+        self.assertIn("hello done", out)
+        self.assertIn("Hello from Jarvis", out)
 
     def test_needs_card(self):
         import runtime

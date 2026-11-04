@@ -59,7 +59,7 @@ def _read(path):
     if ext == ".pdf":
         import pypdf
         reader = pypdf.PdfReader(str(path))
-        return [(f"Seite {i + 1}", page.extract_text() or "") for i, page in enumerate(reader.pages)]
+        return [(f"page {i + 1}", page.extract_text() or "") for i, page in enumerate(reader.pages)]
     if ext == ".docx":
         import desktop
         text = desktop.read(str(path), max_chars=10**7)
@@ -74,7 +74,7 @@ def _chunks(parts):
         for i in range(0, len(text), CHUNK):
             piece = text[i:i + CHUNK].strip()
             if piece:
-                yield (label or f"Zeichen {i}"), piece
+                yield (label or f"character {i}"), piece
 
 
 def index(max_files=None, deadline_s=120):
@@ -132,40 +132,40 @@ def index(max_files=None, deadline_s=120):
 
 
 def _fts_query(q):
-    words = [w for w in re.findall(r"[\wäöüß]+", (q or "").lower()) if len(w) > 2]
+    words = [w for w in re.findall(r"\w+", (q or "").lower()) if len(w) > 2]
     return " ".join(f'"{w}"*' for w in words[:8])
 
 
 def search(query, limit=6):
-    """German text: best passages with file and position."""
+    """Text: best passages with file and position."""
     q = _fts_query(query)
     if not q:
-        return "Wonach soll ich in den Dokumenten suchen?"
+        return "What should I search the documents for?"
     if not DB.exists():
-        return "Der Dokumenten-Index ist noch leer — er baut sich im Hintergrund auf."
+        return "The document index is still empty — it is being built in the background."
     with _LOCK:
         c = _conn()
         try:
             rows = c.execute("select path, pos, snippet(chunks, 2, '»', '«', '…', 24) from chunks "
                              "where chunks match ? order by rank limit ?", (q, max(1, min(limit, 10)))).fetchall()
         except sqlite3.OperationalError as e:
-            return f"Suche fehlgeschlagen: {e}"
+            return f"Search failed: {e}"
         finally:
             c.close()
     if not rows:
-        return f"Nichts zu „{query}“ in den Dokumenten gefunden."
+        return f"Nothing found for “{query}” in the documents."
     return "\n".join(f"[{i + 1}] {path} ({pos}): {snip}" for i, (path, pos, snip) in enumerate(rows))
 
 
 def status():
     if not DB.exists():
-        return "Index noch nicht aufgebaut."
+        return "Index not built yet."
     with _LOCK:
         c = _conn()
         files, chunks = c.execute("select count(*), coalesce(sum(chunks), 0) from files").fetchone()
         c.close()
-    return (f"{files} Dokumente, {chunks} Abschnitte indiziert in {', '.join(str(r) for r in roots())}. "
-            + ("PDF wird gelesen." if pdf_available() else "PDF wird übersprungen (Paket pypdf nicht installiert)."))
+    return (f"{files} documents, {chunks} passages indexed in {', '.join(str(r) for r in roots())}. "
+            + ("PDFs are read." if pdf_available() else "PDFs are skipped (package pypdf not installed)."))
 
 
 def start():

@@ -1,5 +1,5 @@
 """Quick probe of the lean pipeline without the server:
-    .venv\\Scripts\\python.exe scripts\\lean_probe.py "Welches Auto fahre ich?"
+    .venv\\Scripts\\python.exe scripts\\lean_probe.py "Which car do I drive?"
 """
 import os
 import pathlib

@@ -32,21 +32,21 @@ class Forecast(unittest.TestCase):
     def test_steady_growth(self):
         f = mon.forecast("nas_used", TODAY, {"nas_used": series(80, 0.25)})
         self.assertAlmostEqual(f["days_left"], (100 - 85) / 0.25, delta=1)
-        self.assertEqual(f["confidence"], "hoch")
+        self.assertEqual(f["confidence"], "high")
         self.assertEqual((f["n"], f["span"]), (21, 20))
 
     def test_warning_with_basis(self):
         found = mon.forecast_findings(TODAY, {"pc_disk": series(85, 0.4)})
         bad = [x for x in found if not x["ok"]]
         self.assertEqual(len(bad), 1)
-        self.assertIn("in etwa", bad[0]["down"])
-        self.assertIn("Sicherheit hoch, 21 Messwerte über 20 Tage", bad[0]["down"])
+        self.assertIn("in about", bad[0]["down"])
+        self.assertIn("confidence high, 21 readings over 20 days", bad[0]["down"])
 
     def test_no_warning_far_away_flat_or_noisy(self):
         self.assertTrue(all(x["ok"] for x in mon.forecast_findings(TODAY, {"nas_used": series(40, 0.05)})))
         self.assertIsNone(mon.forecast("nas_used", TODAY, {"nas_used": series(60, 0.0)})["days_left"])
         noisy = mon.forecast("pi_disk", TODAY, {"pi_disk": series(70, 0.3, noise=8)})
-        self.assertNotEqual(noisy["confidence"], "hoch")
+        self.assertNotEqual(noisy["confidence"], "high")
 
     def test_too_little_data(self):
         self.assertIsNone(mon.forecast("nas_used", TODAY, {"nas_used": series(80, 1, days=5)}))
@@ -68,8 +68,8 @@ class Recurring(unittest.TestCase):
             hw.HISTORY.unlink()
 
     def test_third_outage_in_a_week_is_named(self):
-        f = dict(key="device:Drucker", ok=False, severity="warn", down="Der Drucker ist seit {min} Minuten weg.",
-                 up="Der Drucker ist wieder da.")
+        f = dict(key="device:Printer", ok=False, severity="warn", down="The printer has been gone for {min} minutes.",
+                 up="The printer is back.")
         now = time.time() - 3 * 86400
         out = []
         for i in range(3):
@@ -78,7 +78,7 @@ class Recurring(unittest.TestCase):
             out += hw.process([f], now=t + 300, quiet=False)
             hw.process([dict(f, ok=True)], now=t + 600, quiet=False)
         self.assertNotIn("wiederkehrend", out[0])
-        self.assertIn("Das ist der 3. Ausfall in 7 Tagen — wiederkehrend.", out[2])
+        self.assertIn("That is outage number 3 in 7 days — recurring.", out[2])
 
 
 class Notices(unittest.TestCase):
@@ -93,18 +93,18 @@ class Notices(unittest.TestCase):
         events.quiet_now = self._quiet
 
     def test_duplicates_merged(self):
-        self.assertIsNotNone(events.publish("say", "Sir, das NAS ist seit 5 Minuten nicht erreichbar."))
-        self.assertIsNone(events.publish("say", "Sir, das NAS ist seit 10 Minuten nicht erreichbar."))
-        self.assertIsNotNone(events.publish("say", "Sir, die Waschmaschine ist fertig."))
+        self.assertIsNotNone(events.publish("say", "Sir, the NAS has not been reachable for 5 minutes."))
+        self.assertIsNone(events.publish("say", "Sir, the NAS has not been reachable for 10 minutes."))
+        self.assertIsNotNone(events.publish("say", "Sir, the washing machine is done."))
         self.assertIsNotNone(events.publish("say", "anders formuliert", key="k1"))
-        self.assertIsNone(events.publish("say", "nochmal anders", key="k1"))
+        self.assertIsNone(events.publish("say", "once more, differently", key="k1"))
 
     def test_hourly_limit_but_critical_and_alarms_pass(self):
-        spoken = [events.publish("say", f"Meldung {chr(65 + i)}") for i in range(events.SAY_PER_HOUR + 2)]
+        spoken = [events.publish("say", f"Notice {chr(65 + i)}") for i in range(events.SAY_PER_HOUR + 2)]
         self.assertTrue(all(not e.get("silent") for e in spoken[:events.SAY_PER_HOUR]))
         self.assertTrue(all(e.get("throttled") for e in spoken[events.SAY_PER_HOUR:]))
-        self.assertFalse(events.publish("say", "Der Pi ist weg.", priority="critical").get("silent"))
-        self.assertFalse(events.publish("alarm", "Wecker", priority="alarm").get("silent"))
+        self.assertFalse(events.publish("say", "The Pi is gone.", priority="critical").get("silent"))
+        self.assertFalse(events.publish("alarm", "Alarm", priority="alarm").get("silent"))
 
 
 if __name__ == "__main__":

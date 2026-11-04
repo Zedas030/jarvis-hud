@@ -75,11 +75,11 @@ MODEL = PROVIDERS[ORDER[0]]["model"] if ORDER else ""     # first choice, for th
 _COOL = {}
 _OLLAMA = {"at": 0.0, "ok": False, "why": ""}
 
-NOTE = ("Gerade bist du im Notbetrieb auf {label} statt Claude. Nutze nur die angebotenen Werkzeuge. "
-        "Kannst du etwas damit nicht nachsehen, sag das in einem Satz statt zu raten.")
-NOTE_NO_TOOLS = ("Gerade bist du im Notbetrieb auf {label} statt Claude, ohne Werkzeuge: kein Web, keine Mails, "
-                 "kein Kalender, kein Smart Home über dich. Licht, Timer, Listen und Wetter erledigt das System "
-                 "selbst. Kannst du etwas nicht nachsehen, sag das in einem Satz statt zu raten.")
+NOTE = ("Right now you are in emergency mode on {label} instead of Claude. Only use the tools offered. "
+        "If you cannot look something up with them, say so in one sentence instead of guessing.")
+NOTE_NO_TOOLS = ("Right now you are in emergency mode on {label} instead of Claude, without tools: no web, no mails, "
+                 "no calendar, no smart home through you. Lights, timers, lists and weather are handled by the system "
+                 "itself. If you cannot look something up, say so in one sentence instead of guessing.")
 
 
 class ProviderError(Exception):
@@ -98,9 +98,9 @@ def _ollama_ready(force=False):
             names = [m.get("name", "") for m in json.loads(r.read()).get("models", [])]
         # "qwen2.5" without a tag means "qwen2.5:latest" to Ollama
         ok = model in names or (":" not in model and any(n.split(":")[0] == model for n in names))
-        why = "" if ok else f"Modell {model} fehlt (ollama pull {model})"
+        why = "" if ok else f"model {model} is missing (ollama pull {model})"
     except (urllib.error.URLError, OSError, ValueError) as e:
-        why = f"Ollama nicht erreichbar ({e})"
+        why = f"Ollama not reachable ({e})"
     _OLLAMA.update(at=time.time(), ok=ok, why=why)
     return ok, why
 
@@ -109,11 +109,11 @@ def _ready(name):
     """(usable now?, reason if not)"""
     cool = _COOL.get(name)
     if cool and cool["until"] > time.time():
-        return False, f"{cool['why']} — wieder ab {time.strftime('%H:%M', time.localtime(cool['until']))}"
+        return False, f"{cool['why']} — again from {time.strftime('%H:%M', time.localtime(cool['until']))}"
     if name == "ollama":
         return _ollama_ready()
     if not PROVIDERS[name]["key"]:
-        return False, f"kein {name.upper()}_API_KEY in .env"
+        return False, f"no {name.upper()}_API_KEY in .env"
     return True, ""
 
 
@@ -134,7 +134,7 @@ def status():
             for p in ORDER for ok, why in [_ready(p)]]
     first = next((r for r in rows if r["ok"]), None)
     return {"mode": MODE, "model": first["model"] if first else MODEL, "ok": bool(first),
-            "why": "" if first else "; ".join(f"{r['name']}: {r['why']}" for r in rows) or "aus",
+            "why": "" if first else "; ".join(f"{r['name']}: {r['why']}" for r in rows) or "off",
             "chain": rows}
 
 
@@ -222,16 +222,16 @@ class McpClient:
             try:
                 line = self.lines.get(timeout=max(0.1, end - time.time()))
             except queue.Empty:
-                raise TimeoutError(f"{method}: keine Antwort") from None
+                raise TimeoutError(f"{method}: no answer") from None
             if line is None:
-                raise RuntimeError("Werkzeug-Server beendet")
+                raise RuntimeError("tool server ended")
             try:
                 msg = json.loads(line)
             except ValueError:
                 continue
             if msg.get("id") == mid:
                 if msg.get("error"):
-                    raise RuntimeError(msg["error"].get("message") or "Fehler")
+                    raise RuntimeError(msg["error"].get("message") or "error")
                 return msg.get("result") or {}
 
     def call(self, name, args, timeout=60):
@@ -256,13 +256,13 @@ def run_tool(mcp, name, args):
             verdict = json.loads(mcp.call("approve", {"tool_name": f"mcp__jarvis__{name}", "input": args},
                                           timeout=perm_timeout) or "{}")
         except (ValueError, TimeoutError, RuntimeError) as e:
-            return f"Bestätigung nicht möglich ({e}). Abgelehnt."
+            return f"Confirmation not possible ({e}). Refused."
         if verdict.get("behavior") != "allow":
-            return verdict.get("message") or "Der User hat diese Aktion nicht bestätigt."
+            return verdict.get("message") or "The user did not confirm this action."
     try:
         return mcp.call(name, args)
     except (TimeoutError, RuntimeError, OSError) as e:
-        return f"Werkzeugfehler: {e}"
+        return f"Tool error: {e}"
 
 
 # ── one provider ─────────────────────────────────────────────────────────────
@@ -285,21 +285,21 @@ def _request(name, body, stream=False):
     except urllib.error.HTTPError as e:
         text = e.read().decode("utf-8", "replace")[:2000]
         if e.code == 429:
-            _cool_down(name, _retry_seconds(e, text), "Limit erreicht")
-            raise ProviderError(f"{p['label']}: Limit erreicht") from None
-        why = {401: "API-Key ungültig",
-               403: "Zugriff gesperrt (Cloudflare)" if "1010" in text else "Zugriff verweigert",
-               404: f"Modell {p['model']} nicht verfügbar ({name.upper()}_MODEL anpassen)"}.get(e.code)
+            _cool_down(name, _retry_seconds(e, text), "limit reached")
+            raise ProviderError(f"{p['label']}: limit reached") from None
+        why = {401: "API key invalid",
+               403: "access blocked (Cloudflare)" if "1010" in text else "access denied",
+               404: f"model {p['model']} not available (adjust {name.upper()}_MODEL)"}.get(e.code)
         if why:
             _cool_down(name, 6 * 3600, why)
             raise ProviderError(f"{p['label']}: {why}") from None
         detail = " ".join(text.split())[:160]
         if e.code >= 500:
-            _cool_down(name, 120, f"Serverfehler {e.code}")
+            _cool_down(name, 120, f"server error {e.code}")
         raise ProviderError(f"{p['label']}: HTTP {e.code} {detail}") from None
     except (urllib.error.URLError, OSError) as e:
-        _cool_down(name, 60, "nicht erreichbar")
-        raise ProviderError(f"{p['label']}: nicht erreichbar ({e})") from None
+        _cool_down(name, 60, "not reachable")
+        raise ProviderError(f"{p['label']}: not reachable ({e})") from None
 
 
 def _stream_text(resp):
@@ -360,9 +360,9 @@ def _turn(name, messages, tools, mcp, usage, model=None):
                 args = {}
             yield dict(t="tool", phase="use", name=f"mcp__jarvis__{tname}", input=json.dumps(args)[:90],
                        args=args if isinstance(args, dict) else None)
-            result = run_tool(mcp, tname, args) if tname in allowed else f"Unbekanntes Werkzeug {tname}."
+            result = run_tool(mcp, tname, args) if tname in allowed else f"Unknown tool {tname}."
             usage["tool_result_chars"] += len(result)
-            yield dict(t="tool", phase="result", ok=not result.startswith(("Werkzeugfehler", "Bestätigung")),
+            yield dict(t="tool", phase="result", ok=not result.startswith(("Tool error", "Confirmation")),
                        name=f"mcp__jarvis__{tname}")
             messages.append({"role": "tool", "tool_call_id": c.get("id") or f"call_{rnd}_{i}",
                              "name": tname, "content": result})
@@ -374,7 +374,7 @@ def run(system, prefix, message, groups=(), private=False):
     groups = [g for g in (groups or ()) if g not in UNSUPPORTED_GROUPS]
     candidates = chain(groups, private)
     if not candidates:
-        yield dict(t="error", message="Kein Ersatz-Modell verfügbar: " + status()["why"])
+        yield dict(t="error", message="No stand-in model available: " + status()["why"])
         return
     tools = tool_specs(groups)
     mcp = None
@@ -408,14 +408,14 @@ def run(system, prefix, message, groups=(), private=False):
                     yield ev
             except (ProviderError, ValueError, KeyError, TypeError) as e:
                 if said:
-                    yield dict(t="error", message=f"{p['label']} brach mitten in der Antwort ab: {e}"[:300])
+                    yield dict(t="error", message=f"{p['label']} broke off in the middle of the answer: {e}"[:300])
                     return
                 errors.append(str(e))
-                yield dict(t="note", message=f"{e} — nächster Ersatz")
+                yield dict(t="note", message=f"{e} — next stand-in")
                 continue
             yield dict(t="usage", **usage)
             return
-        yield dict(t="error", message="Alle Ersatz-Modelle fehlgeschlagen: " + "; ".join(errors))
+        yield dict(t="error", message="All stand-in models failed: " + "; ".join(errors))
     finally:
         if mcp:
             mcp.close()
@@ -423,10 +423,10 @@ def run(system, prefix, message, groups=(), private=False):
 
 def redact(system, prefix):
     """For providers that may train on prompts (Gemini free tier): no profile, no name, no notes from memory."""
-    system = re.sub(r"Was du über den User weißt:.*?Weitere Notizen \(memory_read\):[^\n]*\n?", "", system, flags=re.S)
-    system = re.sub(r"Was du über den User weißt:.*?(?=\n\n[^-\n]|\Z)", "", system, flags=re.S)
-    system = re.sub(r"(?m)^Der User heißt .*$", "", system)
-    prefix = re.sub(r"Passende Notizen:.*?(?=\n\n|</kontext>)", "", prefix or "", flags=re.S)
+    system = re.sub(r"What you know about the user:.*?More notes \(memory_read\):[^\n]*\n?", "", system, flags=re.S)
+    system = re.sub(r"What you know about the user:.*?(?=\n\n[^-\n]|\Z)", "", system, flags=re.S)
+    system = re.sub(r"(?m)^The user's name is .*$", "", system)
+    prefix = re.sub(r"Matching notes:.*?(?=\n\n|</context>)", "", prefix or "", flags=re.S)
     return system, prefix
 
 

@@ -1,19 +1,19 @@
 /* One catalogue for both menus. Favorites stay on this device; the selected view is shared by Jarvis. */
 (function () {
   var entries = [
-    { id: 'tablet', label: 'Raum-Display' },
+    { id: 'tablet', label: 'Room display' },
     { id: 'stark', label: 'Stark-HUD' },
-    { id: 'classic', label: 'Klassisch mit Gedächtnis-Graph' },
-    { id: 'aurora', label: 'Aurora · Glas & Farbverlauf', accent: '#73efd1', background: '#10142b' },
-    { id: 'ivory', label: 'Tageslicht · Hell & klar', accent: '#28716b', background: '#f4f2ec' },
-    { id: 'midnight', label: 'Mitternacht · Panorama', accent: '#9bbcff', background: '#090f20' },
-    { id: 'cockpit', label: 'Cockpit · Systemzentrale', accent: '#f4b85a', background: '#10120f', instruments: true },
-    { id: 'bento', label: 'Bento · Große Kacheln', accent: '#b8a2ff', background: '#141221' },
-    { id: 'horizon', label: 'Horizont · Tagesübersicht', accent: '#ffb48e', background: '#211c23' },
-    { id: 'editorial', label: 'Journal · Magazin', accent: '#9b4b32', background: '#f1ece2' },
-    { id: 'neon', label: 'Neon · Kontrast & Konturen', accent: '#f481df', background: '#110c1d' },
-    { id: 'zen', label: 'Zen · Ruhe & Übersicht', accent: '#9fcbb0', background: '#15201d' },
-    { id: 'orbit', label: 'Orbit · Raumstation', accent: '#70c8ff', background: '#070f1b', instruments: true }
+    { id: 'classic', label: 'Classic with memory graph' },
+    { id: 'aurora', label: 'Aurora · glass & gradient', accent: '#73efd1', background: '#10142b' },
+    { id: 'ivory', label: 'Daylight · bright & clear', accent: '#28716b', background: '#f4f2ec' },
+    { id: 'midnight', label: 'Midnight · panorama', accent: '#9bbcff', background: '#090f20' },
+    { id: 'cockpit', label: 'Cockpit · system centre', accent: '#f4b85a', background: '#10120f', instruments: true },
+    { id: 'bento', label: 'Bento · big tiles', accent: '#b8a2ff', background: '#141221' },
+    { id: 'horizon', label: 'Horizon · day overview', accent: '#ffb48e', background: '#211c23' },
+    { id: 'editorial', label: 'Journal · magazine', accent: '#9b4b32', background: '#f1ece2' },
+    { id: 'neon', label: 'Neon · contrast & outlines', accent: '#f481df', background: '#110c1d' },
+    { id: 'zen', label: 'Zen · calm & overview', accent: '#9fcbb0', background: '#15201d' },
+    { id: 'orbit', label: 'Orbit · space station', accent: '#70c8ff', background: '#070f1b', instruments: true }
   ].concat(window.JarvisLayoutPlus ? JarvisLayoutPlus.entries : []);
   var KEY = 'jarvis.layoutFavorites', active = '', favorites = [], feedback = null;
   function get(id) { return entries.filter(function (entry) { return entry.id === id; })[0]; }
@@ -40,18 +40,18 @@
         });
         select.appendChild(box);
       }
-      group('★ Favoriten', favorites.map(get));
-      group('Neu · Entdecken', entries.slice(13).filter(function (entry) { return favorites.indexOf(entry.id) < 0; }));
-      group('Weitere Ansichten', entries.slice(3, 13).filter(function (entry) { return favorites.indexOf(entry.id) < 0; }));
-      group('Bisherige Ansichten', entries.slice(0, 3).filter(function (entry) { return favorites.indexOf(entry.id) < 0; }));
+      group('★ Favourites', favorites.map(get));
+      group('New · discover', entries.slice(13).filter(function (entry) { return favorites.indexOf(entry.id) < 0; }));
+      group('More views', entries.slice(3, 13).filter(function (entry) { return favorites.indexOf(entry.id) < 0; }));
+      group('Earlier views', entries.slice(0, 3).filter(function (entry) { return favorites.indexOf(entry.id) < 0; }));
       if (get(previous)) select.value = previous;
     });
     document.querySelectorAll('.layout-favorite').forEach(function (button) {
       var selected = favorites.indexOf(active) >= 0;
       button.setAttribute('aria-pressed', String(selected));
-      button.setAttribute('aria-label', selected ? 'Layout aus Favoriten entfernen' : 'Layout als Favorit speichern');
+      button.setAttribute('aria-label', selected ? 'Remove layout from favourites' : 'Save layout as favourite');
       button.title = button.getAttribute('aria-label');
-      button.textContent = button.classList.contains('layout-favorite-full') ? (selected ? '★ Als Favorit gespeichert' : '☆ Als Favorit speichern') : (selected ? '★' : '☆');
+      button.textContent = button.classList.contains('layout-favorite-full') ? (selected ? '★ Saved as favourite' : '☆ Save as favourite') : (selected ? '★' : '☆');
     });
   }
   function toggleFavorite() {
@@ -61,7 +61,7 @@
     var persisted = true;
     try { localStorage.setItem(KEY, JSON.stringify(favorites)); } catch (e) { persisted = false; }
     populate();
-    if (feedback) feedback.textContent = persisted ? 'Favoriten werden auf diesem Gerät gespeichert.' : 'Speichern ist in diesem Browser gesperrt; der Stern gilt nur bis zum Neuladen.';
+    if (feedback) feedback.textContent = persisted ? 'Favourites are saved on this device.' : 'Saving is blocked in this browser; the star only lasts until the next reload.';
   }
   ['layoutSel', 'tLayout'].forEach(function (id) {
     var select = document.getElementById(id);
@@ -72,7 +72,7 @@
     if (id === 'tLayout') {
       select.parentNode.insertAdjacentElement('afterend', button);
       feedback = document.createElement('p'); feedback.className = 'layout-feedback'; feedback.setAttribute('role', 'status');
-      feedback.textContent = 'Favoriten werden auf diesem Gerät gespeichert.';
+      feedback.textContent = 'Favourites are saved on this device.';
       button.insertAdjacentElement('afterend', feedback);
     } else select.insertAdjacentElement('afterend', button);
   });

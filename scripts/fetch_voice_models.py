@@ -28,22 +28,22 @@ def main():
     for name, (url, sha) in FILES.items():
         target = MODELS / name
         if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == sha:
-            print(f"  {name}: vorhanden")
+            print(f"  {name}: present")
             continue
-        print(f"  {name}: lade {url}")
+        print(f"  {name}: loading {url}")
         try:
             data = urllib.request.urlopen(url, timeout=120).read()
         except Exception as e:  # noqa: BLE001
-            print(f"  {name}: Download fehlgeschlagen: {e}")
+            print(f"  {name}: download failed: {e}")
             ok = False
             continue
         got = hashlib.sha256(data).hexdigest()
         if got != sha:
-            print(f"  {name}: Prüfsumme falsch ({got[:12]}…), Datei verworfen")
+            print(f"  {name}: checksum wrong ({got[:12]}…), file dropped")
             ok = False
             continue
         target.write_bytes(data)
-        print(f"  {name}: {len(data) // 1024} KB gespeichert")
+        print(f"  {name}: {len(data) // 1024} KB saved")
     return 0 if ok else 1
 
 

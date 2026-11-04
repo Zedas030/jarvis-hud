@@ -164,17 +164,17 @@ def _fritz_rows():
             with urllib.request.urlopen(f"http://{host}/jason_boxinfo.xml", timeout=8) as r:
                 info = parse_boxinfo(r.read().decode(errors="replace"))
             if not info:
-                notes.append(f"{host} nennt keine FRITZ!-Version")
+                notes.append(f"{host} names no FRITZ! version")
                 continue
             with urllib.request.urlopen(avm_listing_url(info[0]), timeout=15) as r:
                 latest = avm_latest(r.read().decode(errors="replace"))
             if not latest:
-                notes.append(f"AVM nennt keine Version für {info[0]}")
+                notes.append(f"AVM names no version for {info[0]}")
             elif _newer(latest, info[1]):
-                rows.append(f"fritz:{host}: {info[0]} {info[1]} → {latest} (nur Anzeige: kommt über das Mesh der "
-                            "FRITZ!Box oder in der Oberfläche des Geräts)")
+                rows.append(f"fritz:{host}: {info[0]} {info[1]} → {latest} (display only: comes through the mesh of the "
+                            "FRITZ!Box or in the device's own web interface)")
         except Exception as e:  # noqa: BLE001
-            notes.append(f"FRITZ!-Gerät {host} nicht lesbar ({e})")
+            notes.append(f"FRITZ! device {host} not readable ({e})")
     return rows, notes
 
 
@@ -235,20 +235,20 @@ def docker_rows(containers, digest=None):
         try:
             now = digest(image)
         except Exception as e:  # noqa: BLE001
-            notes.append(f"Image von {name} nicht prüfbar ({e})")
+            notes.append(f"Image of {name} cannot be checked ({e})")
             continue
         if not now or now in have:
             continue
-        what = f"Container {name} ({image}) hat ein neueres Image"
+        what = f"Container {name} ({image}) has a newer image"
         if "home-assistant" in image:
             try:
                 cur, latest = _ha_core_versions()
                 if cur and latest:
-                    what = f"Home Assistant {cur} → {latest} (Docker-Image {image})"
+                    what = f"Home Assistant {cur} → {latest} (Docker image {image})"
             except Exception:  # noqa: BLE001
                 pass
-        rows.append(f"pi:docker:{name}: {what} (nur Anzeige: das Image ziehe ich nicht selbst, "
-                    "der Container startet dabei neu)")
+        rows.append(f"pi:docker:{name}: {what} (display only: I do not pull the image myself, "
+                    "the container restarts with it)")
     return rows, notes
 
 
@@ -334,58 +334,58 @@ def check():
     rows, notes = [], []
     try:
         for uid, name, cur, new, can in _ha_updates():
-            rows.append(f"{uid}: {name} {cur} → {new}" + ("" if can else " (nur Anzeige, Home Assistant kann es nicht installieren)"))
+            rows.append(f"{uid}: {name} {cur} → {new}" + ("" if can else " (display only, Home Assistant cannot install it)"))
     except Exception as e:  # noqa: BLE001
-        notes.append(f"Home Assistant nicht lesbar ({e})")
+        notes.append(f"Home Assistant not readable ({e})")
     try:
         for maker, model, newest, behind in firmware_drift(_ha_devices()):
             names = ", ".join(f"{n} {_short(sw)}" for n, sw in behind)
-            rows.append(f"fw:{_slug(maker + ' ' + model)}: {maker} {model} – {len(behind)} mit älterer Firmware als "
-                        f"{_short(newest)}: {names} (nur Anzeige: Update in der App des Herstellers)")
+            rows.append(f"fw:{_slug(maker + ' ' + model)}: {maker} {model} – {len(behind)} with older firmware than "
+                        f"{_short(newest)}: {names} (display only: update in the maker's app)")
     except Exception as e:  # noqa: BLE001
-        notes.append(f"Geräteliste von Home Assistant nicht lesbar ({e})")
+        notes.append(f"Device list of Home Assistant not readable ({e})")
     fr, fn = _fritz_rows()
     rows += fr
     notes += fn
     try:
         j, sid = _nas_session()
         if j is None:
-            notes.append("NAS nicht verbunden")
+            notes.append("NAS not connected")
         else:
             try:
                 dsm = (j._syno({"api": "SYNO.Core.Upgrade.Server", "version": 2, "method": "check",
                                 "user_reading": "true", "need_auto_smallupdate": "true"}, sid).get("update") or {})
                 if dsm.get("available"):
-                    rows.append(f"nas:dsm: DSM-Update {dsm.get('version', '')} — installiere ich nicht selbst, "
-                                "das NAS startet dabei neu: DSM → Systemsteuerung → Update und Wiederherstellung")
+                    rows.append(f"nas:dsm: DSM update {dsm.get('version', '')} — I do not install it myself, "
+                                "the NAS restarts with it: DSM → Control Panel → Update & Restore")
                 for pid, (name, cur, new, _s, _v) in _nas_packages(j, sid).items():
-                    rows.append(f"nas:pkg:{pid}: NAS-Paket {name} {cur} → {new}")
+                    rows.append(f"nas:pkg:{pid}: NAS package {name} {cur} → {new}")
             finally:
                 _nas_logout(j, sid)
     except Exception as e:  # noqa: BLE001
-        notes.append(f"NAS nicht lesbar ({e})")
+        notes.append(f"NAS not readable ({e})")
     try:
         pi = _pi_state()
         if pi is None:
-            notes.append("Pi nicht erreichbar")
+            notes.append("Pi not reachable")
         else:
             if pi["running"]:
-                notes.append("Auf dem Pi läuft gerade ein Update")
+                notes.append("An update is running on the Pi right now")
             if pi["apt"]:
-                rows.append(f"pi:apt: Raspberry Pi, {pi['apt']} Pakete")
+                rows.append(f"pi:apt: Raspberry Pi, {pi['apt']} packages")
             if pi["pihole_update"]:
-                rows.append("pi:pihole: Pi-hole hat eine neue Version")
+                rows.append("pi:pihole: Pi-hole has a new version")
             if pi["reboot"]:
-                notes.append("Der Pi möchte nach früheren Updates neu starten (mache ich nicht selbst)")
+                notes.append("The Pi wants to restart after earlier updates (I do not do that myself)")
             dr, dn = docker_rows(pi["docker"])
             rows += dr
             notes += dn
     except Exception as e:  # noqa: BLE001
-        notes.append(f"Pi nicht lesbar ({e})")
-    head = ("Verfügbare Updates (installieren nur mit Karte, Ziel = id vor dem Doppelpunkt):\n" + "\n".join(rows)
-            if rows else "Alles aktuell, Sir — keine Updates gefunden.")
-    tail = ("\nHinweise: " + "; ".join(notes)) if notes else ""
-    return (head + tail + "\nFire TV aktualisiert sich selbst im Standby; das kann ich nicht auslösen.")[:3500]
+        notes.append(f"Pi not readable ({e})")
+    head = ("Available updates (install only with a card, target = id before the colon):\n" + "\n".join(rows)
+            if rows else "Everything is up to date, Sir — no updates found.")
+    tail = ("\nNotes: " + "; ".join(notes)) if notes else ""
+    return (head + tail + "\nThe Fire TV updates itself in standby; I cannot trigger that.")[:3500]
 
 
 def install(target):
@@ -394,39 +394,39 @@ def install(target):
         entity = target[3:]
         match = [u for u in _ha_updates() if u[0] == target]
         if not match:
-            return f"Für {entity} meldet Home Assistant kein Update."
+            return f"Home Assistant reports no update for {entity}."
         if not match[0][4]:
-            return f"{match[0][1]}: Home Assistant kann dieses Update nicht selbst installieren."
+            return f"{match[0][1]}: Home Assistant cannot install this update itself."
         _ha("/api/services/update/install", {"entity_id": entity})
-        return (f"{match[0][1]}: Installation von {match[0][3]} gestartet. Das Gerät kann dabei kurz neu starten — "
-                "„Gibt es Updates?“ zeigt danach, ob es durch ist.")
+        return (f"{match[0][1]}: installation of {match[0][3]} started. The device may restart briefly — "
+                "“Are there any updates?” shows afterwards whether it went through.")
     if target.startswith("nas:pkg:"):
         return _nas_install(target[8:])
     if target == "nas:dsm":
-        return "Das DSM-Update installiere ich nicht selbst — das NAS startet dabei neu. Bitte im DSM unter Update starten."
+        return "I do not install the DSM update myself — the NAS restarts with it. Please start it in DSM under Update."
     if target.startswith("pi:docker:"):
-        return (f"Container {target[10:]}: das neue Image ziehe ich nicht selbst — es kann das Verhalten ändern. "
-                "Auf dem Pi das Image neu ziehen (docker pull) und den Container neu anlegen.")
+        return (f"Container {target[10:]}: I do not pull the new image myself — it can change the behaviour. "
+                "On the Pi pull the image again (docker pull) and recreate the container.")
     if target.startswith("fritz:"):
-        return ("Das FRITZ!-Gerät aktualisiere ich nicht selbst. In der FRITZ!Box unter Heimnetz → Mesh das Update "
-                "anstoßen oder in der Oberfläche des Geräts unter System → Update.")
+        return ("I do not update the FRITZ! device myself. Start the update in the FRITZ!Box under Home Network → Mesh "
+                "or in the device's own interface under System → Update.")
     if target.startswith("fw:"):
-        return "Diese Firmware kann ich nicht installieren — das geht nur in der App des Herstellers (bei TP-Link: Tapo)."
+        return "I cannot install this firmware — that only works in the maker's app (for TP-Link: Tapo)."
     if target in PI_JOBS:
         st = _pi_state()
         if st is None:
-            return "Pi nicht erreichbar."
+            return "Pi not reachable."
         if st["running"]:
-            return "Auf dem Pi läuft schon ein Update."
+            return "An update is already running on the Pi."
         job = PI_JOBS[target]
         # setsid + nohup: survives the ssh session; the marker in the command line makes pgrep find it.
-        out = _pi(f"setsid nohup sh -c ': jarvis_upd_job; ({job}) > {PI_LOG} 2>&1; echo \"fertig, Code $?\" >> {PI_LOG}' "
+        out = _pi(f"setsid nohup sh -c ': jarvis_upd_job; ({job}) > {PI_LOG} 2>&1; echo \"done, code $?\" >> {PI_LOG}' "
                   "> /dev/null 2>&1 < /dev/null & echo started", timeout=20)
         if out is None or "started" not in (out.stdout or ""):
-            return f"Konnte das Update auf dem Pi nicht starten: {(out.stderr if out else '')[:200]}"
-        return ("Läuft auf dem Pi im Hintergrund (" + ("Pakete" if target == "pi:apt" else "Pi-hole") +
-                "), dauert ein paar Minuten. Pi-hole und DNS können kurz aussetzen. „Wie läuft das Update?“ zeigt den Stand.")
-    return f"Unbekanntes Ziel „{target}“ — erst „Gibt es Updates?“ fragen, dann eine id daraus nehmen."
+            return f"Could not start the update on the Pi: {(out.stderr if out else '')[:200]}"
+        return ("Running on the Pi in the background (" + ("packages" if target == "pi:apt" else "Pi-hole") +
+                "), takes a few minutes. Pi-hole and DNS may drop out briefly. “How is the update going?” shows the progress.")
+    return f"Unknown target “{target}” — first ask “Are there any updates?”, then take an id from it."
 
 
 def _call(j, sid, params):
@@ -436,7 +436,7 @@ def _call(j, sid, params):
     with urllib.request.urlopen(f"{j.SYNO_URL}/webapi/entry.cgi?{q}", timeout=60) as r:
         data = json.loads(r.read())
     if not data.get("success"):
-        raise RuntimeError(f"DSM-Fehler {(data.get('error') or {}).get('code', '?')}")
+        raise RuntimeError(f"DSM error {(data.get('error') or {}).get('code', '?')}")
     return data.get("data") or {}
 
 
@@ -461,18 +461,18 @@ def package_steps(pid, s, volume):
 def _nas_install(pid):
     j, sid = _nas_session()
     if j is None:
-        return "NAS nicht verbunden."
-    step = "Paketliste"
+        return "NAS not connected."
+    step = "package list"
     try:
         pk = _nas_packages(j, sid).get(pid)
         if not pk:
-            return f"Für das NAS-Paket {pid} gibt es kein Update."
+            return f"There is no update for the NAS package {pid}."
         name, cur, new, s, volume = pk
         download, status, fetched, install = package_steps(pid, s, volume)
-        step = "Herunterladen"
+        step = "download"
         tid = _call(j, sid, download).get("taskid")
         if not tid:
-            return f"NAS-Paket {name}: DSM hat keinen Download-Auftrag zurückgegeben. Im Paketzentrum nachsehen."
+            return f"NAS package {name}: DSM returned no download task. Check the Package Center."
         done = False
         for _ in range(60):                       # download: up to ~3 min
             time.sleep(3)
@@ -480,26 +480,26 @@ def _nas_install(pid):
                 done = True
                 break
         if not done:
-            return f"NAS-Paket {name}: Download kam nicht zu Ende. Im Paketzentrum nachsehen."
-        step = "Download prüfen"
+            return f"NAS package {name}: the download did not finish. Check the Package Center."
+        step = "check download"
         path = _call(j, sid, fetched(tid)).get("filename")
         if not path:
-            return f"NAS-Paket {name}: DSM nennt keine heruntergeladene Datei. Im Paketzentrum nachsehen."
-        step = "Installieren"
+            return f"NAS package {name}: DSM names no downloaded file. Check the Package Center."
+        step = "install"
         _call(j, sid, install(path))
         for _ in range(40):                       # install and start: up to ~2 min
             time.sleep(3)
             now = {p["id"]: p.get("version") for p in j._syno(
                 {"api": "SYNO.Core.Package", "version": 2, "method": "list"}, sid).get("packages") or []}
             if now.get(pid) == new:
-                return f"NAS-Paket {name}: {cur} → {new} installiert und läuft."
-        return (f"NAS-Paket {name}: DSM hat die Installation angenommen, Version {new} meldet sich aber noch nicht. "
-                "In ein paar Minuten noch einmal „Gibt es Updates?“ fragen.")
+                return f"NAS package {name}: {cur} → {new} installed and running."
+        return (f"NAS package {name}: DSM accepted the installation, but version {new} does not report yet. "
+                "Ask “Are there any updates?” again in a few minutes.")
     except Exception as e:  # noqa: BLE001
         # Say plainly whose fault a 120 is — Jarvis once blamed the NAS for our own parameters.
-        why = " Das heißt: DSM versteht unseren Aufruf nicht — ein Fehler in Jarvis, nicht am NAS." if "120" in str(e) else ""
-        return (f"NAS-Paket {pid}: DSM hat beim Schritt „{step}“ abgelehnt ({e}).{why} "
-                "Im Paketzentrum geht es von Hand.")
+        why = " That means: DSM does not understand our call — a bug in Jarvis, not in the NAS." if "120" in str(e) else ""
+        return (f"NAS package {pid}: DSM refused at the step “{step}” ({e}).{why} "
+                "It works by hand in the Package Center.")
     finally:
         _nas_logout(j, sid)
 
@@ -507,8 +507,8 @@ def _nas_install(pid):
 def install_status():
     pi = _pi_state()
     if pi is None:
-        return "Pi nicht erreichbar."
+        return "Pi not reachable."
     if pi["running"]:
-        return "Das Update auf dem Pi läuft noch. Letzte Zeilen:\n" + pi["log"]
-    return ("Auf dem Pi läuft kein Update. Letzte Zeilen des letzten Laufs:\n" + (pi["log"] or "—")
-            + ("\nDer Pi möchte neu starten." if pi["reboot"] else ""))
+        return "The update on the Pi is still running. Last lines:\n" + pi["log"]
+    return ("No update is running on the Pi. Last lines of the last run:\n" + (pi["log"] or "—")
+            + ("\nThe Pi wants to restart." if pi["reboot"] else ""))

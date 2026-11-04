@@ -160,19 +160,19 @@
         + gauge(pc.pc_vram, 'VRAM', pc.pc_gpu_temp != null ? num(pc.pc_gpu_temp) + ' °C' : '') + gauge(pc.pc_disk, 'DISK', '', 90) + '</div>'));
     }
     if (!hl.error) {
-      out.push(panel('Netzwerk', '<ul class="slines">'
+      out.push(panel('Network', '<ul class="slines">'
         + line('Download', hl.link === 0 ? 'offline' : num(hl.down, 1) + ' Mbit/s', hl.link === 0 ? 'bad' : '')
         + line('Upload', num(hl.up, 1) + ' Mbit/s')
-        + (hl.ph_pct != null ? line('Pi-hole', num(hl.ph_pct, 1) + ' % geblockt', hl.ph_on === false ? 'bad' : '') : '')
+        + (hl.ph_pct != null ? line('Pi-hole', num(hl.ph_pct, 1) + ' % blocked', hl.ph_on === false ? 'bad' : '') : '')
         + (hl.pi_temp != null ? line('Pi', num(hl.pi_temp, 1) + ' °C', hl.pi_temp > 70 ? 'warn' : '') : '') + '</ul>'));
     }
     if (!h.error && h.solar_w != null) {
-      out.push(panel('Energie', '<div class="sgauges two">' + gauge(h.soc, 'Speicher', h.charge_w > 5 ? '+' + num(h.charge_w) + ' W'
-        : h.out_w > 5 ? '−' + num(h.out_w) + ' W' : 'ruht', 101) + '</div><ul class="slines">'
-        + line('Solar', num(h.solar_w) + ' W', h.solar_w > 50 ? 'good' : '') + line('Heute', num(h.gen_kwh, 1) + ' kWh') + '</ul>'));
+      out.push(panel('Energy', '<div class="sgauges two">' + gauge(h.soc, 'Battery', h.charge_w > 5 ? '+' + num(h.charge_w) + ' W'
+        : h.out_w > 5 ? '−' + num(h.out_w) + ' W' : 'idle', 101) + '</div><ul class="slines">'
+        + line('Solar', num(h.solar_w) + ' W', h.solar_w > 50 ? 'good' : '') + line('Today', num(h.gen_kwh, 1) + ' kWh') + '</ul>'));
     }
     var st = [];
-    if (n.model || n.error) st.push(line('NAS', n.error ? 'nicht erreichbar' : n.ok ? 'in Ordnung · ' + num(n.used_pct) + ' %' : 'prüfen', n.error || !n.ok ? 'bad' : 'good'));
+    if (n.model || n.error) st.push(line('NAS', n.error ? 'not reachable' : n.ok ? 'fine · ' + num(n.used_pct) + ' %' : 'check', n.error || !n.ok ? 'bad' : 'good'));
     if (pi.temp != null || pi.error) st.push(line('Container', pi.error ? 'Pi offline' : pi.up + ' / ' + pi.containers, pi.error || pi.up < pi.containers ? 'bad' : 'good'));
     if (h.router && !h.error) st.push(line('Internet', h.router.online ? 'online' : 'offline', h.router.online ? 'good' : 'bad'));
     if (st.length) out.push(panel('Status', '<ul class="slines">' + st.join('') + '</ul>'));

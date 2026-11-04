@@ -9,7 +9,7 @@ gone after CLIP_TTL_S, only to private addresses.
 
 JARVIS_SONOS lists the speakers, "media_player.x=Label, media_player.y"; empty = feature off.
 Which device speaks where lives in state.json -> speech_outputs {device id: entity}. The entry AUTO
-("Wo ich bin") means the speaker of the room the presence sensors see the user in (whereabouts.py);
+("Where I am") means the speaker of the room the presence sensors see the user in (whereabouts.py);
 it is also the default once presence_room is configured. "" is the device itself, chosen on purpose.
 """
 import ipaddress
@@ -45,7 +45,7 @@ LIVE_IDLE_S = 4.0        # ... and ends the announcement after this long without
 LIVE_MAX_S = 300
 EXT = {"audio/mpeg": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg", "audio/aac": "aac"}
 AUTO = "auto"            # the speaker of the room the user is in
-AUTO_LABEL = "Wo ich bin"
+AUTO_LABEL = "Where I am"
 
 
 def _speakers():
@@ -63,7 +63,7 @@ SPEAKERS = _speakers()
 
 def outputs():
     """Every speaker a device can answer through: the Sonos and the Echos (alexa_voice.py), and — once the
-    presence sensors are set up — "Wo ich bin", the speaker of whichever room the user is in."""
+    presence sensors are set up — "Where I am", the speaker of whichever room the user is in."""
     out = SPEAKERS + alexa_voice.outputs()
     if out and whereabouts.configured():
         out = out + [{"id": AUTO, "label": AUTO_LABEL}]
@@ -124,7 +124,7 @@ def status(device):
     eid = resolve(pick)
     text = label(eid)
     if pick == AUTO:
-        text = f"{AUTO_LABEL} · {label(eid) if eid else 'hier'}"
+        text = f"{AUTO_LABEL} · {label(eid) if eid else 'here'}"
     return {"speakers": outputs() if configured() else [], "output": pick, "output_label": text}
 
 

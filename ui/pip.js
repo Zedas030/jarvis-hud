@@ -17,7 +17,7 @@
       text = stripTones(answerText);
     } else {
       var mine = document.querySelectorAll('#transcript .bubble.me');
-      if (mine.length) text = '„' + mine[mine.length - 1].textContent.trim() + '“';
+      if (mine.length) text = '“' + mine[mine.length - 1].textContent.trim() + '”';
     }
     text = text.replace(/\s+/g, ' ').trim();
     return text.length > 90 ? '… ' + text.slice(-88).replace(/^\S*\s/, '') : text;

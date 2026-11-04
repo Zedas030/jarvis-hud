@@ -1,10 +1,10 @@
 """
 Pronunciation lexicon — applied to every sentence right before it is spoken.
 
-Built-in defaults for the usual stumbling blocks (NAS, Pi, kWh, °C ...) plus
-your own entries in config/aussprache.json ({"Tuya": "Tuja"}), which win.
-By voice: "Sprich Tuya als Tuja aus" (local, 0 tokens).
-Matching is case-sensitive and on whole words, so "Pi" does not touch "Pizza".
+Built-in defaults for the usual stumbling blocks (HA, kWh, °C ...) plus
+your own entries in config/pronunciation.json ({"Tuya": "Too-ya"}), which win.
+By voice: "Pronounce Tuya as Too-ya" (local, 0 tokens).
+Matching is case-sensitive and on whole words, so "HA" does not touch "HAL".
 """
 import json
 import os
@@ -12,12 +12,12 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
-PATH = pathlib.Path(os.environ.get("JARVIS_PRONOUNCE", ROOT / "config" / "aussprache.json"))
+PATH = pathlib.Path(os.environ.get("JARVIS_PRONOUNCE", ROOT / "config" / "pronunciation.json"))
 DEFAULTS = {
-    "NAS": "Nass", "Pi": "Pei", "Raspi": "Raspi", "HA": "Home Assistant", "HUD": "Hadd",
-    "kWh": "Kilowattstunden", "kW": "Kilowatt", "W": "Watt", "°C": " Grad", "km/h": "Kilometer pro Stunde",
-    "LED": "L E D", "PV": "P V", "PC": "P C", "WLAN": "W-Lan", "SSD": "S S D", "CPU": "C P U",
-    "GPU": "G P U", "Wi-Fi": "Wai-Fai", "z. B.": "zum Beispiel", "ca.": "circa", "usw.": "und so weiter",
+    "NAS": "naz", "Raspi": "Raspberry Pie", "HA": "Home Assistant", "HUD": "hud",
+    "kWh": "kilowatt hours", "kW": "kilowatts", "W": "watts", "°C": " degrees", "km/h": "kilometres per hour",
+    "LED": "L E D", "PV": "P V", "PC": "P C", "WLAN": "W-LAN", "SSD": "S S D", "CPU": "C P U",
+    "GPU": "G P U", "e.g.": "for example", "approx.": "approximately", "etc.": "and so on",
 }
 _CACHE = {"mtime": None, "user": {}, "re": None, "map": {}}
 
@@ -36,8 +36,8 @@ def user_entries():
                 user = {}
         table = dict(DEFAULTS, **{k: v for k, v in user.items() if isinstance(k, str) and isinstance(v, str)})
         pats = sorted(table, key=len, reverse=True)
-        # word boundaries that also work for keys like "°C" or "z. B."
-        rx = re.compile("|".join(r"(?<![\wÄÖÜäöüß])" + re.escape(p) + r"(?![\wÄÖÜäöüß])" for p in pats))
+        # word boundaries that also work for keys like "°C" or "e.g."
+        rx = re.compile("|".join(r"(?<![\w])" + re.escape(p) + r"(?![\w])" for p in pats))
         _CACHE.update(mtime=mtime, user=user, re=rx, map=table)
     return _CACHE["user"]
 
@@ -59,8 +59,8 @@ def learn(word, spoken):
     _CACHE["mtime"] = None
 
 
-_SAY_AS = re.compile(r"^\W*(?:jarvis\W+)?sprich\s+[„\"']?(?P<w>[\w.°/ -]{1,30}?)[“\"']?\s+(?:als|wie)\s+"
-                     r"[„\"']?(?P<s>[\w .,-]{1,40}?)[“\"']?\s+aus\W*$", re.I)
+_SAY_AS = re.compile(r"^\W*(?:jarvis\W+)?(?:pronounce|say)\s+[“\"']?(?P<w>[\w.°/ -]{1,30}?)[”\"']?\s+(?:as|like)\s+"
+                     r"[“\"']?(?P<s>[\w .,-]{1,40}?)[”\"']?\W*$", re.I)
 
 
 def handle(n, raw=""):
@@ -69,4 +69,4 @@ def handle(n, raw=""):
         return None
     word, spoken = m.group("w").strip(), m.group("s").strip()
     learn(word, spoken)
-    return f"Gut, ab jetzt sage ich {spoken}, Sir."
+    return f"Very well, from now on I say {spoken}, Sir."

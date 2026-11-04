@@ -21,12 +21,12 @@ class Notifications(unittest.TestCase):
         emergency.resume()
 
     def test_shape_and_content(self):
-        events.publish("say", "Die Waschmaschine ist fertig.", kind="appliance")
-        pid = proposals.add("idea", "Schlaf-Ampel", "Sie fragen oft nach dem Schlaf.", source="suggestions")
+        events.publish("say", "The washing machine is done.", kind="appliance")
+        pid = proposals.add("idea", "Sleep traffic light", "You often ask about sleep.", source="suggestions")
         emergency.pause(hours=1)
         n = server.notifications()
         self.assertEqual(set(n), {"items", "incidents", "proposals", "paused_until", "persona", "tasks"})
-        self.assertEqual(n["items"][0]["text"], "Die Waschmaschine ist fertig.")
+        self.assertEqual(n["items"][0]["text"], "The washing machine is done.")
         self.assertEqual(n["items"][0]["kind"], "appliance")
         self.assertIn(pid, [p["id"] for p in n["proposals"]])
         self.assertIsNotNone(n["paused_until"])
@@ -34,7 +34,7 @@ class Notifications(unittest.TestCase):
 
     def test_route_rows_in_ui(self):
         js = open(os.path.join(os.path.dirname(server.__file__), "ui", "app.js"), encoding="utf-8").read()
-        for needle in ("case 'route':", "/api/notifications", "'Dieser PC'", "view-wall", "Wave.speech"):
+        for needle in ("case 'route':", "/api/notifications", "'This PC'", "view-wall", "Wave.speech"):
             self.assertIn(needle, js)
 
 

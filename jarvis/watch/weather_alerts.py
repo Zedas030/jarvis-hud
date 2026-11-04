@@ -2,7 +2,7 @@
 Official weather warnings of the Deutscher Wetterdienst for the weather location — read
 through Bright Sky (api.brightsky.dev, free, no key; it only gets the coordinates).
 
-  current()   the warnings in force now, spoken ("Gibt es Unwetterwarnungen?")
+  current()   the warnings in force now, spoken ("Are there any severe weather warnings?")
   step()      every JARVIS_ALERTS_SECONDS (600): each new warning once —
               moderate and up by day, severe and extreme also in the quiet hours
               and on the phone; minor ones (frost on a November morning) stay quiet
@@ -36,16 +36,17 @@ def _time(s):
     except (TypeError, ValueError):
         return ""
     today = dt.datetime.now().astimezone().date()
-    day = "heute" if t.date() == today else "morgen" if t.date() == today + dt.timedelta(days=1) else t.strftime("%d.%m.")
+    day = "today" if t.date() == today else "tomorrow" if t.date() == today + dt.timedelta(days=1) else t.strftime("%b %d")
     return f"{day} {t.strftime('%H:%M')}"
 
 
 def say(a):
-    head = (a.get("headline_de") or a.get("event_de") or "Wetterwarnung").strip()
+    # Bright Sky carries every warning in English and German
+    head = (a.get("headline_en") or a.get("event_en") or a.get("headline_de") or "Weather warning").strip()
     when = ""
     if a.get("onset") and a.get("expires"):
-        when = f" von {_time(a['onset'])} bis {_time(a['expires'])}"
-    desc = " ".join((a.get("description_de") or "").split())
+        when = f" from {_time(a['onset'])} to {_time(a['expires'])}"
+    desc = " ".join((a.get("description_en") or a.get("description_de") or "").split())
     first = desc.split(". ")[0].rstrip(".") + "." if desc else ""
     return f"{head}{when}. {first}".strip()
 
@@ -54,11 +55,11 @@ def current():
     try:
         alerts = fetch()
     except Exception as e:  # noqa: BLE001
-        return f"Die Warnungen des Wetterdienstes kann ich gerade nicht abrufen ({str(e)[:60]})."
+        return f"I cannot fetch the weather service's warnings right now ({str(e)[:60]})."
     if not alerts:
-        return "Für hier gibt es keine Warnungen des Deutschen Wetterdienstes."
+        return "There are no warnings from the German Weather Service for here."
     alerts = sorted(alerts, key=lambda a: -LEVEL.get(a.get("severity"), 0))
-    return "Warnungen des Deutschen Wetterdienstes: " + " ".join(say(a) for a in alerts[:3])
+    return "Warnings from the German Weather Service: " + " ".join(say(a) for a in alerts[:3])
 
 
 def new_ones(alerts, seen, now=None):
@@ -89,10 +90,10 @@ def step():
         return
     import infra
     for a, critical in found:
-        text = "Sir, Warnung des Deutschen Wetterdienstes: " + say(a)
+        text = "Sir, warning from the German Weather Service: " + say(a)
         events.publish("say", text, kind="weather", priority="critical" if critical else "normal")
         if critical:
-            infra.phone_notify(text, title="Unwetterwarnung")
+            infra.phone_notify(text, title="Severe weather warning")
 
 
 def start():

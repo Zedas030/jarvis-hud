@@ -40,24 +40,24 @@ class Rules(unittest.TestCase):
         self.assertEqual(policy.action_class("screen_describe"), policy.CONFIRM)
         self.assertNotIn("screen_describe", runtime.NO_CONFIRM)
         self.assertIn("screen_describe", policy.UNTRUSTED)
-        self.assertIn("Anthropic", policy.describe("mcp__jarvis__screen_describe", {"begruendung": "x"}))
+        self.assertIn("Anthropic", policy.describe("mcp__jarvis__screen_describe", {"reason": "x"}))
 
     def test_only_offered_when_asked_about_the_screen(self):
-        self.assertIn("screen", router.llm_route("Wo finde ich in diesem Fenster auf meinem Bildschirm die Einstellung?")["groups"])
-        self.assertNotIn("screen", router.llm_route("Erzähl mir was über Golf")["groups"])
+        self.assertIn("screen", router.llm_route("Where do I find the setting in this window on my screen?")["groups"])
+        self.assertNotIn("screen", router.llm_route("Tell me something about golf")["groups"])
 
     def test_disabled_and_no_claude(self):
         with Patch(vision, ENABLED=False):
-            self.assertIn("ausgeschaltet", vision.describe())
+            self.assertIn("switched off", vision.describe())
         with Patch(vision, ENABLED=True), Patch(runtime, runtime_kind=lambda: "mock"):
-            self.assertIn("braucht Claude", vision.describe())
+            self.assertIn("needs Claude", vision.describe())
 
     def test_blocked_windows(self):
-        with Patch(desktop, _foreground_title=lambda: (1, "Sparkasse Online-Banking"),
-                   windows=lambda: [(1, "Sparkasse Online-Banking", "opera.exe")]):
+        with Patch(desktop, _foreground_title=lambda: (1, "Example Bank online banking"),
+                   windows=lambda: [(1, "Example Bank online banking", "opera.exe")]):
             path, refusal = vision.capture()
         self.assertIsNone(path)
-        self.assertIn("Abgelehnt", refusal)
+        self.assertIn("Refused", refusal)
 
 
 class Call(unittest.TestCase):
@@ -68,29 +68,29 @@ class Call(unittest.TestCase):
 
         class P:
             returncode = 0
-            stdout = json.dumps({"type": "result", "subtype": "success", "result": "Ein Fenster.", "usage": {}})
+            stdout = json.dumps({"type": "result", "subtype": "success", "result": "A window.", "usage": {}})
             stderr = ""
 
         def run(cmd, input=None, **kw):
             seen["cmd"], seen["input"] = cmd, json.loads(input)
             return P()
         with Patch(vision.subprocess, run=run):
-            self.assertEqual(vision.ask_image(img, "Was ist das?"), "Ein Fenster.")
+            self.assertEqual(vision.ask_image(img, "What is that?"), "A window.")
         cmd = seen["cmd"]
         self.assertEqual(cmd[cmd.index("--tools") + 1], "")          # no tools at all
         self.assertNotIn("--allowedTools", cmd)
         blocks = seen["input"]["message"]["content"]
         self.assertEqual(blocks[0]["type"], "image")
-        self.assertEqual(blocks[1]["text"], "Was ist das?")
+        self.assertEqual(blocks[1]["text"], "What is that?")
 
     def test_picture_deleted_and_marked_as_observation(self):
         folder = pathlib.Path(tempfile.mkdtemp(prefix="jarvis-vision-"))
         img = folder / "screen.png"
         img.write_bytes(b"x")
         with Patch(vision, available=lambda: (True, ""), capture=lambda whole=False: (img, None),
-                   ask_image=lambda path, q: "Oben links ein Menü."):
-            out = vision.describe("Wo ist das Menü?")
-        self.assertTrue(out.startswith("Beobachtung (aus dem Bild, kann sich irren)"))
+                   ask_image=lambda path, q: "A menu at the top left."):
+            out = vision.describe("Where is the menu?")
+        self.assertTrue(out.startswith("Observation (from the image, may be wrong)"))
         self.assertFalse(img.exists())
         self.assertFalse(folder.exists())
 
@@ -102,7 +102,7 @@ class Call(unittest.TestCase):
         def boom(path, q):
             raise RuntimeError("Limit")
         with Patch(vision, available=lambda: (True, ""), capture=lambda whole=False: (img, None), ask_image=boom):
-            self.assertIn("fehlgeschlagen", vision.describe())
+            self.assertIn("failed", vision.describe())
         self.assertFalse(img.exists())
 
 

@@ -131,7 +131,7 @@ def _serve(shared):
                 await asyncio.Future()
         except OSError as e:
             STATE.update(running=False, error=f"Port {cfg.port}: {e}")
-            log.warning("Sprach-Engine aus: %s", e)
+            log.warning("voice engine off: %s", e)
 
     asyncio.run(main())
 

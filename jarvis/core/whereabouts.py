@@ -1,14 +1,14 @@
 """
 Which room the user is in — from the presence sensors, through Home Assistant.
 
-Home Assistant keeps a helper up to date from the occupancy sensors (automation "Jarvis: Wo ist Nutzer");
-there the bathroom and the bedroom count as one room, and "Unbekannt" means no sensor sees anyone. Its
+Home Assistant keeps a helper up to date from the occupancy sensors (automation "Jarvis: where is the user");
+there the bathroom and the bedroom count as one room, and "Unknown" means no sensor sees anyone. Its
 entity is `presence_room` in config/home.json; its state is a room name from "speakers" (or any name).
 Jarvis only reads it, at most every TTL_S seconds; without the entity or Home Assistant: "".
 
   room()          the room's name, "" when unknown or not configured
   speaker(room)   the output Jarvis answers through in that room: the Echo's notify.* or the Sonos player
-  line()          one line for the <kontext> block, so the model knows where the user is
+  line()          one line for the <context> block, so the model knows where the user is
 """
 import json
 import os
@@ -20,7 +20,7 @@ import jarvis_profile as profile
 HA_URL = os.environ.get("HA_URL", "http://homeassistant.local:8123").strip().rstrip("/")
 HA_TOKEN = os.environ.get("HA_TOKEN", "").strip()
 TTL_S = float(os.environ.get("JARVIS_PRESENCE_TTL_S", "10"))
-UNKNOWN = {"", "unbekannt", "unknown", "unavailable", "none", "niemand"}
+UNKNOWN = {"", "unknown", "unavailable", "none", "nobody", "unbekannt", "niemand"}
 _CACHE = {"at": 0.0, "room": ""}
 
 
@@ -70,7 +70,6 @@ def line():
     r = room()
     if not r:
         return ""
-    who = profile.USER_NAME or "Der User"
-    article = "in der" if r.lower().endswith("e") else "im"
-    return (f"Aufenthaltsort: {who} ist gerade {article} {r} (Präsenzmelder; Bad und Schlafzimmer zählen "
-            f"als ein Raum). Durchsagen ohne Raumangabe gehören dorthin.")
+    who = profile.USER_NAME or "The user"
+    return (f"Whereabouts: {who} is in the {r} right now (presence sensors; bathroom and bedroom count "
+            f"as one room). Announcements without a room go there.")

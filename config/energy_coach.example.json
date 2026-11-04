@@ -1,9 +1,9 @@
 {
-  "_comment": "Nach config/energy_coach.json kopieren. shiftable: Steckdosen (switch.*), deren Gerät man in die Sonne verschieben kann, mit dem Namen, wie Jarvis ihn sagt. Selten genutzte Steckdosen schlägt der Coach nie vor; das lernt er selbst (beim ersten Blick aus = selten) oder per Sprache: „Den Boiler nutze ich oft“. battery_kwh: nutzbare Größe des Speichers. pv_peak_w: Spitzenleistung der Module, nur bis die abendliche Kalibrierung genug Tage hat. hours: wann er sich von selbst meldet. always_on: Steckdosen, die Tag und Nacht laufen sollen (Kühlschrank, Router) – zählen nicht als Standby.",
+  "_comment": "Copy to config/energy_coach.json. shiftable: sockets (switch.*) whose appliance can be moved into the sunshine, with the name as Jarvis says it. The coach never suggests rarely used sockets; it learns that itself (off at first sight = rare) or by voice: \"I use the boiler often\". battery_kwh: usable size of the storage. pv_peak_w: peak power of the panels, only until the evening calibration has enough days. hours: when he speaks up by himself. always_on: sockets that should run day and night (fridge, router) – they do not count as standby.",
   "shiftable": {
-    "switch.spulmaschine": "die Spülmaschine",
-    "switch.waschmaschine": "die Waschmaschine",
-    "switch.boiler": "den Boiler"
+    "switch.dishwasher": "the dishwasher",
+    "switch.washing_machine": "the washing machine",
+    "switch.boiler": "the boiler"
   },
   "battery_kwh": 4.0,
   "pv_peak_w": 800,
@@ -12,7 +12,7 @@
     18
   ],
   "always_on": [
-    "switch.kuhlschrank",
+    "switch.fridge",
     "switch.router"
   ],
   "budget_eur": 0

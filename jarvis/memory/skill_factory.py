@@ -1,8 +1,8 @@
 """
 Skill factory: what the router learns becomes a draft first, never an active rule.
 
-  1. learning.observe stores a wording Claude had to resolve ("Leselampe aus" →
-     light.leselampe) as a draft in config/learned.json → "drafts".
+  1. learning.observe stores a wording Claude had to resolve ("reading lamp off" →
+     light.reading_lamp) as a draft in config/learned.json → "drafts".
   2. Seen JARVIS_SKILL_MIN_SEEN (2) times, the draft becomes a proposal
      (proposals.py, kind "skill") — the user accepts it on a card.
   3. Accepting runs checks first (check): the devices exist and may be switched,
@@ -50,8 +50,8 @@ def draft_seen(key):
     d = (learning.load().get("drafts") or {}).get(key)
     if not d or d.get("seen", 0) < MIN_SEEN or d.get("proposed"):
         return None
-    pid = proposals.add("skill", f"Gelernte Formulierung „{d['example']}“",
-                        f"{d['seen']}× musste Claude das auflösen; künftig ginge es lokal ohne Tokens.",
+    pid = proposals.add("skill", f"Learned wording “{d['example']}”",
+                        f"Claude had to resolve this {d['seen']}×; from now on it could run locally without tokens.",
                         {"key": key}, source="skill_factory")
     data = dict(learning.load())
     drafts = dict(data.get("drafts") or {})
@@ -78,38 +78,38 @@ def check(key, entities=None):
     ents = entities or d.get("entities") or []
     problems, notes = [], []
     if not ents:
-        problems.append("Entwurf ohne Geräte.")
+        problems.append("Draft without devices.")
     for e in ents:
         if e.split(".")[0] not in SWITCHABLE:
-            problems.append(f"{e}: diese Geräteart schalte ich nicht.")
+            problems.append(f"{e}: I do not switch this kind of device.")
         if router.PROTECTED_OFF.search(e):
-            notes.append(f"{e} ist geschützt — ausschalten bleibt trotzdem gesperrt.")
+            notes.append(f"{e} is protected — switching it off stays locked anyway.")
     known = _ha_entities()
     if known is None:
-        notes.append("Home Assistant gerade nicht erreichbar — Geräte nicht geprüft.")
+        notes.append("Home Assistant not reachable right now — devices not checked.")
     else:
         missing = [e for e in ents if e not in known]
         if missing:
-            problems.append("Gibt es nicht (mehr): " + ", ".join(missing))
+            problems.append("Does not exist (any more): " + ", ".join(missing))
     for r in routines.load():
         if any(learning.key(t) == key for t in r.get("triggers") or []):
-            problems.append(f"Kollidiert mit dem Auslöser der Routine „{r.get('name')}“.")
+            problems.append(f"Collides with the trigger of the routine “{r.get('name')}”.")
     current = (data.get("aliases") or {}).get(key)
     if current and sorted(current.get("entities", [])) != sorted(ents):
-        notes.append("Ersetzt die bisherige Regel (" + ", ".join(current.get("entities", [])) + ") — rücknehmbar.")
+        notes.append("Replaces the previous rule (" + ", ".join(current.get("entities", [])) + ") — can be undone.")
     return problems, notes
 
 
 def activate(key):
-    """Turns a draft into a live rule after the checks. Returns German text."""
+    """Turns a draft into a live rule after the checks. Returns spoken text."""
     data = dict(learning.load())
     drafts = dict(data.get("drafts") or {})
     d = drafts.get(key)
     if not d:
-        return "Diesen Entwurf gibt es nicht (mehr)."
+        return "This draft does not exist (any more)."
     problems, notes = check(key)
     if problems:
-        return "Nicht aktiviert: " + " ".join(problems)
+        return "Not activated: " + " ".join(problems)
     aliases = dict(data.get("aliases") or {})
     before = aliases.get(key)
     version = (before or {}).get("version", 0) + 1
@@ -119,7 +119,7 @@ def activate(key):
     data.update(aliases=aliases, drafts=drafts)
     learning._save(data)
     _history("activate", key, before, aliases[key], " ".join(notes))
-    return f"Aktiv: „{d['example']}“ geht jetzt lokal (Version {version})." + (" " + " ".join(notes) if notes else "")
+    return f"Active: “{d['example']}” now runs locally (version {version})." + (" " + " ".join(notes) if notes else "")
 
 
 def undo(text):
@@ -129,19 +129,19 @@ def undo(text):
     aliases = dict(data.get("aliases") or {})
     keys = [k for k in aliases if k == want or (want and want in k)]
     if not keys:
-        return "Keine aktive gelernte Formulierung passt dazu."
+        return "No active learned wording matches that."
     if len(keys) > 1:
-        return "Mehrere passen: " + ", ".join(keys[:5]) + " — bitte genauer."
+        return "Several match: " + ", ".join(keys[:5]) + " — please be more precise."
     key = keys[0]
     current = aliases[key]
     prev = next((r["before"] for r in reversed(history(key)) if r["action"] == "activate"
                  and r["after"] and r["after"].get("version") == current.get("version")), None)
     if prev:
         aliases[key] = prev
-        msg = f"Zurück auf Version {prev.get('version', 1)}: " + ", ".join(prev.get("entities", []))
+        msg = f"Back to version {prev.get('version', 1)}: " + ", ".join(prev.get("entities", []))
     else:
         aliases.pop(key)
-        msg = f"Gelernte Formulierung „{current.get('example', key)}“ entfernt."
+        msg = f"Learned wording “{current.get('example', key)}” removed."
     data["aliases"] = aliases
     learning._save(data)
     _history("undo", key, current, aliases.get(key))
@@ -152,10 +152,10 @@ def listing():
     data = learning.load()
     out = []
     for k, v in sorted((data.get("aliases") or {}).items()):
-        out.append(f"aktiv v{v.get('version', 1)}: „{v.get('example', k)}“ → {', '.join(v.get('entities', []))}")
+        out.append(f"active v{v.get('version', 1)}: “{v.get('example', k)}” → {', '.join(v.get('entities', []))}")
     for k, v in sorted((data.get("drafts") or {}).items()):
-        out.append(f"Entwurf ({v.get('seen', 1)}×{', vorgeschlagen' if v.get('proposed') else ''}): "
-                   f"„{v.get('example', k)}“ → {', '.join(v.get('entities', []))}")
+        out.append(f"draft ({v.get('seen', 1)}×{', proposed' if v.get('proposed') else ''}): "
+                   f"“{v.get('example', k)}” → {', '.join(v.get('entities', []))}")
     for k, v in sorted((data.get("choices") or {}).items()):
-        out.append(f"Rückfrage beantwortet ({v.get('at', '?')}): „{v.get('example', k)}“ → {', '.join(v.get('entities', []))}")
-    return "\n".join(out) or "Noch nichts gelernt."
+        out.append(f"question answered ({v.get('at', '?')}): “{v.get('example', k)}” → {', '.join(v.get('entities', []))}")
+    return "\n".join(out) or "Nothing learned yet."

@@ -14,7 +14,7 @@ Speech to text for the engine, on the faster-whisper model voice.py already hold
     .stop()
 
 Whisper is not a streaming model: a partial is a full pass over the audio so far (0.2 s on the GPU
-for 8 s of audio, see VOICE-ANALYSE.md). On the CPU that would take longer than the gap between
+for 8 s of audio, see VOICE-ANALYSIS.md). On the CPU that would take longer than the gap between
 partials, so partials stay off there and the endpoint falls back to its no-text wait.
 """
 import json
@@ -30,9 +30,9 @@ log = jarvis_log.get(__name__)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 GHOSTS = re.compile(
-    r"untertitel|amara\.org|vielen dank (fürs|für's|für das) zuschauen|bis zum nächsten mal|swr \d{4}|zdf|"
-    r"copyright|^(danke|tschüss|ja|äh|ähm|hm+)\W*$", re.I)
-NOISE = re.compile(r"^\W*[\[(*♪]?\s*(musik|music|applaus|lachen|gelächter|♪)", re.I)
+    r"subtitles by|amara\.org|thanks? (you )?for watching|please subscribe|see you (in the )?next (time|video)|"
+    r"copyright|^(thank you|thanks|bye|yes|uh|um|hm+)\W*$", re.I)
+NOISE = re.compile(r"^\W*[\[(*♪]?\s*(music|applause|laughter|laughing|♪)", re.I)
 MARKERS = re.compile(r"[\[(][^\])]{0,40}[\])]")
 
 

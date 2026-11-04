@@ -9,14 +9,16 @@ with the expected day in the calendar and a reminder on that day.
                   or DHL's own API (DHL_API_KEY) for DHL only. Without a key: the mails alone.
                   Only the tracking number leaves the house; 17TRACK then knows it.
   sync()          calendar: one all-day entry "📦 Shop · Carrier" in ICLOUD_DEFAULT_CALENDAR;
-                  it moves when the day changes and becomes "✓ zugestellt: …" once delivered.
+                  it moves when the day changes and becomes "✓ delivered: …" once delivered.
                   Announced; the day itself gets a reminder in the morning.
-  describe()      what is on its way, for "Wo bleibt mein Paket?" and the shipments_status tool
-  undo(hours)     takes the automatic entries out again (with mail_events.undo: "Termine rückgängig")
+  describe()      what is on its way, for "Where is my parcel?" and the shipments_status tool
+  undo(hours)     takes the automatic entries out again (with mail_events.undo: "undo the appointments")
 
 Part of the one exception to "background jobs never change anything" (CLAUDE.md), chosen
 by the user for deliveries: fixed code, no model, no links, every entry announced and
 undoable. Same-day services (food, groceries) are no shipments and stay out, as does work.
+
+Carrier and shop mails arrive in German or English, so the parsing patterns below know both.
 """
 import datetime as dt
 import html
@@ -30,7 +32,7 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 PATH = pathlib.Path(os.environ.get("JARVIS_SHIPMENTS_FILE", ROOT / "logs" / "shipments.json"))
-ENABLED = os.environ.get("JARVIS_SHIPMENTS", "1").strip().lower() not in ("0", "off", "false", "no", "aus")
+ENABLED = os.environ.get("JARVIS_SHIPMENTS", "1").strip().lower() not in ("0", "off", "false", "no")
 DHL_KEY = os.environ.get("DHL_API_KEY", "").strip()
 TRACK17_KEY = os.environ.get("TRACK17_API_KEY", "").strip()
 TRACK17_URL = os.environ.get("TRACK17_URL", "https://api.17track.net/track/v2.2").strip().rstrip("/")
@@ -44,21 +46,21 @@ IGNORE = tuple(d.strip().lower() for d in os.environ.get(
     "picnic.app,rewe.de,flaschenpost.de").split(",") if d.strip())
 CARRIERS = [("DHL", r"\bdhl\b|deutsche post"), ("Hermes", r"\bhermes\b"), ("DPD", r"\bdpd\b"), ("GLS", r"\bgls\b"),
             ("UPS", r"\bups\b"), ("FedEx", r"\bfedex\b"), ("Amazon", r"\bamazon\b"), ("GO!", r"\bgo!? express\b")]
-# "Bestellt:" too — Amazon names the delivery day in the order confirmation, not later
+# "Bestellt:" (ordered) too — Amazon names the delivery day in the order confirmation, not later
 SHIP_SUBJECT = re.compile(r"versand|versendet|verschickt|unterwegs|auf dem weg|sendung|zugestellt|zustellung|"
                           r"geliefert|lieferung|paket|abhol|bestellt|shipped|dispatched|out for delivery|delivered|"
-                          r"tracking", re.I)
-TRACKING = [re.compile(r"(?:tracking|sendungs|paket)[ -]?(?:nummer|nr\.?|number|id|code)\s*[:#]?\s*([A-Z0-9]{8,35})\b", re.I),
+                          r"tracking|on its way|ordered|shipment|parcel|package|delivery|arriving", re.I)
+TRACKING = [re.compile(r"(?:tracking|sendungs|paket|parcel|package)[ -]?(?:nummer|nr\.?|number|id|code)\s*[:#]?\s*([A-Z0-9]{8,35})\b", re.I),
             re.compile(r"\b(00340\d{15})\b"), re.compile(r"\b(JJD\d{16,22})\b"), re.compile(r"\b(1Z[0-9A-Z]{16})\b")]
-# an order number holds a digit — "Bestellung ansehen" is a button, not a number
-ORDER = re.compile(r"Bestell(?:ung|nummer|nr\.?)\s*(?:nr\.?|nummer)?\s*[:#]?\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,})",
-                   re.I)
+# an order number holds a digit — "Bestellung ansehen" (view order) is a button, not a number
+ORDER = re.compile(r"(?:Bestell(?:ung|nummer|nr\.?)\s*(?:nr\.?|nummer)?|\border\s*(?:no\.?|number|nr\.?)?)"
+                   r"\s*[:#]?\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,})", re.I)
 AMAZON_ORDER = re.compile(r"\b(\d{3}-\d{7}-\d{7})\b")
 ITEM = re.compile(r"[„\"]([^“\"]{3,60}?)(?:\.\.\.|…)?[“\"]")
 # ── when it comes: the carriers' own notices (DHL, DPD Predict, Hermes, GLS, UPS My Choice) ──
-# A date only counts with a delivery word close by — "Ihre Bestellung vom 20.10." is no delivery day.
+# A date only counts with a delivery word close by — "your order of 20.10." is no delivery day.
 DAY_HINT = re.compile(r"voraussichtlich|erwartet|zustell|zugestellt|liefer|ankunft|ankommen|kommt|bringen|eintreff|"
-                      r"trifft|delivery|deliver|arriv|expected|zeitfenster", re.I)
+                      r"trifft|delivery|deliver|arriv|expected|estimated|scheduled|zeitfenster", re.I)
 MONTHS = {"januar": 1, "jan": 1, "january": 1, "februar": 2, "feb": 2, "february": 2, "märz": 3, "maerz": 3,
           "mär": 3, "march": 3, "mar": 3, "april": 4, "apr": 4, "mai": 5, "may": 5, "juni": 6, "jun": 6, "june": 6,
           "juli": 7, "jul": 7, "july": 7, "august": 8, "aug": 8, "september": 9, "sept": 9, "sep": 9,
@@ -73,16 +75,17 @@ _NUM = re.compile(r"(?<![\d.])(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2}(?!\d))?")
 _NAMED = re.compile(r"(?<!\d)(\d{1,2})\.?\s+(" + _MON + r")\.?(?:\s+(\d{4}))?\b", re.I)
 _NAMED_EN = re.compile(r"\b(" + _MON + r")\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s+(\d{4}))?", re.I)
 _REL = re.compile(r"(?<!guten\s)\b(übermorgen|heute|morgen|today|tomorrow)\b", re.I)
-_WEEKDAY = re.compile(r"(?:\b(?:am|on|this|kommenden?|nächsten?)\s+|(?:zustellung|lieferung|ankunft|arriving)\s*:\s*)"
+_WEEKDAY = re.compile(r"(?:\b(?:am|on|this|kommenden?|nächsten?)\s+|(?:zustellung|lieferung|ankunft|arriving|delivery|arrival)\s*:\s*)"
                       r"(" + _WDS + r")\b", re.I)
 WINDOW = re.compile(r"(?:zwischen\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*(?:uhr\s*)?(?:und|bis|-|–|and|to)\s*"
                     r"(\d{1,2})(?:[:.](\d{2}))?\s*(?:uhr|h\b)"
-                    # Amazon writes "heute 14:15 - 17:15" without "Uhr": both times with minutes then
-                    r"|(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})", re.I)
+                    # Amazon writes "today 14:15 - 17:15" without "Uhr" (o'clock): both times with minutes then
+                    r"|(\d{1,2}):(\d{2})\s*(?:[-–]|and|to|und|bis)\s*(\d{1,2}):(\d{2})", re.I)
 CARRIER_DOMAINS = ("dhl.de", "dhl.com", "deutschepost.de", "dpd.de", "dpd.com", "hermesworld.com", "myhermes.de",
                    "hermes-europe.de", "gls-pakete.de", "gls-group.eu", "gls-group.com", "ups.com")
-SHOP_IN_TEXT = re.compile(r"(?i:paket|sendung|bestellung|lieferung)\s+von\s+([A-ZÄÖÜ0-9][\w&.'\- ]{1,30}?)"
-                          r"(?=\s+(?:kommt|ist|wird|wurde|hat|befindet|trifft)\b|[.,!:;]|$)")
+SHOP_IN_TEXT = re.compile(r"(?i:paket|sendung|bestellung|lieferung|parcel|package|order|delivery|shipment)\s+(?:von|from)\s+"
+                          r"([A-ZÄÖÜ0-9][\w&.'\- ]{1,30}?)"
+                          r"(?=\s+(?:kommt|ist|wird|wurde|hat|befindet|trifft|arrives|is|will|was|has)\b|[.,!:;]|$)")
 
 
 def _near_hint(text, a, b):
@@ -96,15 +99,15 @@ def _year(month, day, year, sent):
     y = sent.year
     try:
         if dt.date(y, month, day) < sent.date() - dt.timedelta(days=30):
-            y += 1                        # "am 02.01." written in December
+            y += 1                        # "on 02.01." written in December
     except ValueError:
         pass
     return y
 
 
 def expected_day(text, sent):
-    """The delivery day a mail names, else None. sent: when the mail came — "morgen" is
-    counted from there, not from today. Explicit dates beat "morgen", which beats "am Montag"."""
+    """The delivery day a mail names, else None. sent: when the mail came — "tomorrow" is
+    counted from there, not from today. Explicit dates beat "tomorrow", which beats "on Monday"."""
     found = []
     for m in _NUM.finditer(text):
         if _near_hint(text, m.start(), m.end()):
@@ -137,7 +140,7 @@ def expected_day(text, sent):
 
 
 def time_window(text):
-    """"zwischen 10:15 und 11:15 Uhr" -> "10:15–11:15", else ""."""
+    """"between 10:15 and 11:15" -> "10:15–11:15", else ""."""
     for m in WINDOW.finditer(text):
         g = m.groups()
         h1, m1, h2, m2 = (g[0], g[1], g[2], g[3]) if g[0] else (g[4], g[5], g[6], g[7])
@@ -150,19 +153,19 @@ def time_window(text):
 def from_carrier(addr):
     dom = (addr or "").rsplit("@", 1)[-1].lower()
     return any(dom == d or dom.endswith("." + d) for d in CARRIER_DOMAINS)
-# "wird morgen zugestellt" is on its way, not delivered: only unambiguous wording counts
-STATUS = [("zugestellt", r"wurde zugestellt|ist zugestellt|erfolgreich zugestellt|zugestellt am|^zugestellt|"
-                         r"^geliefert|wurde geliefert|ist angekommen|\bdelivered\b"),
-          # "versuchte Zustellung": nobody was home — worth saying, not "unterwegs"
-          ("zustellversuch", r"versuchte zustellung|zustellversuch|zustellung wurde versucht|nicht zugestellt werden|"
-                             r"nicht angetroffen|delivery attempt"),
+# "will be delivered tomorrow" is on its way, not delivered: only unambiguous wording counts
+STATUS = [("delivered", r"wurde zugestellt|ist zugestellt|erfolgreich zugestellt|zugestellt am|^zugestellt|"
+                         r"^geliefert|wurde geliefert|ist angekommen|^delivered\b|(?:has been|was|successfully) delivered"),
+          # an attempted delivery: nobody was home — worth saying, not "on the way"
+          ("attempt", r"versuchte zustellung|zustellversuch|zustellung wurde versucht|nicht zugestellt werden|"
+                             r"nicht angetroffen|delivery attempt|tried to deliver|missed (?:your )?delivery"),
           # a Packstation as the delivery address is no "ready for pickup"
-          ("abholbereit", r"abholbereit|zur abholung|kann .{0,25}abgeholt werden|liegt .{0,40}bereit|"
-                          r"ready for pick ?up"),
-          ("heute", r"heute in zustellung|^in zustellung|kommt heute|wird heute|zustellung heute|out for delivery|"
-                    r"zustellung erfolgt heute"),
-          ("unterwegs", r".")]
-DHL_STATUS = {"delivered": "zugestellt", "transit": "unterwegs", "pre-transit": "angekündigt", "failure": "Problem"}
+          ("pickup", r"abholbereit|zur abholung|kann .{0,25}abgeholt werden|liegt .{0,40}bereit|"
+                          r"ready for pick ?up|ready for collection|can be collected|available for pick ?up"),
+          ("today", r"heute in zustellung|^in zustellung|kommt heute|wird heute|zustellung heute|out for delivery|"
+                    r"zustellung erfolgt heute|arriving today|arrives today|will arrive today"),
+          ("on the way", r".")]
+DHL_STATUS = {"delivered": "delivered", "transit": "on the way", "pre-transit": "announced", "failure": "problem"}
 
 
 # ── reading mail ─────────────────────────────────────────────
@@ -245,19 +248,20 @@ def parse(mail):
                                                                 re.I)), "")
     tracking = next((m.group(1) for rx in TRACKING for m in [rx.search(both)] if m and re.search(r"\d{6}", m.group(1))), "")
     if not (tracking or carrier):
-        return None                      # "der Erfolg aus der Sendung" — a newsletter, no parcel
+        return None                      # "the success from the show" (Sendung) — a newsletter, no parcel
     amazon = "amazon" in (mail.get("addr", "") + " " + mail["shop"]).lower()
-    if amazon and not tracking and not re.search(r"zustellung|versendet|geliefert|lieferung|unterwegs", both, re.I):
+    if amazon and not tracking and not re.search(r"zustellung|versendet|geliefert|lieferung|unterwegs|deliver|"
+                                                 r"dispatched|shipped|arriving|on its way", both, re.I):
         return None                      # Prime Video, an app, a password mail: nothing gets delivered
     order = AMAZON_ORDER.search(both) if amazon else None
     order = order or ORDER.search(both)
     status = next(name for name, pat in STATUS if re.search(pat, subj, re.I) or
-                  (name != "unterwegs" and re.search(pat, text[:400], re.I)))
-    eta = mail["date"].date() if status == "heute" else expected_day(both, mail["date"])
+                  (name != "on the way" and re.search(pat, text[:400], re.I)))
+    eta = mail["date"].date() if status == "today" else expected_day(both, mail["date"])
     window = time_window(both)
     carrier_mail = from_carrier(mail.get("addr", ""))
     if carrier_mail:
-        # the carrier's notice names the shop in the text ("Ihr Paket von Fairway kommt morgen")
+        # the carrier's notice names the shop in the text ("your parcel from Fairway arrives tomorrow")
         named = SHOP_IN_TEXT.search(both)
         shop = named.group(1).strip() if named else ""
     else:
@@ -271,7 +275,7 @@ def parse(mail):
     key = tracking or f"{shop or carrier}|{order.group(1) if order else mail['subject'][:40]}"
     if amazon and not tracking:
         key = f"amazon|{order.group(1) if order else (item.group(1).strip() if item else subj[:40])}"
-    return {"key": key, "shop": shop or f"Paket ({carrier})", "carrier": carrier, "tracking": tracking,
+    return {"key": key, "shop": shop or f"Parcel ({carrier})", "carrier": carrier, "tracking": tracking,
             "order": order.group(1) if order else "", "eta": eta, "window": window, "status": status,
             "seen": mail["date"], "subject": subj[:90], "account": mail.get("account", ""),
             "from_carrier": carrier_mail, "shop_named": bool(shop)}
@@ -295,7 +299,7 @@ def merge(items, found):
             it["window"] = f.get("window") or ""     # a new day without a window drops the old window
         elif f.get("window"):
             it["window"] = f["window"]
-        if it.get("status") != "zugestellt":
+        if it.get("status") != "delivered":
             it["status"] = f["status"]
         it["seen"] = f["seen"].isoformat()
     return items
@@ -306,7 +310,7 @@ def dhl(tracking):
     """-> {status, eta (date|None), text} from DHL's tracking API, or None."""
     if not (DHL_KEY and tracking):
         return None
-    url = "https://api-eu.dhl.com/track/shipments?" + urllib.parse.urlencode({"trackingNumber": tracking, "language": "de"})
+    url = "https://api-eu.dhl.com/track/shipments?" + urllib.parse.urlencode({"trackingNumber": tracking, "language": "en"})
     req = urllib.request.Request(url, headers={"DHL-API-Key": DHL_KEY, "accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
@@ -325,17 +329,17 @@ def dhl(tracking):
         except ValueError:
             eta = None
     code = (st.get("statusCode") or "").lower()
-    status = DHL_STATUS.get(code, "unterwegs")
-    if re.search(r"abhol|packstation|filiale", (st.get("description") or "") + " " + (st.get("status") or ""), re.I):
-        status = "abholbereit"
+    status = DHL_STATUS.get(code, "on the way")
+    if re.search(r"abhol|packstation|filiale|pick ?up", (st.get("description") or "") + " " + (st.get("status") or ""), re.I):
+        status = "pickup"
     return {"status": status, "eta": eta, "text": (st.get("description") or st.get("status") or "")[:120]}
 
 
 # ── 17TRACK: one service for every carrier ───────────────────
 # Registering a number uses up quota (once per parcel); asking about it later does not.
-T17_STATUS = {"delivered": "zugestellt", "outfordelivery": "heute", "availableforpickup": "abholbereit",
-              "intransit": "unterwegs", "inforeceived": "angekündigt", "exception": "Problem",
-              "deliveryfailure": "Problem", "notfound": "unterwegs", "expired": "unterwegs"}
+T17_STATUS = {"delivered": "delivered", "outfordelivery": "today", "availableforpickup": "pickup",
+              "intransit": "on the way", "inforeceived": "announced", "exception": "problem",
+              "deliveryfailure": "problem", "notfound": "on the way", "expired": "on the way"}
 
 
 def _t17(path, body):
@@ -365,7 +369,7 @@ def track17(tracking, registered=False):
     info = acc.get("track_info") or {}
     latest = info.get("latest_status") or {}
     code = re.sub(r"[^a-z]", "", (latest.get("status") or "").lower())
-    status = T17_STATUS.get(code, "unterwegs")
+    status = T17_STATUS.get(code, "on the way")
     eta = None
     est = (info.get("time_metrics") or {}).get("estimated_delivery_date") or {}
     when = est.get("from") or est.get("to")
@@ -374,7 +378,7 @@ def track17(tracking, registered=False):
             eta = dt.datetime.fromisoformat(str(when).replace("Z", "+00:00")).date()
         except ValueError:
             eta = None
-    if status == "heute":
+    if status == "today":
         eta = dt.date.today()
     event = info.get("latest_event") or {}
     providers = (info.get("tracking") or {}).get("providers") or [{}]
@@ -387,7 +391,7 @@ def refresh(items, now=None):
     """Live status for what is on its way: 17TRACK for every carrier, else DHL's own API."""
     now = now or time.time()
     for it in items.values():
-        if not it.get("tracking") or it.get("status") == "zugestellt":
+        if not it.get("tracking") or it.get("status") == "delivered":
             continue
         if now - it.get("live_at", 0) < REFRESH_S:
             continue
@@ -428,8 +432,8 @@ def _save(d):
 
 
 def _title(it):
-    done = it.get("status") == "zugestellt"
-    head = "✓ zugestellt: " if done else "📦 "
+    done = it.get("status") == "delivered"
+    head = "✓ delivered: " if done else "📦 "
     # "Amazon: BioBizz · Amazon" says it twice: the carrier only when it is not the shop
     carrier = it.get("carrier") if it.get("carrier") and not it["shop"].lower().startswith(it["carrier"].lower()) else ""
     return (f"{head}{it['shop']}" + (f" · {carrier}" if carrier else "")
@@ -439,24 +443,24 @@ def _title(it):
 def _notes(it):
     parts = []
     if it.get("tracking"):
-        parts.append(f"Sendungsnummer {it['tracking']}" + (f" ({it['carrier']})" if it.get("carrier") else ""))
+        parts.append(f"Tracking number {it['tracking']}" + (f" ({it['carrier']})" if it.get("carrier") else ""))
     if it.get("order"):
-        parts.append(f"Bestellung {it['order']}")
+        parts.append(f"Order {it['order']}")
     if it.get("live_text"):
         parts.append(f"{it.get('live_src', 'Status')}: {it['live_text']}")
-    parts.append(f"Aus der Mail „{it.get('subject', '')}“ — von Jarvis eingetragen.")
+    parts.append(f"From the mail “{it.get('subject', '')}” — entered by Jarvis.")
     return "\n".join(parts)
 
 
 def _day(iso):
     d = dt.date.fromisoformat(iso)
-    return "Mo Di Mi Do Fr Sa So".split()[d.weekday()] + f" {d:%d.%m.}"
+    return "Mon Tue Wed Thu Fri Sat Sun".split()[d.weekday()] + f" {d:%b} {d.day}"
 
 
 # ── the calendar side ────────────────────────────────────────
 def _already_there(cal, it, title, eta):
     """The calendar is read before an entry goes in: one that day under a similar title (the
-    user's own "Paket Amazon") means it is there already. Remembered per day, read once."""
+    user's own "Parcel Amazon") means it is there already. Remembered per day, read once."""
     if it.get("cal_there") != eta:
         try:
             if cal.check(title, eta, allday=True)["same"]:
@@ -487,17 +491,17 @@ def sync(d, now=None, say=None):
         has = it.get("cal_url")
         if it.get("no_calendar"):
             eta = None                    # the user took its entry out: keep tracking, no new entry
-        if it.get("status") == "zugestellt" and it.get("delivered_at") is None:
+        if it.get("status") == "delivered" and it.get("delivered_at") is None:
             it["delivered_at"] = time.time()
         if not eta:
             continue
-        # A day already past gets no new entry: orders from weeks ago whose "Geliefert" mail lies
+        # A day already past gets no new entry: orders from weeks ago whose "delivered" mail lies
         # outside the scanned days looked like they were still on their way.
         if eta < now.date().isoformat() and not has:
             continue
         if has and it.get("cal_date") == eta and it.get("cal_title") == title:
             pass
-        elif not has and it.get("status") != "zugestellt" and _already_there(cal, it, title, eta):
+        elif not has and it.get("status") != "delivered" and _already_there(cal, it, title, eta):
             pass                          # the user's own entry that day: no second one
         else:
             if has:
@@ -506,7 +510,7 @@ def sync(d, now=None, say=None):
                 except Exception:  # noqa: BLE001 — still there: keep it to retry, write the new one anyway
                     if has not in d.setdefault("orphans", []):
                         d["orphans"].append(has)
-            if it.get("status") == "zugestellt" and not has:
+            if it.get("status") == "delivered" and not has:
                 continue                  # delivered before it ever got an entry: nothing to tidy up
             try:
                 _, url = cal.add_event(title, eta, None, "", _notes(it), allday=True, return_url=True)
@@ -519,22 +523,22 @@ def sync(d, now=None, say=None):
                                              "at": time.time()})
             d["auto"] = d["auto"][-40:]
             if not has:
-                say(f"Sir, die Lieferung von {it['shop']} habe ich für {_day(eta)} eingetragen.", f"ship-new-{it['key']}")
+                say(f"Sir, I have entered the delivery from {it['shop']} for {_day(eta)}.", f"ship-new-{it['key']}")
             elif moved:
-                say(f"Sir, die Lieferung von {it['shop']} verschiebt sich auf {_day(eta)}. Ich habe den Termin verlegt.",
+                say(f"Sir, the delivery from {it['shop']} moves to {_day(eta)}. I have moved the entry.",
                     f"ship-move-{it['key']}-{eta}")
         today = now.date().isoformat()
-        if it.get("status") == "zustellversuch" and it.get("attempt_said") != it.get("seen"):
-            say(f"Sir, die Zustellung von {it['shop']} wurde versucht, aber niemand hat geöffnet. "
-                "Schauen Sie in die Mail, wo es jetzt liegt oder wann der nächste Versuch kommt.", f"ship-attempt-{it['key']}")
+        if it.get("status") == "attempt" and it.get("attempt_said") != it.get("seen"):
+            say(f"Sir, delivery of the parcel from {it['shop']} was attempted, but nobody opened. "
+                "Check the mail for where it is now or when the next attempt comes.", f"ship-attempt-{it['key']}")
             it["attempt_said"] = it.get("seen")
-        if it.get("status") == "abholbereit" and it.get("pickup_said") != today:
-            say(f"Sir, Ihr Paket von {it['shop']} liegt zur Abholung bereit.", f"ship-pickup-{it['key']}")
+        if it.get("status") == "pickup" and it.get("pickup_said") != today:
+            say(f"Sir, your parcel from {it['shop']} is ready for pickup.", f"ship-pickup-{it['key']}")
             it["pickup_said"] = today
-        elif eta == today and it.get("status") != "zugestellt" and it.get("reminded") != today:
+        elif eta == today and it.get("status") != "delivered" and it.get("reminded") != today:
             window = it.get("window", "")
-            when = f" zwischen {window.replace('–', ' und ')} Uhr" if window else ""
-            say(f"Sir, heute kommt Ihr Paket von {it['shop']}" + (f" mit {it['carrier']}" if it.get("carrier") else "")
+            when = f" between {window.replace('–', ' and ')}" if window else ""
+            say(f"Sir, your parcel from {it['shop']} arrives today" + (f" with {it['carrier']}" if it.get("carrier") else "")
                 + when + ".", f"ship-today-{it['key']}-{today}")
             it["reminded"] = today
     # forget what was delivered a while ago (its "✓" entry stays in the calendar), and what was
@@ -561,31 +565,31 @@ def check(now=None, mails=None):
 
 def active(d=None):
     d = d or _load()
-    return [it for it in d.get("items", {}).values() if it.get("status") != "zugestellt"]
+    return [it for it in d.get("items", {}).values() if it.get("status") != "delivered"]
 
 
 def describe(d=None):
     items = active(d)
     if not items:
-        return "Keine Sendungen unterwegs, Sir — zumindest laut Postfach."
+        return "No shipments on the way, Sir — at least according to the mailbox."
     rows = []
     for it in sorted(items, key=lambda x: x.get("eta") or "9999"):
-        when = (f", erwartet {_day(it['eta'])}" + (f" {it['window']} Uhr" if it.get("window") else "")
-                if it.get("eta") else ", noch ohne Liefertag")
-        how = f" mit {it['carrier']}" if it.get("carrier") else ""
-        state = {"abholbereit": ", liegt zur Abholung bereit", "heute": ", heute in Zustellung",
-                 "zustellversuch": ", Zustellung wurde versucht"}.get(it.get("status"), "")
+        when = (f", expected {_day(it['eta'])}" + (f" {it['window']}" if it.get("window") else "")
+                if it.get("eta") else ", no delivery day yet")
+        how = f" with {it['carrier']}" if it.get("carrier") else ""
+        state = {"pickup": ", ready for pickup", "today": ", out for delivery today",
+                 "attempt": ", delivery was attempted"}.get(it.get("status"), "")
         rows.append(f"{it['shop']}{how}{when}{state}" + (f" ({it['live_text']})" if it.get("live_text") else ""))
-    note = "" if (TRACK17_KEY or DHL_KEY) else (" Liefertage kann ich erst nennen, wenn sie in einer Mail stehen "
-                                                "oder TRACK17_API_KEY eingetragen ist.")
-    return "Unterwegs: " + "; ".join(rows) + "." + note
+    note = "" if (TRACK17_KEY or DHL_KEY) else (" I can only name delivery days once they are in a mail "
+                                                "or TRACK17_API_KEY is set.")
+    return "On the way: " + "; ".join(rows) + "." + note
 
 
 def status_text():
     try:
         return describe(check())
     except Exception as e:  # noqa: BLE001
-        return describe() + f" (Postfach gerade nicht lesbar: {str(e)[:80]})"
+        return describe() + f" (mailbox not readable right now: {str(e)[:80]})"
 
 
 def undo(hours=24):

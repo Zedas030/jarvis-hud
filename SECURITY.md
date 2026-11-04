@@ -90,8 +90,8 @@ class from the audit log — numbers and fixed label values, no text from the us
 
 - Shown in the HUD via Claude Code's `--permission-prompt-tool` (or `fallback_llm.run_tool` for the
   stand-ins). No answer within `JARVIS_PERM_TIMEOUT` (75 s) means no.
-- The card shows Jarvis' German explanation (`begruendung`), the action, the target, the details
-  and the consequence (`policy.describe`). Only "bestätigt"/"nein" by voice — a bare "ja" does not count.
+- The card shows Jarvis' explanation (`reason`), the action, the target, the details
+  and the consequence (`policy.describe`). Only "confirmed"/"no" by voice — a bare "yes" does not count.
 - Each card covers exactly one call; an earlier yes never authorises a later action.
 - Without an open HUD nobody can confirm, so the answer is no.
 - `pi_run` (one shell command on the Pi over ssh) is CONFIRM: the card shows the exact command. The code
@@ -139,9 +139,9 @@ nothing is stored beyond the minutes counted. The playlist is started through th
 
 ## Other rooms and the TV (`speakers.py`)
 
-`announce` (LIMITED_WRITE) speaks text in a room from `config/home.json` → `speakers`: an Echo through `notify.alexa_media_*`, a Sonos through `tts.speak`. `tv_control` (LIMITED_WRITE) sends a command to the Fire TV's Alexa as if spoken there — so only fixed commands (pause, lauter, …) and app names reach it: letters, digits, spaces, at most 30 characters, never words like kaufen, bestellen, anrufen, Routine or Skill. Nothing can be bought or called through Jarvis. Both go through Home Assistant; the untrusted-content card applies as for any LIMITED_WRITE.
+`announce` (LIMITED_WRITE) speaks text in a room from `config/home.json` → `speakers`: an Echo through `notify.alexa_media_*`, a Sonos through `tts.speak`. `tv_control` (LIMITED_WRITE) sends a command to the Fire TV's Alexa as if spoken there — so only fixed commands (pause, louder, …) and app names reach it: letters, digits, spaces, at most 30 characters, never words like buy, order, call, routine or skill. Nothing can be bought or called through Jarvis. Both go through Home Assistant; the untrusted-content card applies as for any LIMITED_WRITE.
 
-A device's answers can be read aloud by an Echo instead (`alexa_voice.py`, chosen on the HUD's output button like a Sonos): the answer text goes to Amazon through `notify.alexa_media_*` (type tts) — the same text Jarvis would speak, nothing else. The morning briefing (`morning_echo.py`) only speaks, once a day, from fixed text; the follow-ups in the router ("heller", "wieder aus", "im Schlafzimmer auch") only act on what Jarvis switched in the last two minutes, and never switch protected devices off.
+A device's answers can be read aloud by an Echo instead (`alexa_voice.py`, chosen on the HUD's output button like a Sonos): the answer text goes to Amazon through `notify.alexa_media_*` (type tts) — the same text Jarvis would speak, nothing else. The morning briefing (`morning_echo.py`) only speaks, once a day, from fixed text; the follow-ups in the router ("brighter", "off again", "in the bedroom too") only act on what Jarvis switched in the last two minutes, and never switch protected devices off.
 
 ## Weather warnings and habits
 
@@ -179,14 +179,14 @@ LIMITED_WRITE call in the same request needs a card ("taint"). One MCP process p
 
 ## Emergency stop
 
-"Jarvis, stopp alles" / "Not-Aus" (local, no LLM): open cards are denied, a running Claude process
+"Jarvis, stop everything" / "emergency stop" (local, no LLM): open cards are denied, a running Claude process
 is stopped, proactive messages, background jobs and planned commands pause for `JARVIS_PAUSE_HOURS`.
 Alarms still ring. "weitermachen" resumes.
 
 ## Audit
 
 `logs/audit.jsonl`: every tool call (class, shortened arguments with secrets masked, success),
-every card decision, local actions, pauses. 90 days. "Was hast du heute gemacht?" reads it.
+every card decision, local actions, pauses. 90 days. "What did you do today?" reads it.
 
 ## Network
 

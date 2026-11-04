@@ -96,7 +96,7 @@ class Act(unittest.TestCase):
         with Patch(rm, _ollama=lambda path, body=None, timeout=3: calls.append((path, body)) or {}):
             rm.act("unload_ollama", snap(800, ollama=[("qwen2.5:7b-instruct", 4500)]))
         self.assertEqual(calls, [("/api/generate", {"model": "qwen2.5:7b-instruct", "keep_alive": 0})])
-        self.assertIn("entladen", rm.STATE["log"][-1])
+        self.assertIn("unloaded", rm.STATE["log"][-1])
 
     def test_stop_and_restart_voice(self):
         with Patch(tts_chain, gpu_pause=lambda: True, gpu_resume=lambda: None):
@@ -156,12 +156,12 @@ class Ollama(unittest.TestCase):
     def test_smaller_model(self):
         model, why = self.choose(4500, small="qwen2.5:3b")
         self.assertEqual(model, "qwen2.5:3b")
-        self.assertIn("zu wenig Grafikspeicher", why)
+        self.assertIn("not enough graphics memory", why)
 
     def test_no_small_model_says_so(self):
         model, why = self.choose(2000)
         self.assertEqual(model, "qwen2.5:7b-instruct")
-        self.assertIn("teilweise auf der CPU", why)
+        self.assertIn("partly on the CPU", why)
 
 
 class Missing(unittest.TestCase):

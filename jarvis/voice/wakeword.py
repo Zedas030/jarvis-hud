@@ -11,7 +11,7 @@ JARVIS_WAKE selects the mode:
          If that is missing or the mic cannot be opened, it falls back to "text".
 
 With JARVIS_FOLLOWUP_S > 0 the HUD keeps listening for a moment after every answer without the wake word
-(follow-up window), so "Und morgen?" just works. Off by default: nothing counts without "Jarvis".
+(follow-up window), so "And tomorrow?" just works. Off by default: nothing counts without "Jarvis".
 """
 import os
 import pathlib
@@ -21,10 +21,10 @@ import time
 import events
 
 MODE = os.environ.get("JARVIS_WAKE", "off").strip().lower()
-if MODE in ("", "0", "aus", "false", "no", "nein", "none"):
+if MODE in ("", "0", "false", "no", "none"):
     MODE = "off"
 elif MODE not in ("off", "text", "oww"):
-    MODE = "text"            # "JARVIS_WAKE=Jarvis", "=an", "=1": the obvious wish is the wake word on
+    MODE = "text"            # "JARVIS_WAKE=Jarvis", "=on", "=1": the obvious wish is the wake word on
 WORD_MODEL = os.environ.get("JARVIS_WAKE_MODEL", "hey_jarvis").strip()
 THRESHOLD = float(os.environ.get("JARVIS_WAKE_THRESHOLD", "0.5"))
 DEVICE = os.environ.get("JARVIS_WAKE_DEVICE", "").strip() or None     # sounddevice name or index
@@ -75,7 +75,7 @@ def status():
 
 def _fallback(why):
     STATUS.update(mode="text", listening=False, error=why)
-    print(f"  Aktivierungswort: {why} — weiter mit Text-Erkennung („Jarvis …“).", flush=True)
+    print(f"  wake word: {why} — carrying on with text detection (“Jarvis …”).", flush=True)
 
 
 def _listen():
@@ -93,7 +93,7 @@ def _listen():
             pass
         model = Model(wakeword_models=[WORD_MODEL], inference_framework="onnx")
     except Exception as e:  # noqa: BLE001
-        return _fallback(f"Modell nicht ladbar ({str(e)[:120]})")
+        return _fallback(f"model not loadable ({str(e)[:120]})")
     device = int(DEVICE) if DEVICE and DEVICE.isdigit() else DEVICE
     last = 0.0
     while True:
@@ -110,7 +110,7 @@ def _listen():
                         if hasattr(model, "reset"):
                             model.reset()
         except Exception as e:  # noqa: BLE001 — mic unplugged or busy: retry, text mode meanwhile
-            STATUS.update(listening=False, error=f"Mikrofon: {str(e)[:120]}")
+            STATUS.update(listening=False, error=f"microphone: {str(e)[:120]}")
             time.sleep(10)
 
 

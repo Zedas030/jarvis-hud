@@ -52,7 +52,7 @@ def _spend_by_day(start_day):
         except urllib.error.HTTPError as e:
             body = e.read(300).decode("utf-8", "replace")
             if e.code in (401, 403):
-                raise RuntimeError("Key hat keinen Zugriff auf die Cost API (Admin-Key oder persönlicher Key nötig).")
+                raise RuntimeError("The key has no access to the Cost API (an admin key or personal key is needed).")
             raise RuntimeError(f"Cost API HTTP {e.code}: {body}")
         for b in d.get("data", []):
             day = b["starting_at"][:10]
@@ -88,7 +88,7 @@ def _compute():
     if not configured():
         if bal:
             info["remaining"] = bal["usd"]
-            info["note"] = "ohne Cost-Key: Stand vom Eintragen, ohne Abzüge"
+            info["note"] = "without a cost key: the value as entered, without deductions"
         return info
     month_start = dt.datetime.now(dt.timezone.utc).replace(day=1).strftime("%Y-%m-%d")
     first = min(month_start, _day(bal["at"])) if bal else month_start

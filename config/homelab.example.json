@@ -1,8 +1,8 @@
 {
-  "_comment": "Nach config/homelab.json kopieren. devices: wichtige Geräte per host (Ping) oder entity (Home-Assistant-Tracker); critical = auch in den Ruhezeiten melden. limits: feste Grenzen, ab denen gemeldet wird. kuma_skip: Uptime-Kuma-Monitore, die Jarvis schon selbst prüft (keine doppelte Meldung); kuma_critical: auch nachts melden. security_announce: welche Stufen der Sicherheitszentrale Jarvis von selbst ansagt. energy: was der Energie-Kreislauf braucht (automations: Sekunden seit dem letzten Lauf, 0 = muss nur eingeschaltet sein).",
+  "_comment": "Copy to config/homelab.json. devices: important devices by host (ping) or entity (Home Assistant tracker); critical = report during quiet hours too. limits: fixed limits from which Jarvis reports. kuma_skip: Uptime Kuma monitors that Jarvis already checks itself (no double report); kuma_critical: report at night too. security_announce: which severities of the security centre Jarvis announces on his own. energy: what the energy loop needs (automations: seconds since the last run, 0 = only has to be switched on).",
   "devices": [
-    {"name": "Der Router", "host": "192.0.2.1", "critical": true},
-    {"name": "Der Drucker", "entity": "device_tracker.drucker", "critical": false}
+    {"name": "The router", "host": "192.0.2.1", "critical": true},
+    {"name": "The printer", "entity": "device_tracker.printer", "critical": false}
   ],
   "limits": {
     "pi_temp": 75,
@@ -12,14 +12,14 @@
   },
   "kuma_skip": ["Home Assistant", "NAS"],
   "kuma_critical": ["DNS"],
-  "security_announce": ["hoch"],
+  "security_announce": ["high"],
   "energy": {
-    "entities": {"sensor.hausverbrauch": "Hausverbrauch", "sensor.speicher_soc": "Akkustand"},
-    "online": {"binary_sensor.speicher_connectivity": "Der Speicher"},
-    "automations": {"automation.nulleinspeisung": 0, "automation.hausverbrauch_per_mqtt": 300}
+    "entities": {"sensor.house_consumption": "House consumption", "sensor.battery_soc": "Battery level"},
+    "online": {"binary_sensor.battery_connectivity": "The battery"},
+    "automations": {"automation.zero_export": 0, "automation.house_consumption_mqtt": 300}
   },
   "maintenance": {
-    "_comment": "Wartungskalender: certs = host:port, deren TLS-Zertifikat Jarvis prüft (cert_warn_days vorher melden); docker_max_days = Alter eines Container-Images auf dem Pi, ab dem ein Pull fällig ist; backup_max_days = Alter des letzten Hyper-Backup-Laufs, ab dem er mahnt",
+    "_comment": "Maintenance calendar: certs = host:port whose TLS certificate Jarvis checks (report cert_warn_days before); docker_max_days = age of a container image on the Pi from which a pull is due; backup_max_days = age of the last Hyper Backup run from which he reminds",
     "certs": ["homeassistant.local:8123", "nas.local:5001"],
     "cert_warn_days": 14,
     "docker_max_days": 120,

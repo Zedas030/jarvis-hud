@@ -2,14 +2,14 @@
 Windows desktop: arrange windows, search and read files in shared folders,
 read the clipboard, read the screen (local OCR) and run allow-listed scripts.
 
-Windows    "Spotify nach rechts", "Chrome links und Code rechts", "Discord auf
-           Monitor 2", "Spotify maximieren" — local, 0 tokens (handle). Workspaces
+Windows    "Spotify to the right", "Chrome left and Code right", "Discord on
+           monitor 2", "Spotify full screen" — local, 0 tokens (handle). Workspaces
            are routines whose steps open apps and arrange them, e.g.
-           {"do": "Öffne Discord"}, {"do": "Discord nach rechts"}.
+           {"do": "Open Discord"}, {"do": "Discord to the right"}.
 Files      Only below JARVIS_FILE_ROOTS (default Desktop, Documents, Downloads).
            Text, Markdown, CSV, logs, JSON, code and Word (.docx). Files that look
            like work are not read (privacy.py).
-Clipboard  Only when asked ("was habe ich kopiert?"); text only.
+Clipboard  Only when asked ("what did I copy?"); text only.
 Screen     Only when asked. A screenshot of the active window (or the whole
            screen) is read by the Windows OCR on this PC; the image never leaves
            it, only the recognised text goes to the model. Refused while a
@@ -129,9 +129,9 @@ def monitors():
     return [m[0] for m in out]
 
 
-POSITIONS = {"links": (0, 0, .5, 1), "rechts": (.5, 0, .5, 1), "oben links": (0, 0, .5, .5),
-             "oben rechts": (.5, 0, .5, .5), "unten links": (0, .5, .5, .5), "unten rechts": (.5, .5, .5, .5),
-             "mitte": (.15, .1, .7, .8), "voll": None}
+POSITIONS = {"left": (0, 0, .5, 1), "right": (.5, 0, .5, 1), "top left": (0, 0, .5, .5),
+             "top right": (.5, 0, .5, .5), "bottom left": (0, .5, .5, .5), "bottom right": (.5, .5, .5, .5),
+             "centre": (.15, .1, .7, .8), "full": None}
 
 
 def place(hwnd, position, monitor=1):
@@ -150,11 +150,11 @@ def place(hwnd, position, monitor=1):
     return True
 
 
-def arrange(app, position="links", monitor=1, wait=10):
-    """Moves the app's window; waits up to `wait` s for a just-opened app. Returns German text."""
+def arrange(app, position="left", monitor=1, wait=10):
+    """Moves the app's window; waits up to `wait` s for a just-opened app. Returns spoken text."""
     position = _position(position)
     if position is None:
-        return "Diese Position kenne ich nicht (links, rechts, oben links, …, mitte, voll)."
+        return "I do not know this position (left, right, top left, …, centre, full)."
     end = time.time() + wait
     while True:
         hwnd = find_window(app)
@@ -162,37 +162,37 @@ def arrange(app, position="links", monitor=1, wait=10):
             break
         time.sleep(0.5)
     if not hwnd:
-        return f"Kein Fenster von {app} gefunden."
+        return f"No window of {app} found."
     place(hwnd, position, int(monitor or 1))
-    return f"{app} liegt jetzt {'im Vollbild' if position == 'voll' else position}" + (f" auf Monitor {monitor}" if int(monitor or 1) > 1 else "") + "."
+    return f"{app} is now {'full screen' if position == 'full' else 'on the ' + position}" + (f" on monitor {monitor}" if int(monitor or 1) > 1 else "") + "."
 
 
 def _position(text):
     t = (text or "").lower().strip()
-    t = re.sub(r"\b(die |der |den |seite|hälfte|nach |auf )", "", t).strip()
-    t = {"linke": "links", "rechte": "rechts", "vollbild": "voll", "maximieren": "voll", "maximiert": "voll",
-         "groß": "voll", "ganz": "voll"}.get(t, t)
+    t = re.sub(r"\b(the |side|half|to |on |onto )", "", t).strip()
+    t = {"fullscreen": "full", "full screen": "full", "maximise": "full", "maximize": "full", "maximised": "full",
+         "maximized": "full", "big": "full", "whole": "full", "center": "centre", "middle": "centre"}.get(t, t)
     return t if t in POSITIONS else None
 
 
 _ARRANGE = re.compile(
-    r"^(?:schieb |leg |pack |mach |setz |stell )?(?:das |die |den )?(?:fenster )?(?:von )?([\w .+-]{2,30}?) "
-    r"(?:nach |auf die |an die |in die )?(linke seite|rechte seite|linke hälfte|rechte hälfte|links|rechts|"
-    r"oben links|oben rechts|unten links|unten rechts|mitte|vollbild|maximieren|groß)"
-    r"(?: (?:auf |an )?(?:den )?(?:monitor|bildschirm) (\d))?$")
+    r"^(?:move |put |snap |place |make |set )?(?:the )?(?:window )?(?:of )?([\w .+-]{2,30}?) "
+    r"(?:to the |to |on the |on |onto the )?(left side|right side|left half|right half|left|right|"
+    r"top left|top right|bottom left|bottom right|centre|center|middle|full ?screen|maximi[sz]ed|big)"
+    r"(?: (?:on |to )?(?:the )?(?:monitor|screen|display) (\d))?$")
 
 
 def handle(n):
-    """Local router hook: 'Spotify nach rechts', 'Chrome links und Code rechts'. Reply or None."""
-    if not IS_WIN or not re.search(r"\b(links|rechts|oben|unten|mitte|vollbild|maximier|monitor \d)", n):
+    """Local router hook: 'Spotify to the right', 'Chrome left and Code right'. Reply or None."""
+    if not IS_WIN or not re.search(r"\b(left|right|top|bottom|centre|center|middle|full ?screen|maximi|monitor \d)", n):
         return None
-    parts = re.split(r"\s+und\s+", n.strip(" .!"))
+    parts = re.split(r"\s+and\s+", n.strip(" .!"))
     plan = []
     for p in parts:
         m = _ARRANGE.match(p.strip())
         if not m:
             return None
-        app = re.sub(r"^(jarvis )?(bitte )?", "", m.group(1)).strip()
+        app = re.sub(r"^(jarvis )?(please )?", "", m.group(1)).strip()
         if not find_window(app):
             return None                              # not a window we know: let the LLM handle it
         plan.append((app, m.group(2), int(m.group(3) or 1)))
@@ -212,7 +212,7 @@ def _inside_roots(path):
 def search(query, limit=15, max_files=20000):
     words = [w for w in re.split(r"[\s_.-]+", (query or "").lower()) if len(w) > 1]
     if not words:
-        return "Wonach soll ich suchen?"
+        return "What should I search for?"
     import privacy
     hits, seen = [], 0
     for root in FILE_ROOTS:
@@ -236,9 +236,9 @@ def search(query, limit=15, max_files=20000):
             if seen > max_files:
                 break
     if not hits:
-        return f"Keine Datei zu „{query}“ in {', '.join(r.name for r in FILE_ROOTS)}."
+        return f"No file for “{query}” in {', '.join(r.name for r in FILE_ROOTS)}."
     hits.sort(key=lambda h: (-h[0], -h[1]))
-    return "\n".join(f"{p} ({_size(s)}, {time.strftime('%d.%m.%Y', time.localtime(m))})"
+    return "\n".join(f"{p} ({_size(s)}, {time.strftime('%Y-%m-%d', time.localtime(m))})"
                      for _, m, p, s in hits[:limit])
 
 
@@ -250,11 +250,11 @@ def read(path, max_chars=8000):
     import privacy
     p = pathlib.Path(os.path.expandvars(os.path.expanduser((path or "").strip().strip('"'))))
     if not _inside_roots(p):
-        return "Abgelehnt: nur Dateien in den freigegebenen Ordnern (" + ", ".join(str(r) for r in FILE_ROOTS) + ")."
+        return "Refused: only files in the shared folders (" + ", ".join(str(r) for r in FILE_ROOTS) + ")."
     if not p.is_file():
-        return "Datei nicht gefunden."
+        return "File not found."
     if p.suffix.lower() not in TEXT_EXT:
-        return f"{p.suffix or 'Dieses Format'} kann ich nicht lesen (nur Text, Markdown, CSV, Logs, Code, Word)."
+        return f"I cannot read {p.suffix or 'this format'} (only text, Markdown, CSV, logs, code, Word)."
     if p.suffix.lower() == ".docx":
         try:
             with zipfile.ZipFile(p) as z:
@@ -262,19 +262,19 @@ def read(path, max_chars=8000):
             text = re.sub(r"<w:p[ >].*?</w:p>", lambda m: re.sub(r"<[^>]+>", "", m.group(0)) + "\n", xml, flags=re.S)
             text = re.sub(r"<[^>]+>", "", text)
         except (OSError, KeyError, zipfile.BadZipFile) as e:
-            return f"Word-Datei nicht lesbar: {e}"
+            return f"Word file not readable: {e}"
     else:
         text = p.read_text(encoding="utf-8", errors="replace")
     if privacy.is_work(str(p), text[:3000]):
-        return "Das sieht nach Arbeit aus — lese ich nicht."
-    return text[:max_chars] + (f"\n… [gekürzt, {len(text)} Zeichen]" if len(text) > max_chars else "")
+        return "That looks like work — I do not read it."
+    return text[:max_chars] + (f"\n… [shortened, {len(text)} characters]" if len(text) > max_chars else "")
 
 
 # ── clipboard ────────────────────────────────────────────────
 
 def clipboard(max_chars=6000):
     if not IS_WIN:
-        return "Zwischenablage gibt es nur unter Windows."
+        return "The clipboard is only available on Windows."
     u, k = _user32(), ctypes.windll.kernel32
     u.GetClipboardData.restype = ctypes.c_void_p
     k.GlobalLock.restype = ctypes.c_void_p
@@ -285,11 +285,11 @@ def clipboard(max_chars=6000):
             break
         time.sleep(0.1)
     else:
-        return "Die Zwischenablage ist gerade blockiert."
+        return "The clipboard is blocked right now."
     try:
         h = u.GetClipboardData(13)                   # CF_UNICODETEXT
         if not h:
-            return "In der Zwischenablage ist kein Text."
+            return "There is no text in the clipboard."
         ptr = k.GlobalLock(h)
         try:
             text = ctypes.wstring_at(ptr)
@@ -299,8 +299,8 @@ def clipboard(max_chars=6000):
         u.CloseClipboard()
     import privacy
     if privacy.is_work(text[:3000]):
-        return "Der kopierte Text sieht nach Arbeit aus — den lese ich nicht."
-    return text[:max_chars] + (f"\n… [gekürzt, {len(text)} Zeichen]" if len(text) > max_chars else "")
+        return "The copied text looks like work — I do not read it."
+    return text[:max_chars] + (f"\n… [shortened, {len(text)} characters]" if len(text) > max_chars else "")
 
 
 # ── screen (local OCR) ───────────────────────────────────────
@@ -319,12 +319,12 @@ def _foreground_title():
 def screen_text(whole=False):
     """OCR of the active window (or the whole screen). Text only, image stays local and is deleted."""
     if not IS_WIN:
-        return "Bildschirm lesen gibt es nur unter Windows."
+        return "Reading the screen is only available on Windows."
     hwnd, title = _foreground_title()
     titles = [t for _, t, _ in windows()] if whole else [title]
     bad = next((t for t in titles if SCREEN_BLOCK.search(t)), None)
     if bad:
-        return f"Abgelehnt: „{bad[:40]}“ ist sichtbar (Passwörter, Bank oder Nachrichten). Das lese ich nicht."
+        return f"Refused: “{bad[:40]}” is visible (passwords, bank or messages). I do not read that."
     rect = _RECT()
     if not whole:
         _user32().GetWindowRect(hwnd, ctypes.byref(rect))
@@ -336,11 +336,11 @@ def screen_text(whole=False):
         p = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=40,
                            **hostos.QUIET)
     except subprocess.TimeoutExpired:
-        return "Die Texterkennung hat zu lange gebraucht."
+        return "The text recognition took too long."
     text = (p.stdout or "").strip()
     if p.returncode != 0 or not text:
-        return f"Texterkennung fehlgeschlagen: {(p.stderr or 'kein Text erkannt').strip()[:200]}"
-    head = f"Fenster: {title}\n" if not whole else "Ganzer Bildschirm\n"
+        return f"Text recognition failed: {(p.stderr or 'no text recognised').strip()[:200]}"
+    head = f"Window: {title}\n" if not whole else "Whole screen\n"
     return head + text[:7000]
 
 
@@ -357,17 +357,17 @@ def scripts():
 def script_list():
     s = scripts()
     if not s:
-        return "Keine Skripte freigegeben (config/scripts.json, Vorlage scripts.example.json)."
-    return "\n".join(f"- {k}: {v.get('beschreibung', '')}" for k, v in s.items())
+        return "No scripts allowed (config/scripts.json, template scripts.example.json)."
+    return "\n".join(f"- {k}: {v.get('description', '')}" for k, v in s.items())
 
 
 def script_run(name):
     s = scripts().get((name or "").lower().strip())
     if not s:
-        return "Dieses Skript ist nicht freigegeben."
+        return "This script is not allowed."
     path = pathlib.Path(os.path.expandvars(os.path.expanduser(s["path"])))
     if not path.is_file():
-        return f"Skriptdatei fehlt: {path}"
+        return f"Script file missing: {path}"
     if path.suffix.lower() == ".ps1":
         cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(path)]
     elif path.suffix.lower() in (".bat", ".cmd"):
@@ -375,14 +375,14 @@ def script_run(name):
     elif path.suffix.lower() == ".py":
         cmd = [os.sys.executable, str(path)]
     else:
-        return "Nur .ps1, .bat, .cmd oder .py."
+        return "Only .ps1, .bat, .cmd or .py."
     cmd += [str(a) for a in s.get("args") or []]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=int(s.get("timeout") or 120), cwd=str(path.parent),
                            **hostos.QUIET)
     except subprocess.TimeoutExpired:
-        return f"Abgebrochen: {name} lief länger als {s.get('timeout') or 120} s."
+        return f"Cancelled: {name} ran longer than {s.get('timeout') or 120} s."
     out = ((p.stdout or "") + ("\n" + p.stderr if p.stderr else "")).strip()
-    return (f"{name} {'fertig' if p.returncode == 0 else f'mit Fehler {p.returncode}'}."
+    return (f"{name} {'done' if p.returncode == 0 else f'failed with error {p.returncode}'}."
             + (f"\n{out[-2500:]}" if out else ""))

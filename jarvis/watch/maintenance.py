@@ -95,12 +95,12 @@ def certificates(cfg):
         days = cert_days(host.strip(), int(port) if port.isdigit() else 443)
         if days is None:
             out.append(dict(what=f"Zertifikat {host}", days=None, severity="info",
-                            text=f"Das Zertifikat von {host} konnte ich nicht lesen."))
+                            text=f"I could not read the certificate of {host}."))
             continue
         due = days <= int(cfg.get("cert_warn_days", 14))
-        text = (f"Das Zertifikat von {host} ist seit {-days} Tagen abgelaufen." if days < 0 else
-                f"Das Zertifikat von {host} läuft in {days} Tagen ab." if due else
-                f"Zertifikat {host}: noch {days} Tage.")
+        text = (f"The certificate of {host} expired {-days} days ago." if days < 0 else
+                f"The certificate of {host} expires in {days} days." if due else
+                f"Certificate {host}: {days} days left.")
         out.append(dict(what=f"Zertifikat {host}", days=days, severity="warn" if due else "ok", text=text))
     return out
 
@@ -132,23 +132,23 @@ def images(cfg):
     for name, days in parse_images(_pi(DOCKER_AGES_CMD)):
         old = days > limit
         out.append(dict(what=f"Container {name}", days=limit - days, severity="warn" if old else "ok",
-                        text=(f"Das Image von {name} auf dem Pi ist {days} Tage alt — ein Pull wäre fällig." if old
-                              else f"Container {name}: Image {days} Tage alt.")))
+                        text=(f"The image of {name} on the Pi is {days} days old — a pull is due." if old
+                              else f"Container {name}: image {days} days old.")))
     return out
 
 
 # ── backups and disks ────────────────────────────────────────
 
 def backup_age(text, today=None):
-    """Days since the newest 'zuletzt <date>' in infra.backup_status()'s text, or None."""
+    """Days since the newest 'last <date>' in infra.backup_status()'s text, or None."""
     today = today or dt.date.today()
     dates = []
-    for m in re.finditer(r"zuletzt (\d{4}-\d{2}-\d{2})", text or ""):
+    for m in re.finditer(r"(?:last|zuletzt) (\d{4}-\d{2}-\d{2})", text or ""):
         try:
             dates.append(dt.date.fromisoformat(m.group(1)))
         except ValueError:
             pass
-    for m in re.finditer(r"zuletzt (\d{1,2})\.(\d{1,2})\.(\d{4})", text or ""):
+    for m in re.finditer(r"(?:last|zuletzt) (\d{1,2})\.(\d{1,2})\.(\d{4})", text or ""):
         dates.append(dt.date(int(m.group(3)), int(m.group(2)), int(m.group(1))))
     return (today - max(dates)).days if dates else None
 
@@ -165,8 +165,8 @@ def backups(cfg):
     limit = int(cfg.get("backup_max_days", 3))
     old = age > limit
     return [dict(what="Backup NAS", days=limit - age, severity="warn" if old else "ok",
-                 text=(f"Das letzte Backup auf dem NAS ist {age} Tage her." if old
-                       else f"Backup auf dem NAS: zuletzt vor {age} Tag(en)."))]
+                 text=(f"The last backup on the NAS was {age} days ago." if old
+                       else f"Backup on the NAS: last one {age} day(s) ago."))]
 
 
 def disks():
@@ -175,8 +175,8 @@ def disks():
     if not isinstance(s, dict) or s.get("error") or s.get("ok") is None:
         return []
     return [dict(what="NAS-Platten", days=0 if not s["ok"] else None, severity="warn" if not s["ok"] else "ok",
-                 text="Eine Platte oder ein Volume im NAS ist nicht normal — SMART prüfen." if not s["ok"]
-                 else "NAS-Platten: alle normal.")]
+                 text="A disk or a volume in the NAS is not normal — check SMART." if not s["ok"]
+                 else "NAS disks: all normal.")]
 
 
 # ── all together ─────────────────────────────────────────────
@@ -202,16 +202,16 @@ def items(now=None):
 def describe(now=None):
     rows = items(now)
     if not rows:
-        return ("Noch nichts im Wartungskalender, Sir. Zertifikate, Container und Backups trage ich ein, sobald "
-                "config/homelab.json unter maintenance etwas nennt und Pi oder NAS erreichbar sind.")
+        return ("Nothing in the maintenance calendar yet, Sir. I enter certificates, containers and backups as soon as "
+                "config/homelab.json names something under maintenance and the Pi or NAS can be reached.")
     due = [r for r in rows if r["severity"] == "warn"]
     fine = [r for r in rows if r["severity"] == "ok"]
     out = []
     if due:
-        out.append("Fällig: " + " ".join(r["text"] for r in due[:5]))
+        out.append("Due: " + " ".join(r["text"] for r in due[:5]))
     if fine:
         soon = sorted((r for r in fine if r["days"] is not None), key=lambda r: r["days"])[:3]
-        out.append("In Ordnung: " + ", ".join(r["text"].rstrip(".") for r in soon) + ".")
+        out.append("Fine: " + ", ".join(r["text"].rstrip(".") for r in soon) + ".")
     unknown = [r for r in rows if r["severity"] == "info"]
     if unknown:
         out.append(" ".join(r["text"] for r in unknown[:3]))
@@ -228,8 +228,8 @@ def step(now=None):
             watchers.once(f"maintenance:{r['what']}", "Sir, " + r["text"][0].lower() + r["text"][1:], kind="systems")
 
 
-_ASK = re.compile(r"\b(wartung|wartungskalender|was (steht|ist) (bald |demnächst )?(fällig|an im homelab)|"
-                  r"zertifikat\w*|was läuft (bald )?ab|wie alt (sind|ist) .{0,20}(container|image|backup))\b")
+_ASK = re.compile(r"\b(maintenance|maintenance calendar|what is (due|coming up)( soon)?( in the homelab)?|"
+                  r"certificates?|what (expires|runs out)( soon)?|how old (are|is) .{0,20}(containers?|images?|backups?))\b")
 
 
 def handle(n):

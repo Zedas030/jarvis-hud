@@ -3,12 +3,12 @@ Spotify on every device of the account — the phone on the Bluetooth speaker as
 the Web API (Spotify Connect). Two jobs:
 
   hold / release   "Jarvis" (and every time he speaks) turns the music down to a third of its volume, at
-                   most QUIET_PCT (JARVIS_SPOTIFY_HOLD_MODE=leise, the default) or pauses it (=pause), so he hears the request clearly; once he is done the
+                   most QUIET_PCT (JARVIS_SPOTIFY_HOLD_MODE=quiet, the default) or pauses it (=pause), so he hears the request clearly; once he is done the
                    old volume comes back, or it plays on — only if he did it himself, and never after
-                   "Musik aus" in between. A device Spotify cannot set the volume of is paused instead.
+                   "music off" in between. A device Spotify cannot set the volume of is paused instead.
   control          play, pause, next, previous for the music tool, on whatever device is playing.
   transfer         the music into another room: playback moves to the Spotify Connect device of that
-                   name (Sonos, Echo, PC) and plays on there — "Musik vom Schlafzimmer ins Wohnzimmer".
+                   name (Sonos, Echo, PC) and plays on there — "move the music from the bedroom to the living room".
 
 The media keys in jarvis_mcp only reach Spotify on this PC; with this module set up the music tool uses
 the Web API instead and falls back to the keys when it fails.
@@ -30,12 +30,12 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 CLIENT_ID = os.environ.get("JARVIS_SPOTIFY_CLIENT_ID", "").strip()
 TOKEN_FILE = pathlib.Path(os.environ.get("JARVIS_SPOTIFY_TOKEN", ROOT / "config" / "spotify_token.json"))
-HOLD = os.environ.get("JARVIS_SPOTIFY_HOLD", "1").strip().lower() not in ("0", "off", "aus", "false", "no", "nein")
+HOLD = os.environ.get("JARVIS_SPOTIFY_HOLD", "1").strip().lower() not in ("0", "off", "false", "no")
 # Plays on by itself after this long, should the HUD never say "done" (tab closed, network gone).
 HOLD_MAX_S = float(os.environ.get("JARVIS_SPOTIFY_HOLD_MAX_S", "120"))
-# "leise": the music keeps running at QUIET_FACTOR of its volume, never above QUIET_PCT; "pause": it stops.
+# "quiet": the music keeps running at QUIET_FACTOR of its volume, never above QUIET_PCT; "pause": it stops.
 # Relative because a fixed 20 % did nothing on a speaker whose normal level is 15 %.
-HOLD_MODE = "pause" if os.environ.get("JARVIS_SPOTIFY_HOLD_MODE", "leise").strip().lower() in ("pause", "stopp") else "leise"
+HOLD_MODE = "pause" if os.environ.get("JARVIS_SPOTIFY_HOLD_MODE", "quiet").strip().lower() in ("pause", "stop") else "quiet"
 QUIET_PCT = max(0, min(100, int(os.environ.get("JARVIS_SPOTIFY_QUIET_PCT", "20"))))
 QUIET_FACTOR = max(0.0, min(1.0, float(os.environ.get("JARVIS_SPOTIFY_QUIET_FACTOR", "0.3").replace(",", "."))))
 REDIRECT = "http://127.0.0.1:8722/callback"    # Spotify allows loopback IPs, no longer "localhost"
@@ -87,7 +87,7 @@ def _refresh():
     try:
         refresh = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))["refresh_token"]
     except (OSError, ValueError, KeyError) as e:
-        raise RuntimeError("kein Spotify-Login (scripts/spotify_login.py)") from e
+        raise RuntimeError("no Spotify login (scripts/spotify_login.py)") from e
     body = urllib.parse.urlencode({"grant_type": "refresh_token", "refresh_token": refresh,
                                    "client_id": CLIENT_ID}).encode()
     req = urllib.request.Request(TOKEN_URL, data=body, headers={"Content-Type": "application/x-www-form-urlencoded"})
@@ -190,20 +190,20 @@ def hold(who=""):
                 return True
             on, device, vol = _player()
             if not on:
-                _log(f"{who or '?'}: Jarvis gerufen, es lief keine Musik")
+                _log(f"{who or '?'}: Jarvis called, no music was playing")
                 return False
             target = quiet_target(vol) if vol is not None else None
-            if HOLD_MODE == "leise" and vol is not None and target < vol:
+            if HOLD_MODE == "quiet" and vol is not None and target < vol:
                 if _set_volume(target, device):
                     _HELD.update(device=device or "", at=time.time(), volume=vol, quiet=target)
                     STATUS.update(error="", holds=STATUS["holds"] + 1)
                     _save_held()
                     _arm_timer()
-                    _log(f"{who or '?'}: leiser {vol} % → {target} % ({(device or '?')[:8]})")
+                    _log(f"{who or '?'}: quieter {vol} % → {target} % ({(device or '?')[:8]})")
                     return True
-                _log(f"{who or '?'}: Lautstärke nicht setzbar, pausiere stattdessen")
-            elif HOLD_MODE == "leise" and vol is not None:
-                _log(f"{who or '?'}: läuft schon leise ({vol} %), nichts zu tun")
+                _log(f"{who or '?'}: volume cannot be set, pausing instead")
+            elif HOLD_MODE == "quiet" and vol is not None:
+                _log(f"{who or '?'}: already playing quietly ({vol} %), nothing to do")
                 return False
             code, _ = _api("PUT", "/me/player/pause" + _device_q(device))
             if not _ok(code):
@@ -218,7 +218,7 @@ def hold(who=""):
             return True
         except Exception as e:  # noqa: BLE001 — offline or no login: the request still works, just louder
             STATUS["error"] = str(e)[:160]
-            _log("Pause fehlgeschlagen: " + STATUS["error"])
+            _log("Pause failed: " + STATUS["error"])
             return False
 
 
@@ -239,7 +239,7 @@ def _restore():
         return
     _HELD.update(device=held.get("device") or "", at=float(held.get("at") or 0), volume=held.get("volume"),
                  quiet=held.get("quiet", 1 if held.get("volume") is not None else None))
-    _log(("Leiser" if _HELD["volume"] is not None else "Pause") + " nach Neustart übernommen")
+    _log(("Quieter" if _HELD["volume"] is not None else "Pause") + " taken over after restart")
     _arm_timer(max(1.0, HOLD_MAX_S - (time.time() - _HELD["at"])))
 
 
@@ -252,7 +252,7 @@ def _arm_timer(seconds=None):
 
 
 def forget():
-    """The user said what the music should do ("Musik aus", "nächster Titel") — no playing on after that."""
+    """The user said what the music should do ("music off", "next track") — no playing on after that."""
     with _LOCK:
         if _HELD["timer"]:
             _HELD["timer"].cancel()
@@ -268,7 +268,7 @@ def release(who="", why=""):
         forget()
         if device is None:
             return False
-        held_s = f"{who or 'Zeitlimit'}: weiter nach {time.time() - since:.0f} s" + (f" (wartete auf: {why})" if why else "")
+        held_s = f"{who or 'time limit'}: on after {time.time() - since:.0f} s" + (f" (waited for: {why})" if why else "")
         try:
             if vol is not None:
                 return _loud_again(device, vol, quiet, held_s)
@@ -276,17 +276,17 @@ def release(who="", why=""):
             # 19 s after the pause and stayed silent — so on that device a play is sent regardless.
             on, now = playing()
             if on and now and device and now != device:
-                _log(f"{held_s}: läuft schon auf einem anderen Gerät")
+                _log(f"{held_s}: already playing on another device")
                 return True
             code, _ = _api("PUT", "/me/player/play" + _device_q(device))
             if not _ok(code) and device:              # the phone went to sleep and left the device list
                 code, _ = _api("PUT", "/me/player/play")
-            STATUS["error"] = "" if _ok(code) else f"Weiter: HTTP {code}"
-            _log(f"{held_s}: " + ("ok" if _ok(code) else f"HTTP {code} (iPhone eingeschlafen?)"))
+            STATUS["error"] = "" if _ok(code) else f"Resume: HTTP {code}"
+            _log(f"{held_s}: " + ("ok" if _ok(code) else f"HTTP {code} (iPhone asleep?)"))
             return _ok(code)
         except Exception as e:  # noqa: BLE001
             STATUS["error"] = str(e)[:160]
-            _log(f"{held_s}, fehlgeschlagen: " + STATUS["error"])
+            _log(f"{held_s}, failed: " + STATUS["error"])
             return False
 
 
@@ -295,11 +295,11 @@ def _loud_again(device, vol, quiet, held_s):
     _, now, current = _player()
     target = QUIET_PCT if quiet is None else quiet
     if now == device and current is not None and min(abs(current - target), abs(current - vol)) > 1:
-        _log(f"{held_s}: Lautstärke inzwischen von Hand auf {current} %, bleibt so")
+        _log(f"{held_s}: volume set by hand to {current} % meanwhile, it stays")
         return True
     ok = _set_volume(vol, device)
-    STATUS["error"] = "" if ok else "Lautstärke zurück: fehlgeschlagen"
-    _log(f"{held_s}: " + (f"wieder {vol} %" if ok else "Lautstärke zurück fehlgeschlagen"))
+    STATUS["error"] = "" if ok else "volume back: failed"
+    _log(f"{held_s}: " + (f"back to {vol} %" if ok else "volume back failed"))
     return ok
 
 
@@ -312,7 +312,7 @@ def control(action):
             held = _HELD["device"] is not None
             quiet_device, quiet_vol = _HELD["device"], _HELD["volume"]
             forget()
-            if quiet_vol is not None:                 # turned down by the wake word: not still quiet after "Musik aus"
+            if quiet_vol is not None:                 # turned down by the wake word: not still quiet after "music off"
                 _set_volume(quiet_vol, quiet_device)
                 held = False                          # the music never stopped, so the toggle reads it as it is
             on, device = playing()
@@ -325,7 +325,7 @@ def control(action):
                 code = _api("PUT", "/me/player/play" + _device_q(device))[0]
             elif action in ("next", "previous"):
                 code = _api("POST", f"/me/player/{action}" + _device_q(device))[0]
-                if held and _ok(code) and not on:     # "nächster Titel" during the hold: play that one
+                if held and _ok(code) and not on:     # "next track" during the hold: play that one
                     _api("PUT", "/me/player/play" + _device_q(device))
             else:
                 return False
@@ -349,7 +349,7 @@ def devices():
 
 def find_device(name, devs=None):
     """The device called `name` — same name ignoring case, else the only one whose name contains it or is
-    contained in it ("Echo" for "Nutzer' Echo Dot"). None when nothing or more than one fits."""
+    contained in it ("Echo" for "User's Echo Dot"). None when nothing or more than one fits."""
     w = " ".join(str(name or "").split()).lower()
     if not w:
         return None
@@ -378,11 +378,11 @@ def pause_active():
 
 
 def transfer(name):
-    """Move the playback to the device called `name` and play there: "die Musik vom Schlafzimmer ins Wohnzimmer".
-    (True, device name) or (False, reason in German). Spotify only knows devices that are online and
+    """Move the playback to the device called `name` and play there: "the music from the bedroom to the living room".
+    (True, device name) or (False, reason in words). Spotify only knows devices that are online and
     logged into the account — a Sonos or Echo that is not in the list cannot be reached this way."""
     if not configured():
-        return False, "Spotify ist nicht eingerichtet."
+        return False, "Spotify is not set up."
     try:
         with _LOCK:
             quiet_device, quiet_vol = _HELD["device"], _HELD["volume"]
@@ -393,16 +393,16 @@ def transfer(name):
             dev = find_device(name, devs)
             if not dev:
                 known = ", ".join(sorted(d.get("name", "") for d in devs if d.get("name")))
-                return False, f"Spotify kennt kein Gerät „{name}“. Gerade erreichbar: {known or 'keins'}."
+                return False, f"Spotify knows no device “{name}”. Reachable right now: {known or 'none'}."
             code, _ = _api("PUT", "/me/player", body={"device_ids": [dev["id"]], "play": True})
             if not _ok(code):
                 STATUS["error"] = f"transfer {code}"
-                return False, f"Spotify hat die Übergabe an „{dev['name']}“ nicht angenommen (HTTP {code})."
-            _log(f"Wiedergabe → {dev['name']}")
+                return False, f"Spotify did not accept the handover to “{dev['name']}” (HTTP {code})."
+            _log(f"playback → {dev['name']}")
             return True, dev["name"]
     except Exception as e:  # noqa: BLE001 — offline or no login
         STATUS["error"] = str(e)[:160]
-        return False, f"Spotify antwortet nicht ({str(e)[:60]})."
+        return False, f"Spotify does not answer ({str(e)[:60]})."
 
 
 if HOLD and configured():

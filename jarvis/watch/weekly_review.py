@@ -3,8 +3,8 @@ Weekly review: sleep, steps, stress, Body Battery and golf rounds — with patte
 
 Daily (from 9 h) the finished days are fetched from Garmin once and kept locally
 in JARVIS_HEALTH_DATA (logs/health_daily.json; never in the repository). The user
-can add what Garmin cannot know by voice — "Ich habe um 22 Uhr gegessen",
-"zwei Bier getrunken" — through the tool health_log (log_entry below).
+can add what Garmin cannot know by voice — "I had dinner at 10 pm",
+"had two beers" — through the tool health_log (log_entry below).
 
 Sunday (from JARVIS_REVIEW_HOUR, default 18 h) the week is summed up and compared
 with the week before. Patterns are computed in code, not guessed by the model:
@@ -14,7 +14,7 @@ sleep, Body Battery the next morning). A pattern is only named with at least
 three days on each side and a clear difference, always with the counts — it is
 a hint, not proof. The model only phrases the result for speaking.
 
-Note: Erinnerungen/Gesundheit/Wochenrückblick <year>-KW<nn>.
+Note: Memories/Health/Weekly review <year>-W<nn>.
 """
 import datetime as dt
 import json
@@ -41,10 +41,10 @@ PATTERN_DAYS = int(os.environ.get("JARVIS_PATTERN_DAYS", "42"))
 ENABLED = os.environ.get("JARVIS_REVIEW", "1").strip() not in ("0", "false", "no", "off")
 _LOCK = threading.Lock()
 
-SYSTEM = ("Du bist JARVIS. Aus fertig berechneten Gesundheitszahlen formulierst du einen gesprochenen "
-          "Wochenrückblick: Deutsch, du siezt den User, trocken-britisch, vier bis sechs kurze Sätze, kein Markdown, "
-          "Zahlen wie gesprochen. Nenne nur Zahlen und Muster aus den Fakten, erfinde nichts, keine medizinischen "
-          "Ratschläge. Muster vorsichtig formulieren (Häufung, kein Beweis).")
+SYSTEM = ("You are JARVIS. From health figures that are already computed you phrase a spoken "
+          "weekly review: English, formal, dry and British, four to six short sentences, no Markdown, "
+          "numbers as spoken. Only name numbers and patterns from the facts, invent nothing, no medical "
+          "advice. Phrase patterns carefully (a tendency, not proof).")
 
 
 # ── local store ──────────────────────────────────────────────
@@ -71,31 +71,31 @@ def _update(fn):
         return out
 
 
-_KINDS = [("essen", r"\b(gegessen|essen|abendessen|abendbrot|mahlzeit|snack|pizza|döner|burger)"),
-          ("alkohol", r"\b(alkohol|bier|wein|sekt|schnaps|cocktail|getrunken)"),
-          ("koffein", r"\b(kaffee|espresso|cola|energy|koffein)"),
-          ("training", r"\b(training|sport|gelaufen|laufen|fitness|gym)")]
+_KINDS = [("meal", r"\b(ate|eaten|eat|dinner|supper|lunch|meal|snack|pizza|kebab|burger)"),
+          ("alcohol", r"\b(alcohol|beers?|wine|prosecco|champagne|spirits|schnapps|cocktails?|drank|drinks?)"),
+          ("caffeine", r"\b(coffee|espresso|cola|energy|caffeine)"),
+          ("training", r"\b(training|workout|sport|ran|run|running|fitness|gym)")]
 
 
 def log_entry(what, at="", now=None):
-    """health_log: what + time ('22:10', 'gestern 22:10', 'YYYY-MM-DD HH:MM'). After midnight until 5 h
+    """health_log: what + time ('22:10', 'yesterday 22:10', 'YYYY-MM-DD HH:MM'). After midnight until 5 h
     an entry counts for the evening before."""
     now = now or dt.datetime.now()
     text = " ".join((what or "").split())[:80]
     if not text:
-        return "Was soll ich notieren?"
-    kind = next((k for k, pat in _KINDS if re.search(pat, text.lower())), "notiz")
+        return "What should I note?"
+    kind = next((k for k, pat in _KINDS if re.search(pat, text.lower())), "note")
     at = (at or "").strip().lower()
     day = now.date()
-    if "gestern" in at:
+    if "yesterday" in at:
         day -= dt.timedelta(days=1)
     m = re.search(r"(\d{4}-\d{2}-\d{2})", at)
     if m:
         day = dt.date.fromisoformat(m.group(1))
-    m = re.search(r"(\d{1,2})(?::|\.|\s*uhr\s*)?(\d{2})?", re.sub(r"\d{4}-\d{2}-\d{2}", "", at))
+    m = re.search(r"(\d{1,2})(?::|\.|\s*h\s*)?(\d{2})?", re.sub(r"\d{4}-\d{2}-\d{2}", "", at))
     hh, mm = (int(m.group(1)), int(m.group(2) or 0)) if m else (now.hour, now.minute)
     if not (0 <= hh < 24 and 0 <= mm < 60):
-        return "Die Uhrzeit verstehe ich nicht."
+        return "I do not understand the time."
     if hh < 5:
         day -= dt.timedelta(days=1)
         clock = f"{hh + 24:02d}:{mm:02d}"     # 00:30 → "24:30" of the evening before, sorts after 23:00
@@ -103,7 +103,7 @@ def log_entry(what, at="", now=None):
         clock = f"{hh:02d}:{mm:02d}"
     _update(lambda d: d.setdefault(day.isoformat(), {}).setdefault("log", []).append(
         {"kind": kind, "what": text, "at": clock}))
-    return f"Notiert: {text}, {clock if hh >= 5 else f'{hh}:{mm:02d}'} Uhr ({day.strftime('%d.%m.')})."
+    return f"Noted: {text}, {clock if hh >= 5 else f'{hh}:{mm:02d}'} ({day.isoformat()})."
 
 
 # ── Garmin ───────────────────────────────────────────────────
@@ -112,11 +112,11 @@ def _garmin():
     import jarvis_mcp as j
     from garminconnect import Garmin
     if not (j.GARMIN_EMAIL and j.GARMIN_PASSWORD):
-        raise RuntimeError("Garmin nicht verbunden")
+        raise RuntimeError("Garmin not connected")
     g = Garmin(j.GARMIN_EMAIL, j.GARMIN_PASSWORD, return_on_mfa=True)
     needs_mfa, _ = g.login(j.GARMIN_TOKENS)
     if needs_mfa:
-        raise RuntimeError("Garmin verlangt Zwei-Faktor-Anmeldung")
+        raise RuntimeError("Garmin asks for a two-factor login")
     os.makedirs(j.GARMIN_TOKENS, exist_ok=True)
     g.client.dump(j.GARMIN_TOKENS)
     return g
@@ -199,18 +199,18 @@ def week_stats(d, end):
 
 def _features(rec):
     log = rec.get("log") or []
-    meals = [e["at"] for e in log if e.get("kind") == "essen"]
-    f = {"spätes Essen (ab %s Uhr)" % LATE_MEAL: (max(meals) >= LATE_MEAL) if meals else None,
-         "Alkohol": True if any(e.get("kind") == "alkohol" for e in log) else (False if log else None),
-         "einer Golfrunde": (rec.get("golf") or {}).get("rounds", 0) > 0 if "golf" in rec else None,
-         "über 10.000 Schritten": rec["steps"] >= 10000 if rec.get("steps") is not None else None,
-         "hohem Stress (Schnitt ab 40)": rec["stress"] >= 40 if rec.get("stress") is not None else None}
+    meals = [e["at"] for e in log if e.get("kind") in ("meal", "essen")]
+    f = {"a late meal (from %s)" % LATE_MEAL: (max(meals) >= LATE_MEAL) if meals else None,
+         "alcohol": True if any(e.get("kind") in ("alcohol", "alkohol") for e in log) else (False if log else None),
+         "a round of golf": (rec.get("golf") or {}).get("rounds", 0) > 0 if "golf" in rec else None,
+         "over 10,000 steps": rec["steps"] >= 10000 if rec.get("steps") is not None else None,
+         "high stress (average 40 and up)": rec["stress"] >= 40 if rec.get("stress") is not None else None}
     return f
 
 
-_OUTCOMES = [("Schlafscore", lambda r: r.get("sleep_score"), 5, ""),
-             ("Tiefschlaf", lambda r: r["deep_s"] / 60 if r.get("deep_s") else None, 10, " Minuten"),
-             ("Body Battery am Morgen", lambda r: r.get("bb_high"), 8, "")]
+_OUTCOMES = [("sleep score", lambda r: r.get("sleep_score"), 5, ""),
+             ("deep sleep", lambda r: r["deep_s"] / 60 if r.get("deep_s") else None, 10, " minutes"),
+             ("Body Battery in the morning", lambda r: r.get("bb_high"), 8, "")]
 
 
 def patterns(d, end, days=PATTERN_DAYS, min_each=3):
@@ -234,8 +234,8 @@ def patterns(d, end, days=PATTERN_DAYS, min_each=3):
                 continue
             ma, mb = statistics.mean(a), statistics.mean(b)
             if abs(ma - mb) >= threshold:
-                out.append(f"Nach Tagen mit {feat}: {name} im Schnitt {round(ma)}{unit} statt {round(mb)}{unit} "
-                           f"({len(a)} gegen {len(b)} Nächte).")
+                out.append(f"After days with {feat}: {name} on average {round(ma)}{unit} instead of {round(mb)}{unit} "
+                           f"({len(a)} vs. {len(b)} nights).")
     steps = [(d.get(k, {}).get("steps"),
               (d.get((dt.date.fromisoformat(k) + dt.timedelta(days=1)).isoformat()) or {}).get("sleep_score"))
              for k in keys]
@@ -246,23 +246,23 @@ def patterns(d, end, days=PATTERN_DAYS, min_each=3):
         except statistics.StatisticsError:
             r = 0
         if abs(r) >= 0.4:
-            out.append(f"Mehr Schritte gingen {'mit besserem' if r > 0 else 'mit schlechterem'} Schlafscore in "
-                       f"der Nacht danach einher (Zusammenhang {r:+.1f} über {len(pairs)} Tage).")
+            out.append(f"More steps went with a {'better' if r > 0 else 'worse'} sleep score in "
+                       f"the night after (correlation {r:+.1f} over {len(pairs)} days).")
     return out
 
 
 def _fmt(v, unit="", nd=1):
     if v is None:
         return "–"
-    return f"{round(v, nd) if nd else round(v)}{unit}".replace(".", ",")
+    return f"{round(v, nd) if nd else round(v)}{unit}"
 
 
-ROOM_SENSORS = {"Wohnzimmer": "sensor.zeit_wohnzimmer_7_tage", "Schlafzimmer": "sensor.zeit_schlafzimmer_7_tage"}
+ROOM_SENSORS = {"Living Room": "sensor.time_living_room_7_days", "Bedroom": "sensor.time_bedroom_7_days"}
 
 
 def rooms_line(states=None):
     """Hours per room over the last seven days, from Home Assistant's history_stats sensors over the presence
-    helper (input_select.nutzer_raum; Schlafzimmer includes the bathroom). "" without Home Assistant or sensors."""
+    helper (input_select.user_room; Bedroom includes the bathroom). "" without Home Assistant or sensors."""
     if states is None:
         try:
             import briefing
@@ -278,30 +278,30 @@ def rooms_line(states=None):
         parts.append(f"{room} {hours:.0f} h")
     if not parts:
         return ""
-    return "Zeit zu Hause nach Raum (Präsenzmelder, letzte 7 Tage): " + ", ".join(parts) + "."
+    return "Time at home by room (presence sensors, last 7 days): " + ", ".join(parts) + "."
 
 
 def facts(d, end, states=None):
     cur, prev = week_stats(d, end), week_stats(d, end - dt.timedelta(days=7))
     found = patterns(d, end)
-    lines = [f"Woche bis {end.strftime('%d.%m.')}: Daten an {cur['days']} von 7 Tagen."]
+    lines = [f"Week up to {end.isoformat()}: data on {cur['days']} of 7 days."]
     if cur["days"]:
-        lines += [f"Schlaf im Schnitt {_fmt(cur['sleep_h'], ' h')} (Vorwoche {_fmt(prev['sleep_h'], ' h')}), "
-                  f"Schlafscore {_fmt(cur['sleep_score'], nd=0)} (Vorwoche {_fmt(prev['sleep_score'], nd=0)}), "
-                  f"Tiefschlaf {_fmt(cur['deep_min'], ' min', 0)}.",
-                  f"Schritte im Schnitt {_fmt(cur['steps'], nd=0)} pro Tag (Vorwoche {_fmt(prev['steps'], nd=0)}).",
-                  f"Stress im Schnitt {_fmt(cur['stress'], nd=0)} (Vorwoche {_fmt(prev['stress'], nd=0)}), "
-                  f"Body Battery morgens {_fmt(cur['bb_high'], nd=0)} (Vorwoche {_fmt(prev['bb_high'], nd=0)}).",
-                  f"Golf: {cur['golf_rounds']} Runde(n), {cur['golf_minutes']} Minuten "
-                  f"(Vorwoche {prev['golf_rounds']})."]
+        lines += [f"Sleep on average {_fmt(cur['sleep_h'], ' h')} (week before {_fmt(prev['sleep_h'], ' h')}), "
+                  f"sleep score {_fmt(cur['sleep_score'], nd=0)} (week before {_fmt(prev['sleep_score'], nd=0)}), "
+                  f"deep sleep {_fmt(cur['deep_min'], ' min', 0)}.",
+                  f"Steps on average {_fmt(cur['steps'], nd=0)} a day (week before {_fmt(prev['steps'], nd=0)}).",
+                  f"Stress on average {_fmt(cur['stress'], nd=0)} (week before {_fmt(prev['stress'], nd=0)}), "
+                  f"Body Battery in the morning {_fmt(cur['bb_high'], nd=0)} (week before {_fmt(prev['bb_high'], nd=0)}).",
+                  f"Golf: {cur['golf_rounds']} round(s), {cur['golf_minutes']} minutes "
+                  f"(week before {prev['golf_rounds']})."]
     rooms = rooms_line(states)
     if rooms:
         lines.append(rooms)
     if found:
-        lines.append("Muster der letzten Wochen:\n" + "\n".join(f"- {p}" for p in found))
+        lines.append("Patterns of the last weeks:\n" + "\n".join(f"- {p}" for p in found))
     else:
-        lines.append("Muster: noch zu wenig Daten für belastbare Aussagen (je mindestens drei Tage mit und ohne). "
-                     "Essenszeiten kennt Garmin nicht — die notiert Jarvis, wenn der User sie sagt.")
+        lines.append("Patterns: not enough data yet for solid statements (at least three days with and without each). "
+                     "Garmin does not know meal times — Jarvis notes them when the user says them.")
     return cur, found, "\n".join(lines)
 
 
@@ -313,15 +313,15 @@ def review(today=None, speak=True):
     cur, found, text = facts(d, end)
     if not cur["days"]:
         return None
-    spoken = background.ask("weekly-review", SYSTEM, "Fakten:\n" + text) or text.split("Muster")[0].strip()
+    spoken = background.ask("weekly-review", SYSTEM, "Facts:\n" + text) or text.split("Patterns")[0].strip()
     week = background.week_key(end)
-    folder = memory.MEMORY_DIR / "Gesundheit"
+    folder = memory.MEMORY_DIR / "Health"
     folder.mkdir(parents=True, exist_ok=True)
     expires = (today + dt.timedelta(days=365)).isoformat()
-    (folder / f"Wochenrückblick {week}.md").write_text(
-        f"---\ntype: gesundheit\nwichtigkeit: niedrig\nupdated: {today.isoformat()}\nablauf: {expires}\n---\n\n"
-        f"# Wochenrückblick {week}\n\nGehört zu [[Gesundheit]].\n\n" + text +
-        "\n\n## Gesprochen\n\n" + " ".join(spoken.split()) + "\n", encoding="utf-8")
+    (folder / f"Weekly review {week}.md").write_text(
+        f"---\ntype: health\nimportance: low\nupdated: {today.isoformat()}\nexpires: {expires}\n---\n\n"
+        f"# Weekly review {week}\n\nBelongs to [[Health]].\n\n" + text +
+        "\n\n## Spoken\n\n" + " ".join(spoken.split()) + "\n", encoding="utf-8")
     if speak:
         events.publish("say", spoken, kind="health")
     return spoken
@@ -333,7 +333,7 @@ def step(now=None):
         try:
             fetch(now.date())
         except Exception as e:  # noqa: BLE001 — Garmin down, no login: the review says what is missing
-            log.warning("Garmin nicht lesbar (%s)", e)
+            log.warning("Garmin not readable (%s)", e)
     if now.weekday() == 6 and now.hour >= REVIEW_HOUR and background.claim("weekly-review", background.week_key(now.date())):
         review(now.date())
 

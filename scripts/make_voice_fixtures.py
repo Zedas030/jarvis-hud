@@ -4,8 +4,11 @@ user's lines — Whisper does not care whose voice it is — and a shaped noise 
 
     .venv\\Scripts\\python.exe scripts\\make_voice_fixtures.py
 
+The committed files were spoken by the Windows voice "Microsoft Zira" (System.Speech, en-US) with the
+same lines, pauses and cough; this script makes the Piper versions of them.
+
 Replace a file with a real recording of your own voice to tune against yourself
-(16 kHz mono; `ffmpeg -i rec.m4a -ar 16000 -ac 1 tests/fixtures/voice/frage_licht.wav`).
+(16 kHz mono; `ffmpeg -i rec.m4a -ar 16000 -ac 1 tests/fixtures/voice/question_light.wav`).
 """
 import io
 import math
@@ -21,7 +24,7 @@ import paths  # noqa: E402,F401
 import voice_dsp  # noqa: E402
 
 OUT = ROOT / "tests" / "fixtures" / "voice"
-MODEL = ROOT / "models" / "piper" / "de_DE-thorsten-high.onnx"
+MODEL = ROOT / "models" / "piper" / "en_GB-alan-medium.onnx"
 
 
 def main():
@@ -45,13 +48,13 @@ def main():
         return struct.pack(f"<{n}h", *(int(0.5 * 32767 * (rnd.random() * 2 - 1) * math.sin(math.pi * i / n)) for i in range(n)))
 
     items = {
-        "frage_licht": sil(300) + speak("Jarvis, mach das Licht im Wohnzimmer aus.") + sil(1500),
-        "uhrzeit": sil(300) + speak("Jarvis, wie spät ist es gerade?") + sil(2000),
-        "denkpause": sil(300) + speak("Jarvis, und dann") + sil(900) + speak("mach bitte die Musik im Schlafzimmer leiser.") + sil(1500),
-        "unterbrechung_frage": speak("Wie spät ist es eigentlich?") + sil(800),
+        "question_light": sil(300) + speak("Jarvis, turn off the light in the living room.") + sil(1500),
+        "time": sil(300) + speak("Jarvis, what time is it?") + sil(2000),
+        "thinking_pause": sil(300) + speak("Jarvis, and then") + sil(900) + speak("please turn the music in the bedroom down.") + sil(1500),
+        "interruption_question": speak("What time is it, actually?") + sil(800),
         "backchannel_mhm": speak("Mhm.") + sil(800),
-        "husten": cough() + sil(800),
-        "stopp": speak("Stopp.") + sil(800),
+        "cough": cough() + sil(800),
+        "stop": speak("Stop.") + sil(800),
         "name_only": speak("Jarvis?") + sil(800),
     }
     OUT.mkdir(parents=True, exist_ok=True)

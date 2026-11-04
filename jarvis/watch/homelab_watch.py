@@ -53,10 +53,10 @@ LIMITS = {"pi_temp": 75, "pi_disk": 90, "pi_load": 4.0, "nas_temp": 60, "pc_gpu_
 HISTORY = pathlib.Path(os.environ.get("JARVIS_HOMELAB_HISTORY", ROOT / "logs" / "homelab_events.jsonl"))
 # how far above normal an outlier must be (absolute), so 41 °C after a calm 38 °C stays quiet
 MIN_DELTA = {"pi_temp": 8, "pi_disk": 5, "pi_load": 1.0, "nas_temp": 6, "pc_gpu_temp": 10, "pc_disk": 5}
-LABEL = {"pi_temp": ("die Temperatur des Pi", " Grad"), "pi_disk": ("die Belegung der Pi-Speicherkarte", " Prozent"),
-         "pi_load": ("die Last auf dem Pi", ""), "nas_temp": ("die Temperatur des NAS", " Grad"),
-         "pc_gpu_temp": ("die Grafikkarte", " Grad"), "pc_disk": ("die Belegung der Systemplatte", " Prozent"),
-         "nas_used": ("die Belegung des NAS", " Prozent")}
+LABEL = {"pi_temp": ("the temperature of the Pi", " degrees"), "pi_disk": ("the use of the Pi's memory card", " percent"),
+         "pi_load": ("the load on the Pi", ""), "nas_temp": ("the temperature of the NAS", " degrees"),
+         "pc_gpu_temp": ("the graphics card", " degrees"), "pc_disk": ("the use of the system disk", " percent"),
+         "nas_used": ("the use of the NAS", " percent")}
 
 
 def config():
@@ -76,7 +76,7 @@ def _num(s):
 
 
 def _say_num(v):
-    return (f"{v:.1f}".rstrip("0").rstrip(".") if isinstance(v, float) else str(v)).replace(".", ",")
+    return f"{v:.1f}".rstrip("0").rstrip(".") if isinstance(v, float) else str(v)
 
 
 # ── checks: each yields findings ─────────────────────────────
@@ -93,8 +93,8 @@ def check_ha():
     except Exception:  # noqa: BLE001
         ok = False
     return [dict(key="ha", ok=ok, severity="critical",
-                 down="Home Assistant antwortet seit etwa {min} Minuten nicht. Licht und Steckdosen kann ich so nicht schalten.",
-                 up="Home Assistant ist wieder erreichbar.")]
+                 down="Home Assistant has not answered for about {min} minutes. I cannot switch lights and sockets like this.",
+                 up="Home Assistant is reachable again.")]
 
 
 def parse_pi(out):
@@ -111,22 +111,22 @@ def check_pi(metrics):
     if not j.PI_HOST:
         return []
     out = j._pi_status()
-    down = out.startswith("Pi nicht erreichbar")
+    down = out.startswith("Pi not reachable")
     found = [dict(key="pi", ok=not down, severity="critical",
-                  down="Der Raspberry Pi ist seit etwa {min} Minuten nicht erreichbar.",
-                  up="Der Raspberry Pi ist wieder erreichbar.")]
+                  down="The Raspberry Pi has not been reachable for about {min} minutes.",
+                  up="The Raspberry Pi is reachable again.")]
     if down:
         return found
     pi = parse_pi(out)
     for name, state in pi["services"]:
         found.append(dict(key=f"pi_service:{name}", ok=state == "active", severity="warn",
-                          down=f"Auf dem Pi ist der Dienst {name} nicht aktiv ({state}).",
-                          up=f"Der Dienst {name} auf dem Pi läuft wieder."))
+                          down=f"On the Pi the service {name} is not active ({state}).",
+                          up=f"The service {name} on the Pi is running again."))
     for name, status in pi["containers"]:
         bad = not status.startswith("Up") or "unhealthy" in status
         found.append(dict(key=f"pi_container:{name}", ok=not bad, severity="warn",
-                          down=f"Auf dem Pi läuft der Container {name} nicht sauber ({status.strip()[:40]}).",
-                          up=f"Der Container {name} läuft wieder."))
+                          down=f"On the Pi the container {name} is not running cleanly ({status.strip()[:40]}).",
+                          up=f"The container {name} is running again."))
     metrics.update({k: v for k, v in (("pi_temp", pi["temp"]), ("pi_disk", pi["disk"]), ("pi_load", pi["load"]))
                     if v is not None})
     return found
@@ -145,8 +145,8 @@ def check_nas(metrics):
         metrics["nas_temp"] = s["temp"]
     if ok and s.get("used_pct") is not None:
         metrics["nas_used"] = s["used_pct"]
-    return [dict(key="nas", ok=ok, severity="warn", down="Das NAS ist seit etwa {min} Minuten nicht erreichbar.",
-                 up="Das NAS ist wieder erreichbar.")]
+    return [dict(key="nas", ok=ok, severity="warn", down="The NAS has not been reachable for about {min} minutes.",
+                 up="The NAS is reachable again.")]
 
 
 def _ping(host):
@@ -178,8 +178,8 @@ def check_devices(cfg):
         else:
             continue
         found.append(dict(key=f"device:{name}", ok=ok, severity="critical" if dev.get("critical") else "warn",
-                          down=f"{name} ist seit etwa {{min}} Minuten nicht mehr im Netz.",
-                          up=f"{name} ist wieder im Netz."))
+                          down=f"{name} has been off the network for about {{min}} minutes.",
+                          up=f"{name} is back on the network."))
     return found
 
 
@@ -206,10 +206,10 @@ def value_findings(metrics, limits, now=None):
         if not over and len(samples) >= LEARN_SAMPLES:
             mean, sd = statistics.mean(samples), statistics.pstdev(samples)
             odd = val > mean + 3 * max(sd, 0.01) and val - mean >= MIN_DELTA.get(key, 0)
-        text = (f"{label[0].upper() + label[1:]} liegt bei {_say_num(val)}{unit}"
-                + (f", sonst um {_say_num(round(statistics.mean(samples), 1))}." if odd else "."))
+        text = (f"{label[0].upper() + label[1:]} is at {_say_num(val)}{unit}"
+                + (f", usually around {_say_num(round(statistics.mean(samples), 1))}." if odd else "."))
         found.append(dict(key=f"value:{key}", ok=not (over or odd), severity="warn", down=text,
-                          up=f"{label[0].upper() + label[1:]} ist wieder im normalen Bereich."))
+                          up=f"{label[0].upper() + label[1:]} is back in the normal range."))
         if now - hist.get("last", 0) >= 3600 and not (over or odd):     # outliers do not move the normal range
             samples.append(val)
             base[key] = {"samples": samples[-LEARN_SAMPLES:], "last": now}
@@ -245,7 +245,7 @@ def _history(key, state, text, now):
 
 
 def history(limit=20):
-    """Newest incidents first, for the HUD and 'was ist zuletzt ausgefallen?'."""
+    """Newest incidents first, for the HUD and 'what went down last?'."""
     try:
         rows = [json.loads(ln) for ln in HISTORY.read_text(encoding="utf-8").splitlines() if ln.strip()]
     except (OSError, ValueError):
@@ -286,7 +286,7 @@ def process(findings, now=None, quiet=None):
                     import monitoring
                     n = monitoring.recurring(f["key"], now)
                     if n >= 3:
-                        text += f" Das ist der {n}. Ausfall in 7 Tagen — wiederkehrend."
+                        text += f" That is outage number {n} in 7 days — recurring."
                 except Exception:  # noqa: BLE001
                     pass
                 out.append(_msg(text, f["severity"]))
@@ -346,8 +346,8 @@ def check_backup():
         text = infra.backup_status()
         _BACKUP.update(day=today, finding=dict(
             key="backup", ok=not infra.backup_failed(text), severity="warn",
-            down="Ein Backup auf dem NAS ist fehlgeschlagen: " + text.splitlines()[0][:120] + " (seit {min} Minuten bekannt)",
-            up="Die Backups auf dem NAS laufen wieder sauber."))
+            down="A backup on the NAS failed: " + text.splitlines()[0][:120] + " (known for {min} minutes)",
+            up="The backups on the NAS are running cleanly again."))
     f = _BACKUP["finding"]
     return [f, f] if f and not f["ok"] else ([f] if f else [])
 
@@ -357,9 +357,9 @@ def _norm_key(text):
 
 
 def sir(text):
-    """'Der Pi …' → 'Sir, der Pi …' (nouns keep their capital)."""
+    """'The Pi …' → 'Sir, the Pi …' (names keep their capital)."""
     first, _, rest = text.partition(" ")
-    if first in ("Der", "Die", "Das", "Auf"):
+    if first in ("The", "On", "A", "An"):
         first = first.lower()
     return f"Sir, {first} {rest}"
 

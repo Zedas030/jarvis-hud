@@ -1,4 +1,4 @@
 # Windows PC only: volume and per-app ducking (pc.py), window control (desktop.py).
-# On the Linux server these functions move to the PC agent (UMBAU-SERVER.md).
+# On the Linux server these functions move to the PC agent (SERVER-REBUILD.md).
 pycaw
 comtypes

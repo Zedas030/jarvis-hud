@@ -18,7 +18,7 @@ import voice_engine      # noqa: E402
 import voice_state as st  # noqa: E402
 from voice_fakes import Client, FakeResponse, answer_events, fake_speak_stream, feed_ms, make_session, silence, tone  # noqa: E402
 
-SAID = "Jarvis, mach das Licht aus"
+SAID = "Jarvis, turn off the light"
 
 
 def second_session(shared, device):
@@ -31,7 +31,7 @@ def second_session(shared, device):
 
     def fake_post(path, body, stream=False, timeout=30):
         session.posts.append((path, body))
-        return FakeResponse(answer_events("Das Licht ist aus.")) if path == "/api/run" else {}
+        return FakeResponse(answer_events("The light is off.")) if path == "/api/run" else {}
     session._post = fake_post
     return session, client
 
@@ -77,7 +77,7 @@ class MicRooms(unittest.TestCase):
         self.assertTrue(ran(self.ipad))
         self.settle(self.pc_client)
         self.assertFalse(ran(self.pc, 0.5))
-        self.assertTrue(any("iPad hört zu" in e.get("text", "") for e in self.pc_client.of("log")), self.pc_client.events[-5:])
+        self.assertTrue(any("iPad is listening" in e.get("text", "") for e in self.pc_client.of("log")), self.pc_client.events[-5:])
 
     def test_pc_heard_it_first_waits_for_the_ipad(self):
         speak(self.pc)                                   # the PC's endpoint fires earlier through the wall
@@ -104,11 +104,11 @@ class MicRooms(unittest.TestCase):
         self.assertTrue(ran(self.pc))
 
     def test_preferred_mic_from_config_and_room(self):
-        with mock.patch("whereabouts.room", return_value="Schlafzimmer"), \
-                mock.patch("jarvis_profile.ha", side_effect=lambda k, d=None: {"mic_rooms": {"Schlafzimmer": "iPad"}}.get(k, d)):
+        with mock.patch("whereabouts.room", return_value="Bedroom"), \
+                mock.patch("jarvis_profile.ha", side_effect=lambda k, d=None: {"mic_rooms": {"Bedroom": "iPad"}}.get(k, d)):
             self.assertEqual(voice_engine.preferred_mic(), "iPad")
-        with mock.patch("whereabouts.room", return_value="Wohnzimmer"), \
-                mock.patch("jarvis_profile.ha", side_effect=lambda k, d=None: {"mic_rooms": {"Schlafzimmer": "iPad"}}.get(k, d)):
+        with mock.patch("whereabouts.room", return_value="Living room"), \
+                mock.patch("jarvis_profile.ha", side_effect=lambda k, d=None: {"mic_rooms": {"Bedroom": "iPad"}}.get(k, d)):
             self.assertEqual(voice_engine.preferred_mic(), "")
         with mock.patch("whereabouts.room", return_value=""):
             self.assertEqual(voice_engine.preferred_mic(), "")

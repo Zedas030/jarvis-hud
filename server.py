@@ -66,7 +66,7 @@ if __name__ == "__main__" and os.environ.get("JARVIS_CHILD") != "1":
             sys.exit(0)
         child_env["JARVIS_OPEN"] = "0"   # the open page reloads itself
         if rc == RESTART_CODE:
-            print("\n  Code geändert — Neustart mit frischer Sitzung.\n", flush=True)
+            print("\n  Code changed — restarting with a fresh session.\n", flush=True)
             continue
         if rc == 0:
             sys.exit(0)
@@ -74,16 +74,16 @@ if __name__ == "__main__" and os.environ.get("JARVIS_CHILD") != "1":
         try:
             (ROOT / "logs").mkdir(exist_ok=True)
             with (ROOT / "logs" / "crash.log").open("a", encoding="utf-8") as fh:
-                fh.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} Exit-Code {rc} nach "
+                fh.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} exit code {rc} after "
                          f"{int(time.time() - started)} s\n")
         except OSError:
             pass
         if len(crashes) >= 5:
-            print(f"\n  Jarvis ist {len(crashes)}-mal in zehn Minuten abgestürzt — ich höre auf. "
-                  "Details oben und in logs/crash.log.\n", flush=True)
+            print(f"\n  Jarvis crashed {len(crashes)} times in ten minutes — I stop. "
+                  "Details above and in logs/crash.log.\n", flush=True)
             sys.exit(rc)
         pause = min(60, 2 ** len(crashes))
-        print(f"\n  Jarvis ist abgestürzt (Code {rc}) — Neustart in {pause} s.\n", flush=True)
+        print(f"\n  Jarvis crashed (code {rc}) — restarting in {pause} s.\n", flush=True)
         try:
             time.sleep(pause)
         except KeyboardInterrupt:
@@ -161,7 +161,7 @@ def _sonos_hold(speaker, on):
     try:
         (sonos.hold if on else sonos.release)(speaker)
     except Exception as e:  # noqa: BLE001 — no house: the music just stays as loud as it was
-        log.warning("Sonos leiser/lauter: %s", str(e)[:120])
+        log.warning("Sonos quieter/louder: %s", str(e)[:120])
 
 
 def _saved_dashboard_layout(device="pc"):
@@ -293,10 +293,10 @@ def _voice_factor():
         return 1.0
 
 BRIEFING_LLM = os.environ.get("JARVIS_BRIEFING_LLM", "1").strip() not in ("0", "false", "no", "off")
-BRIEFING_PROMPT = (commands.LEAN_PERSONA + "\n\nFormuliere aus den Fakten ein gesprochenes Tagesbriefing: "
-                   "Begrüßung passend zur Tageszeit, dann Termine, Wetter mit Golf-Einschätzung, Speicher und "
-                   "Solar, Mails; fast leere Batterien nur wenn gemeldet. Vier bis sechs kurze Sätze. Keine Börse, "
-                   "keine Nachrichten. Nichts erfinden, was nicht in den Fakten steht.")
+BRIEFING_PROMPT = (commands.LEAN_PERSONA + "\n\nPhrase a spoken daily briefing from the facts: "
+                   "a greeting fitting the time of day, then appointments, weather with the golf verdict, storage and "
+                   "solar, mails; nearly empty batteries only if reported. Four to six short sentences. No stock market, "
+                   "no news. Invent nothing that is not in the facts.")
 
 
 def _voice_engine_status():
@@ -341,21 +341,21 @@ def _describe_call(tool, data):
     if tool.endswith("proposal_accept"):
         import proposals
         p = proposals.get(data.get("id"))
-        return policy.describe(tool, {"begruendung": data.get("begruendung")}) + "\n\n" + (
-            proposals.describe(p) if p else f"Vorschlag {data.get('id')} (nicht gefunden)")
+        return policy.describe(tool, {"reason": data.get("reason")}) + "\n\n" + (
+            proposals.describe(p) if p else f"Proposal {data.get('id')} (not found)")
     if tool.startswith("mcp__jarvis__") and not tool.endswith("calendar_add"):
         return policy.describe(tool, data)
     if tool.endswith("calendar_add"):
-        parts = [f"⚠ {data['_hinweis']}" if data.get("_hinweis") else "",
-                 f"Neuer Termin: {data.get('title', '?')}",
-                 f"{data.get('start', '?')}" + (f" bis {data['end']}" if data.get("end") else ""),
+        parts = [f"⚠ {data['_note']}" if data.get("_note") else "",
+                 f"New appointment: {data.get('title', '?')}",
+                 f"{data.get('start', '?')}" + (f" to {data['end']}" if data.get("end") else ""),
                  data.get("location") or "", data.get("calendar") or ""]
         return "\n".join(p for p in parts if p)
     # Plain-language "what and why" first, the raw command below — the user has to
     # know what he is approving without reading shell syntax.
-    kind = {"Bash": "Befehl ausführen", "PowerShell": "Befehl ausführen", "Write": "Datei schreiben",
-            "Edit": "Datei ändern", "Read": "Datei lesen", "Glob": "Dateien suchen",
-            "Grep": "Dateien durchsuchen", "WebFetch": "Webseite abrufen"}.get(tool, tool)
+    kind = {"Bash": "Run a command", "PowerShell": "Run a command", "Write": "Write a file",
+            "Edit": "Change a file", "Read": "Read a file", "Glob": "Find files",
+            "Grep": "Search files", "WebFetch": "Fetch a web page"}.get(tool, tool)
     why = data.get("description") or ""
     for key in ("command", "file_path", "path", "url", "pattern"):
         if isinstance(data.get(key), str):
@@ -432,7 +432,7 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:                    # cut off in the HUD: nobody listens any more
             self.close_connection = True
         except Exception as e:  # noqa: BLE001 — provider broke off mid-sentence
-            log.warning("Stimme abgebrochen: %s", str(e)[:120])
+            log.warning("voice cancelled: %s", str(e)[:120])
             self.close_connection = True
         finally:
             close = getattr(chunks, "close", None)
@@ -477,7 +477,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "bad json"}, 400)
         token = devices.pair(req.get("code"), req.get("name"))
         if not token:
-            return self._json({"error": "Code falsch oder abgelaufen."}, 403)
+            return self._json({"error": "Code wrong or expired."}, 403)
         return self._json({"ok": True}, headers={"Set-Cookie": devices.cookie_header(token)})
 
     def _token_ok(self):
@@ -727,7 +727,7 @@ class Handler(BaseHTTPRequestHandler):
             # The HUD's restart button: same exit as after a code change, so the supervisor
             # starts a fresh server at once (and .env is read again) — no crash entry.
             if os.environ.get("JARVIS_CHILD") != "1":
-                return self._json({"ok": False, "error": "Nicht unter dem Supervisor gestartet (start-jarvis.bat)."})
+                return self._json({"ok": False, "error": "Not started under the supervisor (start-jarvis.bat)."})
             runtime.cancel_active()
             threading.Timer(0.5, lambda: os._exit(RESTART_CODE)).start()   # let this answer leave first
             return self._json({"ok": True})
@@ -759,7 +759,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 usd = float(str(json.loads(raw or b"{}").get("usd", "")).replace(",", ".").replace("$", ""))
             except (ValueError, json.JSONDecodeError):
-                return self._json({"error": "Betrag ungültig"}, 400)
+                return self._json({"error": "Invalid amount"}, 400)
             return self._json(billing.set_balance(usd))
 
         if p == "/api/permission/answer":
@@ -877,24 +877,24 @@ class Handler(BaseHTTPRequestHandler):
         t0 = time.time()
         commands.update_state(lambda d: d.__setitem__("last_turn_at", time.time()))
         low = message.strip().lower()
-        # "Kannst du mir das Tagesbriefing nochmal geben?" too, not only the HUD's start line:
+        # "Can you give me the daily briefing again?" too, not only the HUD's start line:
         # as a normal turn it got no tools and Jarvis said he could not fetch anything.
-        is_briefing = low.startswith(("/briefing", "tagesbriefing zum start")) or bool(
-            re.search(r"\b(tages)?briefing\b", low) and not re.search(r"\b(aus|abschalt\w*|abbrech\w*|stopp?|nicht)\b", low))
+        is_briefing = low.startswith(("/briefing", "daily briefing at start")) or bool(
+            re.search(r"\b(daily )?briefing\b", low) and not re.search(r"\b(off|switch\w* off|cancel\w*|stop\w*|not|dont|don't)\b", low))
         if is_briefing:
             facts = briefing.briefing_facts()
             today = time.strftime("%Y-%m-%d")
             commands.update_state(lambda d: d.__setitem__("briefing_day", today))
             if not BRIEFING_LLM:
-                text = "Ihr Tagesbriefing, Sir. " + " ".join(ln.lstrip("- ") for ln in facts.splitlines())
+                text = "Your daily briefing, Sir. " + " ".join(ln.lstrip("- ") for ln in facts.splitlines())
                 emit(dict(t="delta", text=text))
                 emit(dict(t="complete", ms=0))
                 log_usage("briefing-local", None, [], {}, message=message, reply=text)
                 return
             route = {"kind": "llm", "groups": [], "model": router.MODEL_SIMPLE, "reason": "briefing"}
             system = BRIEFING_PROMPT
-            prefix = f"<kontext>\nJetzt: {time.strftime('%A, %d.%m.%Y, %H:%M Uhr')}\nFakten:\n{facts}\n</kontext>"
-            message = "Tagesbriefing bitte."
+            prefix = f"<context>\nNow: {time.strftime('%A, %Y-%m-%d, %H:%M')}\nFacts:\n{facts}\n</context>"
+            message = "Daily briefing, please."
         else:
             route = router.route(message, ha_full=bool(commands.ha_request(message)))
             try:
@@ -903,8 +903,8 @@ class Handler(BaseHTTPRequestHandler):
                 pass
             if route["kind"] == "local":
                 reply = route["reply"]
-                emit(dict(t="note", message=f"lokal erledigt ({route['handler']}) — 0 Tokens"))
-                emit(dict(t="route", model="lokal", groups=[route["handler"]], reason="Router, 0 Tokens"))
+                emit(dict(t="note", message=f"done locally ({route['handler']}) — 0 tokens"))
+                emit(dict(t="route", model="local", groups=[route["handler"]], reason="router, 0 tokens"))
                 emit(dict(t="delta", text=reply))
                 emit(dict(t="complete", ms=int((time.time() - t0) * 1000)))
                 try:
@@ -919,7 +919,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             cached = answer_cache.get(message, route["groups"])
             if cached:                                   # same question minutes ago: no second call
-                emit(dict(t="note", message="aus dem Zwischenspeicher — 0 Tokens"))
+                emit(dict(t="note", message="from the cache — 0 tokens"))
                 emit(dict(t="delta", text=cached))
                 emit(dict(t="complete", ms=int((time.time() - t0) * 1000)))
                 commands.remember_turn(message, cached)
@@ -929,14 +929,14 @@ class Handler(BaseHTTPRequestHandler):
             system = commands.lean_system(route["groups"])
             prefix = commands.lean_prefix(message, route["groups"])
             if typed:                                    # typed: longer text, only the first paragraph is spoken
-                prefix = prefix.replace("</kontext>", personality.TYPED_HINT + "\n</kontext>")
-            if hint:                                     # the voice engine: "unterbrochen nach Satz N" is context, not the question
-                prefix = prefix.replace("</kontext>", hint + "\n</kontext>")
-        why = ("Claude nicht erreichbar" if runtime.runtime_kind() != "claude" else
-               "Claude-Limit erreicht" if fallback_llm.claude_blocked(commands.load().get("usage")) else None)
+                prefix = prefix.replace("</context>", personality.TYPED_HINT + "\n</context>")
+            if hint:                                     # the voice engine: "interrupted after sentence N" is context, not the question
+                prefix = prefix.replace("</context>", hint + "\n</context>")
+        why = ("Claude not reachable" if runtime.runtime_kind() != "claude" else
+               "Claude limit reached" if fallback_llm.claude_blocked(commands.load().get("usage")) else None)
         if why and fallback_llm.available():
             return self._local_llm(message, prefix, emit, t0, is_briefing, why, route["groups"])
-        emit(dict(t="note", message=f"{route['model']} · {', '.join(route['groups']) or 'ohne Werkzeuge'}"))
+        emit(dict(t="note", message=f"{route['model']} · {', '.join(route['groups']) or 'no tools'}"))
         emit(dict(t="route", model=route["model"], groups=route["groups"], reason=route.get("reason", "")))
         hit = memory.top_match(message)
         if hit and not is_briefing:
@@ -947,7 +947,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             for ev in runtime.run_lean(message, route["model"], route["groups"], system, prefix):
                 if ev.get("t") == "error" and not "".join(reply).strip() and fallback_llm.available():
-                    failed = ev.get("message") or "Fehler"    # not a word said yet: the local model takes over
+                    failed = ev.get("message") or "error"    # not a word said yet: the local model takes over
                     break
                 if ev.get("t") == "tool" and ev.get("phase") == "use":
                     tools.append((ev.get("name") or "", ev.pop("args", None) or {}))
@@ -964,15 +964,15 @@ class Handler(BaseHTTPRequestHandler):
                         try:
                             memory.log_turn(message, text)
                         except OSError as e:
-                            emit(dict(t="note", message=f"Protokoll fehlgeschlagen: {e}"))
-                    commands.remember_turn(message if not is_briefing else "(Tagesbriefing)", text)
+                            emit(dict(t="note", message=f"log failed: {e}"))
+                    commands.remember_turn(message if not is_briefing else "(daily briefing)", text)
                     if memory.build_graph(force=True)["total"] != before:
                         emit(dict(t="graph"))
                     if not is_briefing:
                         answer_cache.put(message, route["groups"], text, [n for n, _ in tools])
                         learned = learning.observe(message, tools)
                         if learned:
-                            emit(dict(t="note", message=f"Entwurf gelernt: „{learned}“ — wartet auf Ihre Freigabe"))
+                            emit(dict(t="note", message=f"draft learned: “{learned}” — waiting for your approval"))
                 emit(ev)
         except (BrokenPipeError, ConnectionResetError):
             pass
@@ -995,7 +995,7 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 pass
         if failed:
-            self._local_llm(message, prefix, emit, t0, is_briefing, f"Claude-Fehler ({failed[:80]})",
+            self._local_llm(message, prefix, emit, t0, is_briefing, f"Claude error ({failed[:80]})",
                             route["groups"])
 
     def _local_llm(self, message, prefix, emit, t0, is_briefing, why, groups=()):
@@ -1012,7 +1012,7 @@ class Handler(BaseHTTPRequestHandler):
                 t = ev.get("t")
                 if t == "provider":
                     who = ev
-                    emit(dict(t="note", message=f"{why} — antwortet {ev['label']} ({ev['model']})"
+                    emit(dict(t="note", message=f"{why} — {ev['label']} answers ({ev['model']})"
                                                 + (f" · {', '.join(groups)}" if groups else "")))
                     emit(dict(t="route", model=f"{ev['label']} {ev['model']}", groups=groups, reason=why))
                     continue
@@ -1033,7 +1033,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         except Exception as e:  # noqa: BLE001
             try:
-                emit(dict(t="error", message=f"Auch das Ersatz-Modell antwortet nicht: {e}"[:300]))
+                emit(dict(t="error", message=f"The stand-in model does not answer either: {e}"[:300]))
             except OSError:
                 pass
             return
@@ -1049,8 +1049,8 @@ class Handler(BaseHTTPRequestHandler):
                 pass
             learned = learning.observe(message, tools)
             if learned:
-                emit(dict(t="note", message=f"Entwurf gelernt: „{learned}“ — wartet auf Ihre Freigabe"))
-        commands.remember_turn(message if not is_briefing else "(Tagesbriefing)", text)
+                emit(dict(t="note", message=f"draft learned: “{learned}” — waiting for your approval"))
+        commands.remember_turn(message if not is_briefing else "(daily briefing)", text)
         if memory.build_graph(force=True)["total"] != before:
             emit(dict(t="graph"))
         log_usage("fallback:" + (who["name"] if who else "?"), who["model"] if who else None, groups, usage,
@@ -1106,15 +1106,15 @@ class Handler(BaseHTTPRequestHandler):
         last = commands.load().get("last_turn_at") or 0
         if SESSION["id"] and time.time() - last > SESSION_IDLE_MIN * 60:
             SESSION["id"] = None
-            emit(dict(t="note", message="Neue Sitzung nach Pause (Gedächtnis bleibt)"))
+            emit(dict(t="note", message="new session after a pause (memory stays)"))
         commands.update_state(lambda d: d.__setitem__("last_turn_at", time.time()))
         if not SESSION["id"]:
             runtime.HA["on"] = False   # a fresh session starts light
         want_ha = commands.ha_request(message)
         if want_ha is not None and want_ha != runtime.HA["on"]:
             runtime.HA["on"] = want_ha
-            emit(dict(t="note", message="Home Assistant verbunden" if want_ha
-                      else "Home Assistant getrennt"))
+            emit(dict(t="note", message="Home Assistant connected" if want_ha
+                      else "Home Assistant disconnected"))
         heavy = False
         session = SESSION["id"]
         ACTIVE["emit"] = emit
@@ -1136,14 +1136,14 @@ class Handler(BaseHTTPRequestHandler):
                 if ev.get("t") == "complete" and runtime.valid_session(ev.get("session_id")):
                     SESSION["id"] = None if heavy else ev["session_id"]
                     if heavy:
-                        emit(dict(t="note", message="Sitzung zu schwer — die nächste startet frisch"))
+                        emit(dict(t="note", message="session too heavy — the next one starts fresh"))
                 if ev.get("t") == "error":
                     SESSION["id"] = None
                 if ev.get("t") == "complete":
                     try:
                         memory.log_turn(message, "".join(reply))
                     except OSError as e:
-                        emit(dict(t="note", message=f"Protokoll fehlgeschlagen: {e}"))
+                        emit(dict(t="note", message=f"log failed: {e}"))
                     # Claude may have written a memory note this turn: refresh the graph
                     if memory.build_graph(force=True)["total"] != before:
                         emit(dict(t="graph"))
@@ -1191,7 +1191,7 @@ def _watch_code():
         idle = (ACTIVE["emit"] is None and not PENDING and not RUN_LOCK.locked()
                 and time.time() - LAST_POST[0] > RESTART_QUIET_S)
         if changed and idle:
-            print("\n  Code geändert — starte neu.", flush=True)
+            print("\n  Code changed — restarting.", flush=True)
             SESSION["id"] = None       # new code, new conversation; memory carries over
             runtime.shutdown()
             runtime.lean_shutdown()
@@ -1207,7 +1207,7 @@ def main():
     jarvis_log.setup()             # logs/jarvis.log (JSON lines), warnings also on the console
     moved, deleted = memory.housekeeping()
     if moved or deleted:
-        print(f"  Aufgeräumt: {len(moved)} in den Papierkorb, {deleted} endgültig gelöscht", flush=True)
+        print(f"  Tidied up: {len(moved)} moved to the trash, {deleted} deleted for good", flush=True)
 
     def daily_housekeeping():
         while True:
@@ -1252,7 +1252,7 @@ def main():
     briefing.start_watchdog()
     scheduler.start()              # timers, alarms, reminders, planned commands
     watchers.start()               # proactive notices (appliances, appointments, storage, NAS)
-    reflection.start()             # learning loop: Lernprotokoll, weekly rules proposal
+    reflection.start()             # learning loop: learning log, weekly rules proposal
     weekly_review.start()          # Garmin once a day, weekly review on Sunday
     homelab_watch.start()          # outages and unusual values in the homelab
     energy_coach.start()           # learns the plugs, says when solar power is left over
@@ -1279,9 +1279,9 @@ def main():
     ambience.start()               # music / sport / TV playing in the house (Home Assistant)
     if sonos.configured():
         try:
-            print(f"  Sonos-Ausgabe: {sonos.start()}", flush=True)   # clip server on the LAN
+            print(f"  Sonos output: {sonos.start()}", flush=True)   # clip server on the LAN
         except OSError as e:
-            print(f"  Sonos-Ausgabe aus: {e}", flush=True)
+            print(f"  Sonos output off: {e}", flush=True)
     overlay.start()                # desktop card while the HUD tab is hidden
     if os.environ.get("JARVIS_CHILD") == "1":    # only a supervised child can be restarted
         threading.Thread(target=_watch_code, daemon=True).start()

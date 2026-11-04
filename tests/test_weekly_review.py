@@ -44,7 +44,7 @@ def synthetic(days=35, late_every=3):
         day = END - dt.timedelta(days=days - 1 - i)
         rec = {"steps": 8000 + (i % 5) * 1000, "stress": 30, "bb_high": 80, "sleep_s": 7 * 3600,
                "deep_s": 5400, "sleep_score": 80, "golf": {"rounds": 0, "minutes": 0},
-               "log": [{"kind": "essen", "what": "Abendessen", "at": "22:15" if i % late_every == 0 else "19:00"}]}
+               "log": [{"kind": "meal", "what": "Dinner", "at": "22:15" if i % late_every == 0 else "19:00"}]}
         d[day.isoformat()] = rec
     for k in list(d):
         prev = (dt.date.fromisoformat(k) - dt.timedelta(days=1)).isoformat()
@@ -64,14 +64,14 @@ class Review(unittest.TestCase):
 
     def test_log_entry(self):
         now = dt.datetime(2026, 10, 22, 23, 0)
-        self.assertIn("Notiert", wr.log_entry("Abendessen", "22:10", now=now))
-        wr.log_entry("zwei Bier", "00:30", now=dt.datetime(2026, 10, 23, 1, 0))
+        self.assertIn("Noted", wr.log_entry("Dinner", "22:10", now=now))
+        wr.log_entry("two beers", "00:30", now=dt.datetime(2026, 10, 23, 1, 0))
         d = wr.load()
-        self.assertEqual(d["2026-10-22"]["log"][0], {"kind": "essen", "what": "Abendessen", "at": "22:10"})
-        self.assertEqual(d["2026-10-22"]["log"][1]["kind"], "alkohol")
+        self.assertEqual(d["2026-10-22"]["log"][0], {"kind": "meal", "what": "Dinner", "at": "22:10"})
+        self.assertEqual(d["2026-10-22"]["log"][1]["kind"], "alcohol")
         self.assertEqual(d["2026-10-22"]["log"][1]["at"], "24:30")        # counts for the evening before
-        wr.log_entry("Kaffee", "gestern 15:00", now=now)
-        self.assertEqual(wr.load()["2026-10-21"]["log"][0]["kind"], "koffein")
+        wr.log_entry("Coffee", "yesterday 15:00", now=now)
+        self.assertEqual(wr.load()["2026-10-21"]["log"][0]["kind"], "caffeine")
 
     def test_fetch_backfills_once(self):
         g = FakeGarmin()
@@ -83,41 +83,41 @@ class Review(unittest.TestCase):
 
     def test_late_dinner_pattern(self):
         found = wr.patterns(synthetic(), END)
-        late = [p for p in found if "spätes Essen" in p and "Schlafscore" in p]
+        late = [p for p in found if "late meal" in p and "sleep score" in p]
         self.assertEqual(len(late), 1, found)
-        self.assertIn("65 statt 80", late[0])
+        self.assertIn("65 instead of 80", late[0])
         self.assertFalse(any("Golf" in p for p in found))                # never played: no pattern
 
     def test_rooms_line_from_home_assistant(self):
-        states = {"sensor.zeit_wohnzimmer_7_tage": {"state": "23.6"}, "sensor.zeit_schlafzimmer_7_tage": {"state": "61.2"}}
-        self.assertEqual(wr.rooms_line(states), "Zeit zu Hause nach Raum (Präsenzmelder, letzte 7 Tage): Wohnzimmer 24 h, Schlafzimmer 61 h.")
-        self.assertEqual(wr.rooms_line({"sensor.zeit_wohnzimmer_7_tage": {"state": "unavailable"}}), "")
+        states = {"sensor.time_living_room_7_days": {"state": "23.6"}, "sensor.time_bedroom_7_days": {"state": "61.2"}}
+        self.assertEqual(wr.rooms_line(states), "Time at home by room (presence sensors, last 7 days): Living Room 24 h, Bedroom 61 h.")
+        self.assertEqual(wr.rooms_line({"sensor.time_living_room_7_days": {"state": "unavailable"}}), "")
         self.assertEqual(wr.rooms_line(), "")                       # no Home Assistant in tests
         _, _, text = wr.facts(synthetic(), END, states)
-        self.assertIn("Wohnzimmer 24 h", text)
+        self.assertIn("Living Room 24 h", text)
 
     def test_too_little_data_says_so(self):
         d = {k: v for k, v in synthetic().items() if k >= "2026-10-21"}
         _, found, text = wr.facts(d, END)
         self.assertEqual(found, [])
-        self.assertIn("noch zu wenig Daten", text)
+        self.assertIn("not enough data yet", text)
 
     def test_review_note_and_message(self):
         wr._save(synthetic())
-        background.ask = lambda job, system, prompt: "Ihre Woche, Sir: ordentlich geschlafen."
+        background.ask = lambda job, system, prompt: "Your week, Sir: you slept decently."
         spoken = wr.review(END + dt.timedelta(days=1))
-        self.assertEqual(spoken, "Ihre Woche, Sir: ordentlich geschlafen.")
-        note = memory.MEMORY_DIR / "Gesundheit" / "Wochenrückblick 2026-KW43.md"
+        self.assertEqual(spoken, "Your week, Sir: you slept decently.")
+        note = memory.MEMORY_DIR / "Health" / "Weekly review 2026-W43.md"
         text = note.read_text(encoding="utf-8")
-        self.assertIn("Schlafscore", text)
-        self.assertIn("ablauf:", text)
+        self.assertIn("sleep score", text)
+        self.assertIn("expires:", text)
         self.assertEqual(events._LOG[-1]["text"], spoken)
 
     def test_review_without_model_uses_facts(self):
         wr._save(synthetic())
         background.ask = lambda *a: None
         spoken = wr.review(END + dt.timedelta(days=1), speak=False)
-        self.assertIn("Schlaf im Schnitt", spoken)
+        self.assertIn("Sleep on average", spoken)
 
     def test_no_data_no_review(self):
         self.assertIsNone(wr.review(END + dt.timedelta(days=1), speak=False))

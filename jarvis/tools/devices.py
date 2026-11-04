@@ -67,7 +67,7 @@ def pair(code, name):
         _CODE.update(code=None, until=0)
         token = secrets.token_urlsafe(32)
         data = _load()
-        data[secrets.token_hex(4)] = dict(name=(str(name or "").strip() or "Gerät")[:40], hash=_hash(token),
+        data[secrets.token_hex(4)] = dict(name=(str(name or "").strip() or "Device")[:40], hash=_hash(token),
                                           created=time.strftime("%Y-%m-%d %H:%M"), seen="")
         _save(data)
         return token

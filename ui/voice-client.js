@@ -71,7 +71,7 @@ var VoiceClient = {
       });
     } catch (e) {
       micProblem = 'blocked';
-      VoiceClient.log('error', /NotAllowed|denied/i.test(String(e)) ? 'Mikrofon im Browser blockiert' : 'Kein Mikrofon: ' + String(e).slice(0, 60));
+      VoiceClient.log('error', /NotAllowed|denied/i.test(String(e)) ? 'microphone blocked in the browser' : 'no microphone: ' + String(e).slice(0, 60));
       updateMicButton();
       return false;
     }
@@ -88,7 +88,7 @@ var VoiceClient = {
       await ctx.audioWorklet.addModule(u2);
       URL.revokeObjectURL(u1); URL.revokeObjectURL(u2);
     } catch (e) {
-      VoiceClient.log('error', 'AudioWorklet nicht verfügbar — alte Sprachverarbeitung');
+      VoiceClient.log('error', 'AudioWorklet not available — old voice processing');
       VoiceClient.teardownAudio();
       return false;
     }
@@ -115,7 +115,7 @@ var VoiceClient = {
     VoiceClient.connect();
     setInterval(function () { if (VoiceClient.gain) VoiceClient.gain.gain.value = outVolume(); }, 1000);
     VoiceClient.ambienceTimer = setInterval(VoiceClient.pushAmbience, 5000);
-    VoiceClient.log('ok', 'Sprach-Engine verbunden — einfach reden, reinreden erlaubt');
+    VoiceClient.log('ok', 'voice engine connected — just talk, talking over him is fine');
     return true;
   },
 
@@ -157,9 +157,9 @@ var VoiceClient = {
     ws.onclose = function (e) {
       VoiceClient.ready = false;
       if (!VoiceClient.on) return;
-      if (e.code === 4003) { VoiceClient.log('error', 'Engine lehnt das Token ab — Seite neu laden'); return; }
+      if (e.code === 4003) { VoiceClient.log('error', 'the engine refuses the token — reload the page'); return; }
       VoiceClient.mirror('IDLE');
-      VoiceClient.log('note', 'Engine getrennt — verbinde neu');
+      VoiceClient.log('note', 'engine disconnected — reconnecting');
       VoiceClient.reconnectTimer = setTimeout(VoiceClient.connect, 1500);
     };
     ws.onerror = function () { /* onclose follows */ };
@@ -178,7 +178,7 @@ var VoiceClient = {
       setTimeout(resolve, 60000);           // never block the notice queue for good
     });
   },
-  stopAll: function (why) { VoiceClient.json({ t: 'stop', why: why || 'Stopp' }); VoiceClient.flush(30); },
+  stopAll: function (why) { VoiceClient.json({ t: 'stop', why: why || 'stop' }); VoiceClient.flush(30); },
   ptt: function (on) { VoiceClient.json({ t: 'ptt', on: !!on }); },
   wakeHeard: function () { VoiceClient.json({ t: 'wake_heard' }); },
   pushAmbience: function () {
@@ -207,7 +207,7 @@ var VoiceClient = {
         VoiceClient.cfg = ev.config || {};
         if (VoiceClient.player) VoiceClient.player.port.postMessage({ t: 'rate', rate: VoiceClient.cfg.out_rate || 24000 });
         VoiceClient.mirror('LISTENING');
-        VoiceClient.log('note', 'bereit · VAD ' + ev.vad + (ev.partials ? ' · Partials' : '') + (ev.stt ? '' : ' · KEINE Spracherkennung'));
+        VoiceClient.log('note', 'ready · VAD ' + ev.vad + (ev.partials ? ' · Partials' : '') + (ev.stt ? '' : ' · NO speech recognition'));
         break;
       case 'state': VoiceClient.mirror(ev.state, ev.why); break;
       case 'level':
@@ -271,7 +271,7 @@ var VoiceClient = {
       case 'LISTENING': Live.armed = Live.sending = Live.speaking = false; running = false; document.body.classList.remove('running'); if (answerBubble) answerBubble.classList.remove('thinking'); setVoiceState('LISTENING', 'hot'); break;
       case 'THINKING': running = true; Live.armed = Live.sending = false; Live.speaking = false; setVoiceState('THINKING', 'hot'); break;
       case 'SPEAKING': running = false; document.body.classList.remove('running'); Live.speaking = true; setVoiceState('SPEAKING', 'hot'); break;
-      case 'INTERRUPTED': Live.speaking = false; Live.armed = true; setVoiceState('PAUSED · höre', 'hot'); break;
+      case 'INTERRUPTED': Live.speaking = false; Live.armed = true; setVoiceState('PAUSED · listening', 'hot'); break;
       case 'RESUMING': setVoiceState('SPEAKING', 'hot'); break;
     }
     if (why) VoiceClient.log('note', state + ' ← ' + why);

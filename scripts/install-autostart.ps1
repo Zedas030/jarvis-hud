@@ -1,24 +1,24 @@
-# Jarvis beim Anmelden automatisch starten (Windows-Aufgabenplanung).
+# Start Jarvis automatically at sign-in (Windows Task Scheduler).
 #
-#   powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1            # einrichten
-#   powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -Remove    # wieder entfernen
+#   powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1            # set up
+#   powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -Remove    # remove again
 #
-# Die Aufgabe startet start-jarvis.bat 30 Sekunden nach der Anmeldung (WLAN und
-# Home Assistant sind dann erreichbar), nur für diesen Benutzer, ohne Adminrechte.
-# Stürzt Jarvis ab, startet ihn server.py selbst neu; endet der ganze Prozess
-# trotzdem, versucht die Aufgabe es bis zu dreimal im Minutenabstand erneut.
+# The task starts start-jarvis.bat 30 seconds after sign-in (WiFi and
+# Home Assistant can be reached by then), only for this user, without admin rights.
+# If Jarvis crashes, server.py restarts it itself; should the whole process end
+# anyway, the task tries again up to three times, one minute apart.
 param([switch]$Remove)
 
 $name = "Jarvis HUD"
 if ($Remove) {
     Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
-    Write-Host "Autostart entfernt."
+    Write-Host "Autostart removed."
     return
 }
 
 $root = Split-Path -Parent $PSScriptRoot
 $bat = Join-Path $root "start-jarvis.bat"
-if (-not (Test-Path $bat)) { throw "start-jarvis.bat nicht gefunden: $bat" }
+if (-not (Test-Path $bat)) { throw "start-jarvis.bat not found: $bat" }
 
 $action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$bat`"" -WorkingDirectory $root
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
@@ -29,5 +29,5 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 
 Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Settings $settings -Principal $principal `
-    -Description "Startet den Jarvis-Sprachassistenten beim Anmelden." -Force | Out-Null
-Write-Host "Autostart eingerichtet: '$name' startet $bat bei der Anmeldung."
+    -Description "Starts the Jarvis voice assistant at sign-in." -Force | Out-Null
+Write-Host "Autostart set up: '$name' starts $bat at sign-in."

@@ -1,21 +1,21 @@
 """
 The 3D printer (Bambu Lab, ha-bambulab integration in Home Assistant) — read only, 0 tokens.
 
-  describe(states, n)  "Wie weit ist der Drucker?", "Welches Filament ist im AMS?",
-                       "Wie heiß ist die Düse?" — one spoken answer from the HA states
+  describe(states, n)  "How far along is the printer?", "Which filament is in the AMS?",
+                       "How hot is the nozzle?" — one spoken answer from the HA states
   handle(n, raw)       the router's entry: printer questions, never commands
   watch(states, say)   background (watchers.py): says when a print is done, failed, paused
                        or the printer reports an error. Only speaks, never switches anything.
 
-The printer is found by its sensor "<prefix>_druckstatus" (or "_print_status" when HA runs in
-English); JARVIS_PRINTER names the prefix if there are several, 0 switches it all off.
+The printer is found by its sensor "<prefix>_print_status" (or "_druckstatus" when HA runs in
+German); JARVIS_PRINTER names the prefix if there are several, 0 switches it all off.
 """
 import datetime as dt
 import os
 import re
 
 PREFIX = os.environ.get("JARVIS_PRINTER", "").strip().lower()
-OFF = PREFIX in ("0", "off", "aus", "false", "no")
+OFF = PREFIX in ("0", "off", "false", "no")
 
 # what the integration calls each value, German and English entity ids
 _KEYS = {
@@ -40,18 +40,18 @@ _KEYS = {
 BUSY = ("running", "prepare", "pause", "slicing", "init")
 # why a print stopped by itself, from the current stage
 _PAUSED = {
-    "paused_filament_runout": "das Filament ist leer",
-    "paused_first_layer_error": "die erste Schicht sieht fehlerhaft aus",
-    "paused_nozzle_filament_covered_detected": "an der Düse klebt Filament",
-    "paused_cutter_error": "der Filamentschneider klemmt",
-    "paused_front_cover_falling": "die Frontabdeckung ist offen",
-    "paused_nozzle_temperature_malfunction": "die Düsentemperatur stimmt nicht",
-    "paused_heat_bed_temperature_malfunction": "die Druckbetttemperatur stimmt nicht",
-    "paused_spaghetti_defect": "die Kamera sieht Filamentsalat",
-    "paused_ams_lost": "das AMS antwortet nicht",
-    "paused_low_fan_speed_heat_break": "ein Lüfter dreht zu langsam",
-    "paused_chamber_temperature_control_error": "die Druckraumtemperatur stimmt nicht",
-    "paused_skipped_step": "ein Motor hat Schritte verloren",
+    "paused_filament_runout": "the filament has run out",
+    "paused_first_layer_error": "the first layer looks faulty",
+    "paused_nozzle_filament_covered_detected": "filament is stuck to the nozzle",
+    "paused_cutter_error": "the filament cutter is jammed",
+    "paused_front_cover_falling": "the front cover is open",
+    "paused_nozzle_temperature_malfunction": "the nozzle temperature is off",
+    "paused_heat_bed_temperature_malfunction": "the print bed temperature is off",
+    "paused_spaghetti_defect": "the camera sees spaghetti",
+    "paused_ams_lost": "the AMS does not answer",
+    "paused_low_fan_speed_heat_break": "a fan is spinning too slowly",
+    "paused_chamber_temperature_control_error": "the chamber temperature is off",
+    "paused_skipped_step": "a motor has skipped steps",
 }
 _LAST = {}            # prefix -> {"status", "error", "hms", "real", "job", "blind"} of the previous round
 # The first "error" of every print is the printer announcing its first-layer scan (Micro Lidar),
@@ -104,10 +104,10 @@ def _duration(hours):
     mins = round((hours or 0) * 60)
     h, m = divmod(mins, 60)
     if h and m:
-        return f"{h} Stunde{'n' if h != 1 else ''} {m} Minute{'n' if m != 1 else ''}"
+        return f"{h} hour{'s' if h != 1 else ''} {m} minute{'s' if m != 1 else ''}"
     if h:
-        return f"{h} Stunde{'n' if h != 1 else ''}"
-    return f"{m} Minute{'n' if m != 1 else ''}"
+        return f"{h} hour{'s' if h != 1 else ''}"
+    return f"{m} minute{'s' if m != 1 else ''}"
 
 
 def _clock(iso):
@@ -145,81 +145,82 @@ def _real(p):
 
 
 def _task(p):
-    return f" „{p['task']}“" if _known(p.get("task")) else ""
+    return f" “{p['task']}”" if _known(p.get("task")) else ""
 
 
 def _degrees(v):
     n = _num(v)
-    return f"{round(n)} Grad" if n is not None else "?"
+    return f"{round(n)} degrees" if n is not None else "?"
 
 
 def _temps(p):
     parts = []
-    for key, name in (("nozzle", "Düse"), ("bed", "Druckbett"), ("chamber", "Druckraum")):
+    for key, name in (("nozzle", "nozzle"), ("bed", "print bed"), ("chamber", "chamber")):
         if _known(p.get(key)):
             target = _num(p.get(key + "_target"))
-            parts.append(f"{name} {_degrees(p[key])}" + (f" von {round(target)}" if target else ""))
+            parts.append(f"{name} {_degrees(p[key])}" + (f" of {round(target)}" if target else ""))
     return ", ".join(parts)
 
 
 def _filament(p):
     if not p["slots"]:
-        return "Ein AMS sehe ich nicht, Sir."
+        return "I do not see an AMS, Sir."
     rows = []
     for ams, n, s in p["slots"]:
         a = s.get("attributes") or {}
         name = s["state"] if _known(s["state"]) and not a.get("empty") else ""
         left = a.get("remain")
         where = f"Slot {n}" if len(p["humidity"]) <= 1 else f"AMS {ams} Slot {n}"
-        rows.append(f"{where} {name}" + (f" ({left} Prozent übrig)" if name and isinstance(left, (int, float))
-                                         and left >= 0 else "") if name else f"{where} leer")
-    hum = "; ".join(f"Luftfeuchtigkeit {v} Prozent" for _, v in p["humidity"] if _known(v))
-    return "Im AMS: " + ", ".join(rows) + "." + (f" {hum}." if hum else "")
+        rows.append(f"{where} {name}" + (f" ({left} percent left)" if name and isinstance(left, (int, float))
+                                         and left >= 0 else "") if name else f"{where} empty")
+    hum = "; ".join(f"humidity {v} percent" for _, v in p["humidity"] if _known(v))
+    return "In the AMS: " + ", ".join(rows) + "." + (f" {hum.capitalize()}." if hum else "")
 
 
 def describe(states, n=""):
     p = find(states)
     if not p:
-        return "Den 3D-Drucker finde ich in Home Assistant nicht, Sir."
+        return "I cannot find the 3D printer in Home Assistant, Sir."
     if p.get("online") == "off" or p["status"] in ("offline", "unavailable"):
-        return "Der Drucker ist offline, Sir."
-    if re.search(r"\b(filament|ams|spule\w*|rolle\w*|material)\b", n):
+        return "The printer is offline, Sir."
+    if re.search(r"\b(filament|ams|spools?|rolls?|material)\b", n):
         return _filament(p)
-    if re.search(r"\b(temperatur\w*|heiß|warm|grad|düse|bett|druckbett|druckraum)\b", n):
-        return f"Am Drucker: {_temps(p)}."
+    if re.search(r"\b(temperatures?|hot|warm|degrees|nozzle|bed|print bed|chamber)\b", n):
+        return f"At the printer: {_temps(p)}."
     status = p["status"]
-    text = {"idle": "Der Drucker ist frei, Sir.",
-            "finish": f"Der letzte Druck{_task(p)} ist fertig, Sir.",
-            "failed": f"Der letzte Druck{_task(p)} ist fehlgeschlagen, Sir."}.get(status)
+    text = {"idle": "The printer is free, Sir.",
+            "finish": f"The last print{_task(p)} is finished, Sir.",
+            "failed": f"The last print{_task(p)} failed, Sir."}.get(status)
     if status in BUSY:
         progress = _num(p.get("progress"))
-        text = (f"Der Drucker {'ist pausiert bei' if status == 'pause' else 'druckt'}{_task(p)}"
-                + (f": {round(progress)} Prozent" if progress is not None else ""))
+        text = (f"The printer {'is paused at' if status == 'pause' else 'is printing'}{_task(p)}"
+                + (f": {round(progress)} percent" if progress is not None else ""))
         layer, layers = _num(p.get("layer")), _num(p.get("layers"))
         if layer and layers:
-            text += f", Schicht {round(layer)} von {round(layers)}"
+            text += f", layer {round(layer)} of {round(layers)}"
         why = _PAUSED.get(p.get("stage", ""))
         if status == "pause" and why:
             text += f" — {why}"
         remaining = _num(p.get("remaining"))
         if status != "pause" and remaining:
             end = _clock(p.get("end")) if _known(p.get("end")) else ""
-            text += f". Noch etwa {_duration(remaining)}" + (f", fertig gegen {end} Uhr" if end else "")
+            text += f". About {_duration(remaining)} to go" + (f", done around {end}" if end else "")
         text += "."
-    text = text or f"Der Drucker meldet: {status}."
+    text = text or f"The printer reports: {status}."
     real, blind = _real(p)
     if real:
-        text += f" Er meldet einen Fehler: {'; '.join(real)}."
+        text += f" It reports an error: {'; '.join(real)}."
     elif blind:
-        text += " Er meldet einen Fehler — die Details stehen in der Bambu-App."
+        text += " It reports an error — the details are in the Bambu app."
     return text
 
 
-_ASK = re.compile(r"\b(3d drucker|drucker|druck|druckt|drucken|bambu|filament|ams|düse|druckbett|druckraum)\b")
-_QUESTION = re.compile(r"\b(wie|was|wann|welche\w*|ist|sind|läuft|fertig|status|noch|weit|lange|druckt|gerade)\b")
+_ASK = re.compile(r"\b(3d printer|printer|print|printing|bambu|filament|ams|nozzle|print bed|chamber)\b")
+_QUESTION = re.compile(r"\b(how|what|whats|when|which|is|are|running|done|finished|status|still|far|long|printing|now)\b")
 # switching or paper printing: not a status question
-_NOT = re.compile(r"\b(licht|lampe|beleuchtung|schalt\w*|mach\w*|stopp\w*|abbrech\w*|pausier\w*|fortsetz\w*|"
-                  r"druck\w* .{0,25}(aus|datei|dokument|pdf|seite)|ausdrucken|papier|luftdruck|blutdruck)\b")
+_NOT = re.compile(r"\b(light|lamp|lighting|switch\w*|turn\w*|stop\w*|cancel\w*|pause|resume|"
+                  r"print (out|this|the (file|document|pdf|page))|print\w* .{0,25}(file|document|pdf|page)|paper|"
+                  r"air pressure|blood pressure)\b")
 
 
 def handle(n, raw=""):
@@ -251,19 +252,19 @@ def watch(states, say):
         return
     was_busy = last["status"] in BUSY
     if p["status"] == "finish" and was_busy:
-        say(f"printer_done:{job}", f"Sir, der 3D-Druck{_task(p)} ist fertig.")
+        say(f"printer_done:{job}", f"Sir, the 3D print{_task(p)} is finished.")
     elif p["status"] == "failed" and last["status"] != "failed":
-        say(f"printer_failed:{job}", f"Sir, der 3D-Druck{_task(p)} ist fehlgeschlagen. Schauen Sie bitte nach dem Drucker.")
+        say(f"printer_failed:{job}", f"Sir, the 3D print{_task(p)} failed. Please have a look at the printer.")
     elif p["status"] == "pause" and last["status"] in ("running", "prepare"):
         why = _PAUSED.get(p.get("stage", ""))
         if why:                        # a pause the user pressed himself needs no notice
-            say(f"printer_pause:{job}:{p.get('stage')}", f"Sir, der 3D-Drucker hat angehalten: {why}.")
+            say(f"printer_pause:{job}:{p.get('stage')}", f"Sir, the 3D printer has stopped: {why}.")
     new = [t for t in real if t not in (last.get("real") or [])]
     if new:
-        say(f"printer_error:{job}:{'|'.join(new)}"[:200], f"Sir, der 3D-Drucker meldet einen Fehler: {'; '.join(new)}.")
+        say(f"printer_error:{job}:{'|'.join(new)}"[:200], f"Sir, the 3D printer reports an error: {'; '.join(new)}.")
     elif blind and not last.get("blind"):
         if now["skipped"] != job and p["status"] in BUSY:
             now["skipped"] = job        # the first one of a print is the first-layer scan
         else:
             count = (p["_attr"].get("hms") or {}).get("Count")
-            say(f"printer_error:{job}:{count}", "Sir, der 3D-Drucker meldet einen Fehler. Die Details stehen in der Bambu-App.")
+            say(f"printer_error:{job}:{count}", "Sir, the 3D printer reports an error. The details are in the Bambu app.")

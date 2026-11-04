@@ -1,5 +1,5 @@
-# Eigene Umgebung (.venv-tts) für die lokale GPU-Stimme (Chatterbox Multilingual, RTX 50xx).
-# Chatterbox schreibt ein altes PyTorch fest, das Blackwell-GPUs nicht kennt. Deshalb so installieren:
+# Separate environment (.venv-tts) for the local GPU voice (Chatterbox Multilingual, RTX 50xx).
+# Chatterbox pins an old PyTorch that does not know Blackwell GPUs. So install it like this:
 #   .venv-tts\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 #   .venv-tts\Scripts\python.exe -m pip install --no-deps chatterbox-tts
 #   .venv-tts\Scripts\python.exe -m pip install -r requirements-tts.txt

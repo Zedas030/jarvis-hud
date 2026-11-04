@@ -25,7 +25,7 @@ def place_suffix():
 
 def persona_line():
     """One line for the system prompt — empty if no name is configured."""
-    return f"Der User heißt {USER_NAME}." if USER_NAME else ""
+    return f"The user's name is {USER_NAME}." if USER_NAME else ""
 
 
 def _load_home():

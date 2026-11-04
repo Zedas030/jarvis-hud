@@ -4,11 +4,11 @@ may only change after the user confirms a card.
 
 A background job cannot show a card (cards exist only inside a turn in the
 HUD). So it stores a proposal here and mentions it; in the next conversation
-the proposal sits in the context block, Jarvis explains it in German and calls
+the proposal sits in the context block, Jarvis explains it in plain words and calls
 proposal_accept — which always goes through the confirmation card.
 
 Kinds and what accepting does:
-  rules     learned rules → section "Gelernte Regeln" in the note Vorlieben (reflection.py)
+  rules     learned rules → section "Learned rules" in the note Preferences (reflection.py)
   routine   a routine → config/routines.json (routines.py)
   reminder  a reminder → the scheduler in the HUD server
   idea      needs new code: only noted as wanted, Jarvis never changes his own code
@@ -98,38 +98,38 @@ def resolve(pid, status):
 
 
 def describe(p):
-    """What the card shows: in plain German, what happens on yes."""
+    """What the card shows: in plain words, what happens on yes."""
     pl = p.get("payload") or {}
     if p["kind"] == "rules":
-        body = "\n".join(f"• {r.get('regel', r) if isinstance(r, dict) else r}" for r in pl.get("rules") or [])
-        return f"Diese Regeln in die Notiz Vorlieben übernehmen:\n{body}"
+        body = "\n".join(f"• {r.get('rule', r) if isinstance(r, dict) else r}" for r in pl.get("rules") or [])
+        return f"Add these rules to the note Preferences:\n{body}"
     if p["kind"] == "routine":
         steps = "; ".join(next(iter(s.values()), "") if isinstance(s, dict) else str(s) for s in pl.get("steps") or [])
-        return f"Routine „{pl.get('name', p['title'])}“ anlegen. Auslöser: {', '.join(pl.get('triggers') or [])}. Schritte: {steps}"
+        return f"Create routine “{pl.get('name', p['title'])}”. Triggers: {', '.join(pl.get('triggers') or [])}. Steps: {steps}"
     if p["kind"] == "reminder":
-        return f"Erinnerung anlegen: {pl.get('text', p['title'])} um {pl.get('at', '?')}"
+        return f"Create reminder: {pl.get('text', p['title'])} at {pl.get('at', '?')}"
     if p["kind"] == "calendar":
         import mail_events
         listed = mail_events.card_lines(pl.get("ids"))
-        return "Diese Termine aus Ihren Mails eintragen:\n" + ("\n".join(f"• {t}" for t in listed)
-                                                               or "(nicht mehr gefunden)")
+        return "Add these appointments from your mails:\n" + ("\n".join(f"• {t}" for t in listed)
+                                                            or "(no longer found)")
     if p["kind"] == "switch_off":
-        return "Ausschalten:\n" + "\n".join(f"• {label}" for label in pl.get("labels") or pl.get("entities") or [])
+        return "Switch off:\n" + "\n".join(f"• {label}" for label in pl.get("labels") or pl.get("entities") or [])
     if p["kind"] == "habit":
         import user_habits
         when = user_habits._when(pl.get("weekdays") or range(7), pl.get("at", "08:00"))
-        return (f"{when.capitalize()}: „{pl.get('text', p['title'])}“ "
-                + ("von selbst sagen." if pl.get("mode") == "say" else "vorab holen, damit die Antwort sofort kommt."))
+        return (f"{when[:1].upper() + when[1:]}: “{pl.get('text', p['title'])}” "
+                + ("say on my own." if pl.get("mode") == "say" else "fetch in advance, so the answer comes instantly."))
     if p["kind"] == "skill":
         import learning
         import skill_factory
         d = (learning.load().get("drafts") or {}).get(pl.get("key")) or {}
         problems, notes = skill_factory.check(pl.get("key"))
-        return (f"Router-Regel aktivieren: „{d.get('example', pl.get('key'))}“ schaltet "
-                f"{', '.join(d.get('entities', [])) or '?'} künftig lokal."
-                + ("\nPrüfung: " + " ".join(problems) if problems else "\nPrüfung bestanden.")
+        return (f"Activate router rule: “{d.get('example', pl.get('key'))}” switches "
+                f"{', '.join(d.get('entities', [])) or '?'} locally from now on."
+                + ("\nCheck: " + " ".join(problems) if problems else "\nCheck passed.")
                 + (" " + " ".join(notes) if notes else ""))
-    return f"Als gewünschte Fähigkeit vormerken (bauen müssen Sie sie in Claude Code): {p['title']}"
+    return f"Note as a wanted ability (you have to build it in Claude Code): {p['title']}"
 
 
 def block():
@@ -138,19 +138,19 @@ def block():
     if not items:
         return ""
     rows = "\n".join(f"- {p['id']}: {p['title']} — {p['why']}" for p in items[:4])
-    return ("Offene Vorschläge von dir (warten auf den User):\n" + rows +
-            "\nSagt der User ja oder fragt danach: erst auf Deutsch erklären, was passiert und warum, dann "
-            "proposal_accept mit id und begruendung. Bei nein: proposal_decline. Nicht von selbst aufdrängen, "
-            "höchstens einmal kurz erwähnen, wenn es passt.")
+    return ("Your open proposals (waiting for the user):\n" + rows +
+            "\nIf the user says yes or asks about it: first explain in English what happens and why, then "
+            "proposal_accept with id and reason. If no: proposal_decline. Do not push it on your own, "
+            "mention it briefly once at most when it fits.")
 
 
 def accept(pid, internal=None):
     """Carries out an accepted proposal. internal(op, args) reaches the HUD server (reminders)."""
     p = get(pid)
     if not p:
-        return "Diesen Vorschlag gibt es nicht."
+        return "This proposal does not exist."
     if p["status"] != "open" or p.get("expires", 0) < time.time():
-        return "Dieser Vorschlag ist nicht mehr offen."
+        return "This proposal is no longer open."
     pl = p.get("payload") or {}
     if p["kind"] == "rules":
         import reflection
@@ -159,7 +159,7 @@ def accept(pid, internal=None):
         import routines
         result = routines.tool("routine_save", pl)
     elif p["kind"] == "reminder":
-        result = internal("reminder_add", pl) if internal else "Erinnerungen gehen nur über den Server."
+        result = internal("reminder_add", pl) if internal else "Reminders only work through the server."
     elif p["kind"] == "skill":
         import skill_factory
         result = skill_factory.activate(pl.get("key"))
@@ -182,11 +182,11 @@ def accept(pid, internal=None):
         import user_habits
         result = user_habits.add_job(pl)
     else:
-        result = "Vorgemerkt."
+        result = "Noted."
     resolve(pid, "accepted")
     try:
         import suggestions
-        suggestions.mark(p, "angenommen")
+        suggestions.mark(p, "accepted")
     except Exception:  # noqa: BLE001 — the note is a log, not a requirement
         pass
     return result
@@ -195,10 +195,10 @@ def accept(pid, internal=None):
 def decline(pid):
     p = resolve((pid or "").strip(), "declined")
     if not p:
-        return "Diesen Vorschlag gibt es nicht."
+        return "This proposal does not exist."
     try:
         import suggestions
-        suggestions.mark(p, "abgelehnt")
+        suggestions.mark(p, "declined")
     except Exception:  # noqa: BLE001
         pass
-    return "Verworfen."
+    return "Discarded."

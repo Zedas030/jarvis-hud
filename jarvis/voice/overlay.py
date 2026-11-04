@@ -26,18 +26,18 @@ import time
 
 import events
 
-ENABLED = os.environ.get("JARVIS_OVERLAY", "1").strip().lower() not in ("0", "off", "false", "no", "aus")
+ENABLED = os.environ.get("JARVIS_OVERLAY", "1").strip().lower() not in ("0", "off", "false", "no")
 STYLE = os.environ.get("JARVIS_OVERLAY_STYLE", "panda").strip().lower()
 STALE_S = 90          # a hidden tab without Live may only run timers once a minute
 W, H = 340, 124
 LOOK = {
-    "speaking":    ("SPRICHT", "#5fe4ff", 0.9),
-    "hearing":     ("HÖRT DICH", "#2ed99b", 0.6),
-    "listening":   ("HÖRT ZU", "#2ed99b", 0.25),
-    "busy":        ("DENKT NACH", "#b98cff", 2.4),
-    "sleeping":    ("BEREIT", "#2b8ba8", 0.12),
-    "needs-click": ("KLICK NÖTIG", "#ffb340", 0.0),
-    "blocked":     ("MIKRO AUS", "#ff6ba6", 0.0),
+    "speaking":    ("SPEAKING", "#5fe4ff", 0.9),
+    "hearing":     ("HEARS YOU", "#2ed99b", 0.6),
+    "listening":   ("LISTENING", "#2ed99b", 0.25),
+    "busy":        ("THINKING", "#b98cff", 2.4),
+    "sleeping":    ("READY", "#2b8ba8", 0.12),
+    "needs-click": ("CLICK NEEDED", "#ffb340", 0.0),
+    "blocked":     ("MIC OFF", "#ff6ba6", 0.0),
     "off":         ("PAUSE", "#6f8aa3", 0.08),
 }
 STATE = {"visible": True, "st": "off", "detail": "", "line": "", "tone": "", "at": 0.0}
@@ -101,7 +101,7 @@ def _run():
     try:
         import tkinter as tk
     except ImportError:
-        print("  Overlay: tkinter fehlt — kein Fenster beim Tab-Wechsel.", flush=True)
+        print("  overlay: tkinter missing — no window when switching tabs.", flush=True)
         return
     (_run_card if STYLE in ("karte", "card", "orb") else _run_panda)(tk)
 
@@ -184,10 +184,10 @@ FUR, PATCH, VISOR, WARN = "#f2f2f2", "#1d1d1d", "#07111c", "#ffb340"
 # The answer's tone tag ([dry], [amused], …, see commands.py) or its words set the face.
 MOODS = (
     ("worried",   ("concern", "worr", "sigh", "sad", "sorry", "apolog", "caut", "alarm", "urgent", "grave"),
-                  ("fehler", "warnung", "achtung", "leider", "kaputt", "fehlgeschlagen", "ausgefallen", "störung", "offline")),
+                  ("error", "warning", "careful", "unfortunately", "broken", "failed", "down", "outage", "offline")),
     ("critical",  ("dry", "sarcas", "pointed", "skept", "wry", "deadpan", "critic", "doubt", "unimpress"), ()),
     ("happy",     ("amused", "pleased", "warm", "cheer", "laugh", "delight", "happy", "excit", "playful", "chuckl"), ()),
-    ("proud",     ("satisf", "proud", "smug", "confident", "triumph"), ("erledigt", "geschafft", "fertig", "erfolgreich")),
+    ("proud",     ("satisf", "proud", "smug", "confident", "triumph"), ("done", "managed", "finished", "successful")),
     ("surprised", ("surpris", "astonish", "gasp", "impress", "amaz"), ()),
     ("serious",   ("firm", "serious", "measured", "stern", "crisp", "neutral", "calm", "whisper"), ()),
 )

@@ -1,45 +1,49 @@
+> 🇩🇪 German version: [jarvis-hud-de](https://github.com/Zedas030/jarvis-hud-de)
+
 <div align="center">
 
 # J.A.R.V.I.S.
 
-**Persönlicher Sprachassistent mit Gedächtnis, Smart-Home-Steuerung und HUD — angetrieben von Claude Code**
+**Personal voice assistant with memory, smart home control and a HUD — powered by Claude Code**
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![Platform](https://img.shields.io/badge/Plattform-Windows%2011-0078D6?logo=windows&logoColor=white)
-![Claude Code](https://img.shields.io/badge/Gehirn-Claude%20Code%20CLI-D97757)
+![Platform](https://img.shields.io/badge/Platform-Windows%2011-0078D6?logo=windows&logoColor=white)
+![Claude Code](https://img.shields.io/badge/Brain-Claude%20Code%20CLI-D97757)
 ![Home Assistant](https://img.shields.io/badge/Smart%20Home-Home%20Assistant-41BDF5?logo=homeassistant&logoColor=white)
-![Local first](https://img.shields.io/badge/Sprache-lokal%20(Whisper%20%2B%20GPU--TTS)-2ea44f)
+![Local first](https://img.shields.io/badge/Voice-local%20(Whisper%20%2B%20GPU--TTS)-2ea44f)
 
 </div>
 
 ---
 
-JARVIS ist ein selbst gehosteter Sprachassistent im Stil des Iron-Man-Computers. Man spricht frei im Browser, er antwortet mit natürlicher Stimme, steuert das Smart Home, kennt Kalender, Postfach und Heimnetz, und er baut sich ein **dauerhaftes Gedächtnis** in einem Obsidian-Vault auf.
+JARVIS is a self-hosted voice assistant in the style of the Iron Man computer. You talk freely in the browser, he answers with a natural voice, controls the smart home, knows your calendar, mailbox and home network, and builds up a **lasting memory** in an Obsidian vault.
 
-Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine API-Abrechnung pro Token. Damit das Kontingent lange reicht, beantwortet ein **lokaler Intent-Router** einfache Befehle komplett ohne LLM. Alles andere läuft als **schlanker, zustandsloser Aufruf** mit eigenem Kurz-Prompt und nur den Werkzeugen, die die Anfrage wirklich braucht.
+The language model is the **Claude Code CLI** in subscription mode, so there is no API billing per token. To make the allowance last, a **local intent router** answers simple commands entirely without an LLM. Everything else runs as a **lean, stateless call** with its own short prompt and only the tools the request really needs.
 
 <div align="center">
 
-![Jarvis-HUD, Ansicht Sonnenlauf](docs/screenshots/hud.png)
+![Jarvis HUD, "Sun path" view](docs/screenshots/hud.png)
 
-<sub>HUD am PC, Ansicht „Sonnenlauf“ · Instanz mit Beispielkonfiguration, keine persönlichen Daten</sub>
+<sub>HUD on the PC, "Sun path" view · instance with the example configuration, no personal data</sub>
 
 </div>
 
-## Inhalt
+## Contents
 
 - [Highlights](#highlights)
-- [Was alles möglich ist](#was-alles-möglich-ist)
-- [Bedienung](#bedienung)
-- [Stimme: Anbieter-Kette, Sprach-Engine, Notbetrieb](#stimme-anbieter-kette-sprach-engine-notbetrieb)
-- [Gedächtnis und Lernen](#gedächtnis-und-lernen)
-- [Sicherheitsmodell](#sicherheitsmodell)
-- [Architektur](#architektur)
-- [Schnellstart](#schnellstart)
-- [Unterwegs: iPhone, iPad, Handy](#unterwegs-iphone-ipad-handy)
-- [Projektstruktur](#projektstruktur)
-- [Dokumentation](#dokumentation)
-- [Raspberry Pi: Monitoring und Doku](#raspberry-pi-monitoring-und-doku)
+- [What it can do](#what-it-can-do)
+- [Usage](#usage)
+- [Voice: provider chain, voice engine, fallback mode](#voice-provider-chain-voice-engine-fallback-mode)
+- [Language and voice settings](#language-and-voice-settings)
+- [Memory and learning](#memory-and-learning)
+- [Security model](#security-model)
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Secrets](#secrets)
+- [On the go: iPhone, iPad, phone](#on-the-go-iphone-ipad-phone)
+- [Project structure](#project-structure)
+- [Documentation](#documentation)
+- [Raspberry Pi: monitoring and docs](#raspberry-pi-monitoring-and-docs)
 
 ---
 
@@ -47,287 +51,311 @@ Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine AP
 
 <table>
 <tr>
-<td width="50%" valign="top">🎙️ <b>Freihändig sprechen</b><br>Live-Mikrofon, Satzende-Erkennung, Reinreden unterbricht ihn. Aktivierungswort „Jarvis“ wahlweise lokal per openWakeWord.</td>
-<td width="50%" valign="top">⚡ <b>0 Tokens für Alltägliches</b><br>Licht, Steckdosen, Musik, Timer, Wecker, Uhrzeit, Wetter: ein lokaler Intent-Router antwortet in Millisekunden, ohne LLM.</td>
+<td width="50%" valign="top">🎙️ <b>Hands-free talking</b><br>Live microphone, end-of-sentence detection, talking over him interrupts him. Wake word "Jarvis", optionally local with openWakeWord.</td>
+<td width="50%" valign="top">⚡ <b>0 tokens for everyday things</b><br>Lights, sockets, music, timers, alarms, time, weather: a local intent router answers in milliseconds, without an LLM.</td>
 </tr>
 <tr>
-<td valign="top">🪶 <b>Schlanke Claude-Aufrufe</b><br>Eigener Kurz-Prompt, nur die nötigen Werkzeuge, automatische Modellwahl. In Messungen über 25× weniger Tokens als ein Standard-Aufruf.</td>
-<td valign="top">🧠 <b>Echtes Gedächtnis</b><br>Obsidian-Vault mit Themen-Notizen, Gesprächsprotokoll, Episoden je Tag, Ablaufdaten und Papierkorb. Jede Erinnerung mit prüfbarer Herkunft.</td>
+<td valign="top">🪶 <b>Lean Claude calls</b><br>Its own short prompt, only the tools needed, automatic model choice. Measured at over 25× fewer tokens than a standard call.</td>
+<td valign="top">🧠 <b>Real memory</b><br>Obsidian vault with topic notes, conversation log, episodes per day, expiry dates and a trash folder. Every memory with a source you can check.</td>
 </tr>
 <tr>
-<td valign="top">🏠 <b>Weiß, wo du bist</b><br>Präsenzmelder je Raum: Antwort aus dem Lautsprecher des Raums, Musik wandert mit, Heizung folgt, Morgen-Briefing beim ersten Gang ins Bad.</td>
-<td valign="top">📣 <b>Meldet sich selbst</b><br>Waschmaschine fertig, Zeit loszufahren, Paket kommt, Speicher voll, Unwetter, neues Gerät im WLAN. Mit Ruhezeiten, nie ohne Karte.</td>
+<td valign="top">🏠 <b>Knows where you are</b><br>Presence sensors per room: the answer comes from that room's speaker, music moves with you, the heating follows, the morning briefing starts on the first trip to the bathroom.</td>
+<td valign="top">📣 <b>Speaks up by himself</b><br>Washing machine done, time to leave, parcel arriving, battery full, severe weather, new device on the WiFi. With quiet hours, never without a card.</td>
 </tr>
 <tr>
-<td valign="top">🛟 <b>Notbetrieb</b><br>Fällt Claude aus, übernimmt eine kostenlose Kette Groq → Gemini → Ollama mit denselben Werkzeugen. Die Stimme hat ihre eigene Kette aus Cloud-, GPU- und Gratis-Anbietern.</td>
-<td valign="top">🛡️ <b>Kontrolliert und ehrlich</b><br>Aktionsklassen im Code statt im Prompt, Bestätigungskarten, Schutz vor fremden Anweisungen in Mails und Webseiten, Audit-Log, Not-Aus, nur <code>localhost</code>.</td>
+<td valign="top">🛟 <b>Fallback mode</b><br>If Claude is down, a free chain Groq → Gemini → Ollama takes over with the same tools. The voice has its own chain of cloud, GPU and free providers.</td>
+<td valign="top">🛡️ <b>Controlled and honest</b><br>Action classes in code instead of the prompt, confirmation cards, protection against third-party instructions in mails and web pages, audit log, emergency stop, <code>localhost</code> only.</td>
 </tr>
 <tr>
-<td valign="top">🖥️ <b>PC und Windows</b><br>Lautstärke, Apps, Bildschirmsperre, Fenster anordnen, Dateien und Zwischenablage, Bildschirmtext per lokaler OCR. Spotify wird leiser, solange Jarvis zuhört oder spricht.</td>
-<td valign="top">🛰️ <b>Heimnetz</b><br>Pi, NAS, FRITZ!Box, UniFi, Updates mit Freigabe-Karte, Wächter für neue Geräte. <i>„Lagebericht“</i> fasst Uptime Kuma, Sicherheitszentrale und Energie-Kreislauf zusammen.</td>
+<td valign="top">🖥️ <b>PC and Windows</b><br>Volume, apps, screen lock, window arranging, files and clipboard, screen text through local OCR. Spotify gets quieter while Jarvis listens or speaks.</td>
+<td valign="top">🛰️ <b>Home network</b><br>Pi, NAS, FRITZ!Box, UniFi, updates with an approval card, a watcher for new devices. <i>"Situation report"</i> sums up Uptime Kuma, the security centre and the energy loop.</td>
 </tr>
 </table>
 
 ---
 
-## Was alles möglich ist
+## What it can do
 
-Die Architektur trennt **Router** (Regeln), **Werkzeuge** (MCP-Server) und **Gedächtnis** (Markdown). Neue Fähigkeiten lassen sich deshalb meist mit wenigen Zeilen ergänzen. Eine Auswahl, die vollständige Liste steht unter [Funktionen](docs/funktionen.md):
+The architecture separates the **router** (rules), the **tools** (MCP server) and the **memory** (Markdown). New abilities usually take only a few lines. A selection; the full list is in [Features](docs/features.md):
 
-**Im Alltag**
-- *„Guten Morgen“* liefert ein Tagesbriefing mit Wetter, Terminen, Energie, fast leeren Batterien und neuen Mails.
-- *„Kann ich heute noch eine Runde laufen / golfen?“* ergibt eine Ampel aus Wetter, Wind, Tageslicht und Arbeitszeit.
-- *„Trag mir Freitag um zehn den Zahnarzt ein“* (mit Bestätigung), *„Hab ich wichtige Mails?“*, *„Wann muss ich los?“* (Fahrzeit zum nächsten Termin), *„Kommt heute ein Paket?“*
-- *„Timer 8 Minuten für die Pizza“*, *„Weck mich um 6:45“*, *„Erinnere mich morgen um 9 daran, Anna anzurufen“*, *„Setz Milch auf die Einkaufsliste“*. Lokal, ohne Tokens, übersteht Neustarts.
-- *„Wenn ich Gute Nacht sage, mach alle Lichter aus und sag mir, wann der Wecker klingelt“* legt eine Routine an. Danach läuft *„Gute Nacht“* ohne LLM.
+**Everyday life**
+- *"Good morning"* gives a daily briefing with weather, appointments, energy, nearly empty batteries and new mails.
+- *"Can I still go for a run / play golf today?"* gives a traffic light from weather, wind, daylight and working hours.
+- *"Put the dentist in for Friday at ten"* (with confirmation), *"Do I have important mails?"*, *"When do I have to leave?"* (travel time to the next appointment), *"Is a parcel coming today?"*
+- *"Timer 8 minutes for the pizza"*, *"Wake me at 6:45"*, *"Remind me tomorrow at 9 to call Anna"*, *"Put milk on the shopping list"*. Local, no tokens, survives restarts.
+- *"When I say good night, turn off all the lights and tell me when the alarm rings"* creates a routine. From then on *"Good night"* runs without an LLM.
 
-**Zuhause**
-- *„Mach das Licht im Wohnzimmer auf 40 Prozent“*, *„Ist die Waschmaschine noch an?“*, *„Szene Kino“*, danach zwei Minuten lang *„heller“*, *„wieder aus“*, *„und im Schlafzimmer auch“*.
-- Jarvis weiß über Präsenzmelder, in welchem Raum du bist: Antworten kommen aus dem Lautsprecher dort, *„hol die Musik zu mir“* schiebt Spotify auf den Lautsprecher des Raums, die Heizung folgt dir, nachts sagt der Sonos gute Nacht.
-- *„Sag im Wohnzimmer: Essen ist fertig“* spricht über den Echo Dot, im Schlafzimmer über den Sonos. Antworten wahlweise aus dem Echo, mit Alexas Stimme.
-- *„Wie viel liefert die Solaranlage?“*, *„Was kostet mich der PC im Monat?“*, *„Wer zieht Standby-Strom?“*, *„Wann soll ich die Spülmaschine anmachen?“* (Energie-Coach aus Akkustand, Verbrauch und Sonnenvorhersage).
-- Verlässt du die Wohnung und es läuft noch etwas, kommt ein Vorschlag „Ausschalten“ aufs Handy. Kommst du heim: *„Willkommen zurück. Während du weg warst: …“*
-- Unwetterwarnungen des DWD von selbst, Routinen-Vorschläge aus deinen Gewohnheiten, *„Öffne Netflix auf dem Fernseher“* über Alexa am Fire TV.
+**At home**
+- *"Set the living room light to 40 percent"*, *"Is the washing machine still on?"*, *"Cinema scene"*, then for two minutes *"brighter"*, *"off again"*, *"and in the bedroom too"*.
+- Jarvis knows from presence sensors which room you are in: answers come from the speaker there, *"bring the music to me"* moves Spotify to the room's speaker, the heating follows you, at night the Sonos says good night.
+- *"Say in the living room: dinner is ready"* speaks through the Echo Dot, in the bedroom through the Sonos. Answers optionally from the Echo, in Alexa's voice.
+- *"How much is the solar system delivering?"*, *"What does the PC cost me per month?"*, *"Who is drawing standby power?"*, *"When should I turn on the dishwasher?"* (energy coach from battery level, consumption and the solar forecast).
+- If you leave the flat and something is still running, a "switch off" suggestion comes to your phone. When you come home: *"Welcome back. While you were out: …"*
+- Severe weather warnings from the German weather service (DWD) by themselves, routine suggestions from your habits, *"Open Netflix on the TV"* through Alexa on the Fire TV.
 
-**Technik und Netzwerk**
-- *„Wie geht es dem Pi / dem NAS?“*, *„Ist ein unbekanntes Gerät im WLAN?“*, *„Wer ist gerade im WLAN?“* (UniFi), *„Gibt es Updates?“* (FRITZ!Box, NAS, Pi; installiert nur mit Karte).
-- *„Lagebericht“*, *„Läuft die Nulleinspeisung?“*, *„Welche Sicherheitsbefunde sind offen?“* lokal aus Uptime Kuma, der ORBIT-Sicherheitszentrale und Home Assistant.
-- *„Starte die Container auf dem Pi neu“* (ein Befehl per SSH, immer mit Bestätigungskarte), *„Wie weit ist der Drucker?“* (Bambu Lab), *„Was steht im Wartungskalender?“*
+**Tech and network**
+- *"How is the Pi / the NAS doing?"*, *"Is there an unknown device on the WiFi?"*, *"Who is on the WiFi right now?"* (UniFi), *"Are there any updates?"* (FRITZ!Box, NAS, Pi; installs only with a card).
+- *"Situation report"*, *"Is the zero export running?"*, *"Which security findings are open?"* locally from Uptime Kuma, the ORBIT security centre and Home Assistant.
+- *"Restart the containers on the Pi"* (one command over SSH, always with a confirmation card), *"How far along is the printer?"* (Bambu Lab), *"What is in the maintenance calendar?"*
 
-**Smarter im Alltag**
-- *„Was habe ich dich letzte Woche zum Drucker gefragt?“* beantwortet der Router aus dem Gesprächsprotokoll. *„Wie war mein Schlaf, als ich das letzte Mal krank war?“* aus dem episodischen Gedächtnis.
-- Fragst du an mehreren Tagen zur gleichen Zeit dasselbe, schlägt Jarvis samstags vor, es dir von selbst zu sagen. Schlechter Schlaf-Score oder hoher Stress (Garmin) machen den Vormittag „schonend“.
-- *„Fokus 45 Minuten“* sammelt Meldungen statt sie zu sprechen. *„Was zahle ich für die Haftpflicht?“* sucht in der gescannten Post (Paperless). *„Serie auf dem Fernseher weiterschauen“* (Jellyfin).
-- Ab 21 Uhr spricht er leiser und langsamer, in den Ruhezeiten flüstert er. Bei *„Mach Wohnzimmer an“* mit Lampe und Steckdose fragt er einmal nach und merkt sich die Antwort.
+**Smarter every day**
+- *"What did I ask you about the printer last week?"* is answered by the router from the conversation log. *"How did I sleep the last time I was ill?"* from the episodic memory.
+- If you ask the same thing at the same time on several days, Jarvis suggests on Saturday to tell you by himself. A poor sleep score or high stress (Garmin) makes the morning "gentle".
+- *"Focus 45 minutes"* collects notices instead of speaking them. *"What do I pay for liability insurance?"* searches the scanned post (Paperless). *"Continue watching the series on the TV"* (Jellyfin).
+- From 9 pm he speaks more quietly and slowly, during quiet hours he whispers. With *"Turn on the living room"* and both a lamp and a socket, he asks once and remembers the answer.
 
 ---
 
-## Bedienung
+## Usage
 
-| Aktion | So geht’s |
+| Action | How |
 |---|---|
-| Live-Modus | Klick auf **Live**. Der Button zeigt den Zustand: *Hört zu*, *Höre dich*, *Denkt*, *Spricht*. Mit Aktivierungswort: *Sag „Jarvis“*. |
-| Push-to-Talk | Live-Button halten, sprechen, loslassen. |
-| Unterbrechen | Einfach reinreden: Nach 150 ms hält er an und hört zu. Sagst du etwas, ist das die neue Frage; „Stopp“ beendet die Antwort. Sagst du nichts oder nur „mhm“, macht er mit dem angefangenen Satz weiter. |
-| Timer und Wecker | Countdown oben in der Leiste. Es klingelt, dann spricht er. Reinreden, `Esc` oder **Stop** beendet das Klingeln, *„Schlummern“* gibt 9 Minuten. |
-| Meldungen | Erscheinen mit gelbem Rand im Gespräch und werden vorgelesen; in den Ruhezeiten nur angezeigt. |
-| Bestätigen | Karte anklicken oder „bestätigt“ / „nein“ sagen. Ein bloßes „ja“ zählt bewusst nicht. |
-| Mini-Fenster | Verlässt du den Jarvis-Tab, steht unten rechts auf dem Desktop ein kleiner Roboter-Panda mit Zustand, letzter Zeile, **■ Stopp** und Mikrofon. |
-| Ausgabe wählen | 🔈 **Ton hier**, 🔊 **Wo ich bin**, **Echo Wohnzimmer** oder **Sonos Schlafzimmer**: pro Gerät, wo die Antworten zu hören sind. |
-| Tippen und Befehle | Eingabefeld, `Enter`. `/new`, `/status`, `/recall <Begriff>`, `/graph`, `/help` |
-| Nachschlagen | Weiß Jarvis etwas nicht und steht es weder in den Notizen noch in den Werkzeugen, sucht er im Web. Private Daten kommen nie in die Suche. |
+| Live mode | Click **Live**. The button shows the state: *Listening*, *Hearing you*, *Thinking*, *Speaking*. With the wake word: *Say "Jarvis"*. |
+| Push-to-talk | Hold the Live button, speak, let go. |
+| Interrupting | Just talk over him: after 150 ms he stops and listens. If you say something, that is the new question; "Stop" ends the answer. If you say nothing or just "mhm", he carries on with the sentence he started. |
+| Timers and alarms | Countdown at the top of the bar. It rings, then he speaks. Talking over it, `Esc` or **Stop** ends the ringing, *"Snooze"* gives 9 minutes. |
+| Notices | Appear with a yellow border in the conversation and are read out; during quiet hours they are only shown. |
+| Confirming | Click the card or say "confirmed" / "no". A plain "yes" deliberately does not count. |
+| Mini window | When you leave the Jarvis tab, a small robot panda sits at the bottom right of the desktop with the state, the last line, **■ Stop** and the microphone. |
+| Choosing the output | 🔈 **Sound here**, 🔊 **Where I am**, **Echo living room** or **Sonos bedroom**: per device, where the answers can be heard. |
+| Typing and commands | Input field, `Enter`. `/new`, `/status`, `/recall <term>`, `/graph`, `/help` |
+| Looking things up | If Jarvis does not know something and it is neither in the notes nor in the tools, he searches the web. Private data never goes into the search. |
 
-Mehr dazu, inklusive Persönlichkeitsprofilen, Windows-Steuerung, 3D-Drucker, Updates, Pakete und Postfächer: [Bedienung](docs/bedienung.md).
+More, including personality profiles, Windows control, 3D printer, updates, parcels and mailboxes: [Usage](docs/usage.md).
 
 ---
 
-## Stimme: Anbieter-Kette, Sprach-Engine, Notbetrieb
+## Voice: provider chain, voice engine, fallback mode
 
 ```
-Fish Audio ─▶ ElevenLabs ─▶ Lokal (Chatterbox GPU · Piper CPU) ─▶ Azure ─▶ Google ─▶ Edge
+Fish Audio ─▶ ElevenLabs ─▶ local (Chatterbox GPU · Piper CPU) ─▶ Azure ─▶ Google ─▶ Edge
 ```
 
-- **Ausfallsichere Stimme:** Jeder Anbieter ist ein Adapter. Ist einer erschöpft (Guthaben, Quota, ungültiger Key), wird er bis zum Reset übersprungen, auch über Neustarts hinweg. Bei einem vorübergehenden Fehler wechselt nur der aktuelle Satz den Anbieter, ohne hörbaren Abbruch. Das HUD zeigt den aktiven Anbieter mit Restguthaben.
-- **Sprach-Engine auf dem Server:** Silero VAD, adaptives Satzende mit Teilergebnissen von Whisper, Unterbrechen in 150 ms, Weitersprechen am Satzanfang, wenn nur „mhm“ kam. Metriken je Durchgang für Grafana, Tuning in `config/voice.yaml`.
-- **Lokal zuerst:** Spracherkennung mit Whisper (`large-v3-turbo` auf der GPU) und die GPU-Stimme laufen offline. Ab 21 Uhr leiser, in den Ruhezeiten geflüstert.
-- **Notbetrieb:** Ist das Claude-Kontingent erschöpft oder bricht ein Aufruf ab, antwortet die erste verfügbare Stufe aus **Groq → Gemini → Ollama**, mit denselben Jarvis-Werkzeugen und Bestätigungskarten. Gemini sieht nie Mail, Kalender oder Gesundheit.
+- **Fail-safe voice:** every provider is an adapter. If one is used up (credit, quota, invalid key), it is skipped until its reset, across restarts too. On a temporary error only the current sentence switches provider, without an audible break. The HUD shows the active provider with its remaining credit.
+- **Voice engine on the server:** Silero VAD, adaptive end of sentence with Whisper partial results, interrupting in 150 ms, carrying on at the start of the sentence when only "mhm" came. Metrics per turn for Grafana, tuning in `config/voice.yaml`.
+- **Local first:** speech recognition with Whisper (`large-v3-turbo` on the GPU) and the GPU voice run offline. Quieter from 9 pm, whispered during quiet hours.
+- **Fallback mode:** if the Claude allowance is used up or a call breaks off, the first available stage of **Groq → Gemini → Ollama** answers, with the same Jarvis tools and confirmation cards. Gemini never sees mail, calendar or health.
 
-Details, Messwerte und das Tuning-Protokoll: [Stimme und Sprach-Engine](docs/sprache.md).
-
----
-
-## Gedächtnis und Lernen
-
-Der Vault ist ein Obsidian-Ordner mit Markdown-Notizen nach Themen (`Personen/Anna`, `Projekte/…`, `Geräte/…`), einem automatischen Gesprächsprotokoll und Episoden je Tag (Gespräche, Garmin, Meldungen, Ausfälle). Jarvis merkt und vergisst selbstständig (Ablaufdaten, Papierkorb), speichert nichts doppelt und überschreibt einen Widerspruch nie, sondern fragt nach. Jede Erinnerung hat eine prüfbare Herkunft.
-
-- **Lernt dazu:** Formulierungen, die Claude einmal auflösen musste („Leselampe aus“), schaltet er danach selbst. Gleiche Fragen innerhalb von 5 Minuten kommen aus dem Zwischenspeicher. *„Verbrauchsbericht“* sagt, wie viel lokal lief.
-- **Lernschleife:** Bewertet seine Gespräche selbst, schlägt sonntags feste Regeln vor, macht einen Wochenrückblick mit Mustern aus Schlaf, Schritten, Stress und Golf und schlägt zweimal pro Woche eine neue Fähigkeit vor.
-- **Keine Arbeitsthemen:** Was nach Arbeit aussieht, wird weder protokolliert noch gespeichert (`privacy.py`).
-- **Änderungen nur mit Karte:** Hintergrundjobs ändern nichts selbst. Sie legen einen Vorschlag ab, Jarvis erklärt ihn, und erst die Karte setzt ihn um.
-
-Resource Manager, Context Engine, Task Engine, Dokumentensuche und die lernfähigen Module im Einzelnen: [Gedächtnis und Lernen](docs/gedaechtnis.md).
+Details, measurements and the tuning log: [Voice and voice engine](docs/voice.md).
 
 ---
 
-## Sicherheitsmodell
+## Language and voice settings
 
-- **Nur lokal:** Der Server bindet an `127.0.0.1`. Jede Anfrage braucht ein pro Start erzeugtes Token, Host und Origin werden geprüft.
-- **Fernzugriff nur gekoppelt:** Der Geräte-Port ist nur über `tailscale serve` erreichbar und zeigt ohne gekoppeltes Gerät nur die Kopplungsseite.
-- **Aktionsklassen im Code:** Jedes Werkzeug hat eine Klasse (lesen, begrenzt schreiben, bestätigen, gesperrt); der Test schlägt fehl, wenn eins fehlt. Karten werden im Code erzwungen, nie nur im Prompt.
-- **Bestätigungskarten:** Shell-Befehle, Kalender-Einträge, Schreiben außerhalb des Vaults. Ohne Antwort nach 75 s abgelehnt.
-- **Fremde Inhalte:** Mail, Web, Kalender, Dateien, Zwischenablage und Bildschirm sind markierte, nicht vertrauenswürdige Daten und können keine Anweisungen geben.
-- **Geschützte Geräte:** Router, PC, Server und Kühlschrank schaltet der Router nie selbst aus. Fragen schalten nie.
-- **Kein Selbstumbau:** Zur Laufzeit gibt es keine Werkzeuge zum Bearbeiten von Code. Audit-Log und Not-Aus.
-- **Daten bleiben lokal:** `.env`, `config/*.json`, `vault/`, `logs/`, `state.json` und Modelle stehen in `.gitignore`.
+This repository is the English edition: Jarvis understands and speaks English, and all prompts, intent phrases, replies, logs and UI texts are English. The German edition lives in [jarvis-hud-de](https://github.com/Zedas030/jarvis-hud-de). Compared with it, these defaults changed:
 
-Die Regeln im Detail: [Sicherheitsmodell](docs/sicherheit.md) und [SECURITY.md](SECURITY.md).
+| Setting | German edition | This edition |
+|---|---|---|
+| `WHISPER_LOCAL_LANG` (local speech recognition, also the warm-up clip) | `de` | `en` |
+| `ELEVENLABS_STT_LANG` / `ELEVENLABS_LANG` | `deu` / `de` | `eng` / `en` |
+| `EDGE_VOICE` | `de-DE-FlorianMultilingualNeural` | `en-GB-RyanNeural` |
+| `AZURE_VOICE` (SSML `xml:lang`) | `de-DE-FlorianMultilingualNeural` (`de-DE`) | `en-GB-RyanNeural` (`en-GB`) |
+| `GOOGLE_TTS_VOICE` (`languageCode`) | `de-DE-Chirp3-HD-Charon` (`de-DE`) | `en-GB-Chirp3-HD-Charon` (`en-GB`) |
+| Piper model (CPU voice) | `de_DE-thorsten-high.onnx` | `en_GB-alan-medium.onnx` |
+| Chatterbox (local GPU voice) `language_id` | `de` | `en` |
+| Home Assistant `tts.speak` language | `de` | `en` |
+| HUD locale, browser speech synthesis | `de-DE` | `en-GB` |
+| Whisper ghost/noise phrases, backchannel and stop words (`config/voice.yaml`) | German | English |
+| Default Home Assistant entity ids (e.g. `sensor.house_consumption`, plug suffix `_current_consumption`) | German entity names | English entity names; the old German suffixes can still be set through the `JARVIS_PLUG_*` variables |
+
+The voice test clips in `tests/fixtures/voice/` were spoken anew in English. Carrier and booking mails from German shops are still parsed in both languages, since they arrive in German regardless of the assistant's language.
 
 ---
 
-## Architektur
+## Memory and learning
+
+The vault is an Obsidian folder with Markdown notes by topic (`People/Anna`, `Projects/…`, `Devices/…`), an automatic conversation log and episodes per day (conversations, Garmin, notices, outages). Jarvis remembers and forgets on his own (expiry dates, trash folder), stores nothing twice and never overwrites a contradiction — he asks instead. Every memory has a source you can check.
+
+- **Learns:** wordings that Claude had to resolve once ("reading lamp off") he switches himself from then on. The same questions within 5 minutes come from the cache. *"Usage report"* tells how much ran locally.
+- **Learning loop:** rates his own conversations, suggests fixed rules on Sundays, does a weekly review with patterns from sleep, steps, stress and golf, and suggests a new ability twice a week.
+- **No work topics:** whatever looks like work is neither logged nor stored (`privacy.py`).
+- **Changes only with a card:** background jobs change nothing themselves. They file a suggestion, Jarvis explains it, and only the card puts it into effect.
+
+Resource manager, context engine, task engine, document search and the learning modules in detail: [Memory and learning](docs/memory.md).
+
+---
+
+## Security model
+
+- **Local only:** the server binds to `127.0.0.1`. Every request needs a token created at each start; host and origin are checked.
+- **Remote access only when paired:** the device port can only be reached through `tailscale serve` and shows only the pairing page without a paired device.
+- **Action classes in code:** every tool has a class (read, limited write, confirm, blocked); the test fails if one is missing. Cards are enforced in code, never only in the prompt.
+- **Confirmation cards:** shell commands, calendar entries, writing outside the vault. Declined after 75 s without an answer.
+- **Third-party content:** mail, web, calendar, files, clipboard and screen are marked as untrusted data and cannot give instructions.
+- **Protected devices:** the router never switches off the router, PC, servers or the fridge by itself. Questions never switch anything.
+- **No self-modification:** at runtime there are no tools for editing code. Audit log and emergency stop.
+- **Data stays local:** `.env`, `config/*.json`, `vault/`, `logs/`, `state.json` and models are in `.gitignore`.
+
+The rules in detail: [Security model](docs/security.md) and [SECURITY.md](SECURITY.md).
+
+---
+
+## Architecture
 
 ```mermaid
 flowchart LR
     subgraph Browser["Browser (HUD)"]
-        MIC[Mikrofon + VAD] --> STT
-        SPK[Wiedergabe Satz für Satz]
+        MIC[Microphone + VAD] --> STT
+        SPK[Playback sentence by sentence]
     end
     subgraph Server["server.py (127.0.0.1)"]
-        STT["/api/listen<br/>Whisper lokal"] --> RUN["/api/run"]
-        RUN --> R{"Intent-Router<br/>router.py"}
-        R -->|einfacher Befehl| LOCAL[Code-Handler<br/>0 Tokens]
-        R -->|echte Frage| LEAN["Schlanker Claude-Aufruf<br/>runtime.py"]
-        LEAN <--> MCP["Werkzeuge<br/>jarvis_mcp.py"]
+        STT["/api/listen<br/>Whisper local"] --> RUN["/api/run"]
+        RUN --> R{"Intent router<br/>router.py"}
+        R -->|simple command| LOCAL[Code handler<br/>0 tokens]
+        R -->|real question| LEAN["Lean Claude call<br/>runtime.py"]
+        LEAN <--> MCP["Tools<br/>jarvis_mcp.py"]
         SPEAK["/api/speak<br/>tts_chain.py"]
     end
     MCP --> HA[(Home Assistant)]
-    MCP --> NET[(Pi · NAS · Netzwerk)]
-    MCP --> PIM[(Kalender · Mail · Garmin)]
-    MCP --> VAULT[(Obsidian-Vault)]
+    MCP --> NET[(Pi · NAS · network)]
+    MCP --> PIM[(Calendar · mail · Garmin)]
+    MCP --> VAULT[(Obsidian vault)]
     LOCAL --> SPEAK
     LEAN --> SPEAK
     SPEAK --> SPK
 ```
 
-| Komponente | Aufgabe |
+| Component | Job |
 |---|---|
-| `server.py` | HTTP-Server (nur `127.0.0.1`), HUD, API-Endpunkte, Bestätigungskarten, Verbrauchsprotokoll, Selbst-Neustart bei Codeänderungen |
-| `router.py` | Intent-Router: lokale Handler, Wahl der Werkzeuggruppen und des Modells |
-| `runtime.py` | Startet `claude -p` schlank (`--system-prompt`, `--tools`, `--strict-mcp-config`, `--no-session-persistence`) mit vorgewärmtem Prozess-Pool |
-| `jarvis_mcp.py` | MCP-Server mit allen Werkzeugen in Gruppen, Bestätigungs-Schranke, Ergebnis-Obergrenze |
-| `memory.py` · `episodes.py` | Vault → Wissensgraph, Kern-Erinnerungen, Protokoll, Episoden, Aufräumen |
-| `voice_engine.py` · `voice_ws.py` | Full-Duplex-Sprach-Engine: Zustandsmaschine, Silero VAD, Satzende, Barge-in, Fortsetzen; WebSocket für Browser und Satelliten |
-| `tts_chain.py` · `local_tts_server.py` | Sprachausgabe-Kette mit Adaptern, lokale GPU-Stimme in eigener Umgebung |
-| `scheduler.py` · `watchers.py` · `events.py` | Timer, Wecker, Erinnerungen; Regeln für Meldungen von selbst; Push-Kanal zum HUD |
-| `fallback_llm.py` | Notbetrieb: Ersatz-Kette Groq → Gemini → Ollama mit Jarvis-Werkzeugen |
-| `policy.py` · `privacy.py` · `proposals.py` | Aktionsklassen, Arbeitsthemen-Filter, Vorschläge mit Karte |
-| `ui/` | HUD (Vanilla JS, 3D-Wissensgraph ohne Abhängigkeiten), 19 Layouts pro Gerät |
+| `server.py` | HTTP server (`127.0.0.1` only), HUD, API endpoints, confirmation cards, usage log, self-restart on code changes |
+| `router.py` | Intent router: local handlers, choice of tool groups and model |
+| `runtime.py` | Starts `claude -p` lean (`--system-prompt`, `--tools`, `--strict-mcp-config`, `--no-session-persistence`) with a pre-warmed process pool |
+| `jarvis_mcp.py` | MCP server with all tools in groups, confirmation gate, result size limit |
+| `memory.py` · `episodes.py` | Vault → knowledge graph, core memories, log, episodes, tidying up |
+| `voice_engine.py` · `voice_ws.py` | Full-duplex voice engine: state machine, Silero VAD, end of sentence, barge-in, resuming; WebSocket for browsers and satellites |
+| `tts_chain.py` · `local_tts_server.py` | Speech output chain with adapters, local GPU voice in its own environment |
+| `scheduler.py` · `watchers.py` · `events.py` | Timers, alarms, reminders; rules for notices by himself; push channel to the HUD |
+| `fallback_llm.py` | Fallback mode: replacement chain Groq → Gemini → Ollama with the Jarvis tools |
+| `policy.py` · `privacy.py` · `proposals.py` | Action classes, work topic filter, suggestions with a card |
+| `ui/` | HUD (vanilla JS, 3D knowledge graph without dependencies), 19 layouts per device |
 
-**Effizienz:** Eigener Kurz-Prompt statt Claude-Code-Standard, Werkzeuggruppen nach Bedarf, automatische Modellwahl (Haiku/Sonnet), Antwort-Cache, Prozess-Pool. In Messungen braucht ein Aufruf **über 25× weniger Tokens** als ein Standard-Aufruf; was der Router kann, kostet nichts. Alle Komponenten und die Messung: [Architektur und Effizienz](docs/architektur.md).
+**Efficiency:** its own short prompt instead of the Claude Code default, tool groups as needed, automatic model choice (Haiku/Sonnet), answer cache, process pool. Measured, a call needs **over 25× fewer tokens** than a standard call; whatever the router can do costs nothing. All components and the measurement: [Architecture and efficiency](docs/architecture.md).
 
 ---
 
-## Schnellstart
+## Quick start
 
-**Voraussetzungen:** Windows 11 · Python 3.12 · Node.js · ein Claude-Abo. Optional: NVIDIA-GPU (CUDA 12.8) für Whisper `large-v3-turbo` und die lokale Stimme.
+**Requirements:** Windows 11 · Python 3.12 · Node.js · a Claude subscription. Optional: NVIDIA GPU (CUDA 12.8) for Whisper `large-v3-turbo` and the local voice.
 
 ```powershell
-# 1  Claude Code installieren und anmelden (Abo, kein API-Key)
+# 1  Install Claude Code and sign in (subscription, no API key)
 npm.cmd install -g @anthropic-ai/claude-code
 claude auth login
 
-# 2  Python-Umgebung
+# 2  Python environment
 py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-# mit NVIDIA-GPU zusätzlich: -r requirements-gpu.txt · auf dem Windows-PC: -r requirements-windows.txt
+# with an NVIDIA GPU also: -r requirements-gpu.txt · on the Windows PC: -r requirements-windows.txt
 
-# 3  Konfiguration
-copy .env.example .env                      # Werte eintragen
-copy config\home.example.json config\home.json   # HA-Entity-IDs eintragen (optional)
-mkdir vault\Erinnerungen
+# 3  Configuration
+copy .env.example .env                      # fill in the values
+copy config\home.example.json config\home.json   # fill in the HA entity ids (optional)
+mkdir vault\Memories
 
 # 4  Start
 start-jarvis.bat
 ```
 
-Alle Einstellungen stehen kommentiert in [`.env.example`](.env.example); persönliche Daten gehören ausschließlich in `.env` und `config/*.json`, beide in `.gitignore`. Autostart, lokale Stimmen (Piper, Chatterbox auf der GPU), die Tabelle der Einstellungen sowie Entwicklung und Diagnose: [Installation und Konfiguration](docs/installation.md).
+All settings are commented in [`.env.example`](.env.example); personal data belongs only in `.env` and `config/*.json`, both in `.gitignore`. Autostart, local voices (Piper, Chatterbox on the GPU), the table of settings, and development and diagnosis: [Installation and configuration](docs/installation.md).
 
 ```powershell
-.venv\Scripts\python.exe -m unittest discover -s tests      # alle Tests: ohne Haus, Claude, Netz und Ton
+.venv\Scripts\python.exe -m unittest discover -s tests      # all tests: without house, Claude, network and sound
 ```
 
 ---
 
-## Zugangsdaten und eigene Werte
+## Secrets
 
-Im Repo stehen keine echten Schlüssel, Passwörter oder Adressen. Alle Zugänge sind optional und gehören in
-`.env` (Vorlage [`.env.example`](.env.example)), alle Geräte in `config/*.json` (Vorlagen
-`config/*.example.json`). Beide sind in `.gitignore`. Die vollständige Tabelle aller Einstellungen steht in
-[Installation und Konfiguration](docs/installation.md#konfiguration).
+The repo contains no real keys, passwords or addresses. All access is optional. Secrets go into `.env` (template
+[`.env.example`](.env.example)), devices into `config/*.json` (templates `config/*.example.json`). Both are in
+`.gitignore`. The full table of all settings is in [Installation and configuration](docs/installation.md#configuration).
 
-| Was | Wo der echte Wert hingehört |
+| What | Where the real value goes |
 |---|---|
-| Stimme: `FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY`, `GOOGLE_TTS_API_KEY` | `.env` |
-| Notbetrieb: `GROQ_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_URL` | `.env` |
-| Home Assistant: `HA_URL`, `HA_TOKEN`, `HA_MCP_URL` | `.env`; Entitäten für Dashboard, Räume und Geräte in `config/home.json` |
-| Mail und Kalender: `ICLOUD_USER`, `ICLOUD_APP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_USER`, `MAIL_PASSWORD` | `.env`, bei iCloud ein App-spezifisches Passwort |
-| Heimnetz: `PIHOLE_URL`, `PIHOLE_PASSWORD`, `PROMETHEUS_URL`, `KUMA_URL`, `SYNOLOGY_*`, `UNIFI_*`, `JELLYFIN_*`, `PAPERLESS_*`, `JARVIS_PI_HOST`, `JARVIS_PI_USER` | `.env` |
-| Sonstiges: `DHL_API_KEY`, `GARMIN_EMAIL`, `GARMIN_PASSWORD`, `JARVIS_SPOTIFY_CLIENT_ID` | `.env`; Spotify danach einmal mit `scripts\spotify_login.py` anmelden |
+| Voice: `FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY`, `GOOGLE_TTS_API_KEY` | `.env` |
+| Fallback mode: `GROQ_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_URL` | `.env` |
+| Home Assistant: `HA_URL`, `HA_TOKEN`, `HA_MCP_URL` | `.env`; entities for dashboard, rooms and devices in `config/home.json` |
+| Mail and calendar: `ICLOUD_USER`, `ICLOUD_APP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_USER`, `MAIL_PASSWORD` | `.env`, for iCloud an app-specific password |
+| Home network: `PIHOLE_URL`, `PIHOLE_PASSWORD`, `PROMETHEUS_URL`, `KUMA_URL`, `SYNOLOGY_*`, `UNIFI_*`, `JELLYFIN_*`, `PAPERLESS_*`, `JARVIS_PI_HOST`, `JARVIS_PI_USER` | `.env` |
+| Other: `DHL_API_KEY`, `GARMIN_EMAIL`, `GARMIN_PASSWORD`, `JARVIS_SPOTIFY_CLIENT_ID` | `.env`; then sign in to Spotify once with `scripts\spotify_login.py` |
 
-Für die Veröffentlichung wurden persönliche Werte so ersetzt:
+**Changing or rotating a secret:** create the new key or password at the provider (or a new long-lived token in Home Assistant under *Profile → Security*), replace the value in `.env`, restart Jarvis (**⟳ Restart** in the HUD reads `.env` again), then revoke the old key at the provider. The Spotify refresh token is stored in `config/spotify_token.json` after the login; delete that file and run `scripts\spotify_login.py` again to replace it. The HUD token for the browser is created anew at every start and needs no rotation; paired iPhones and iPads can be removed under **📱 Devices**.
 
-| Anonymisiert | Im Repo | Eigener Wert |
+For publication, personal values were replaced like this:
+
+| Anonymised | In the repo | Your own value |
 |---|---|---|
-| Name | „Nutzer“ | `JARVIS_USER_NAME` in `.env` |
-| Wohnort, Koordinaten, Warnzelle | „Musterort“, „Musterstadt“, `000000000` | `JARVIS_PLACE`, `JARVIS_WEATHER_LAT`, `JARVIS_WEATHER_LON` in `.env` |
-| Adressen im Heimnetz | `10.0.0.x` als Beispiel in Kommentaren und Standardwerten | die passende `*_URL`- bzw. `*_HOST`-Variable in `.env`. Die Links zu Monitoring und Doku stehen fest in `ui/index.html` und werden dort angepasst. |
-| Tailscale-Namen | `…tailxxxx.ts.net` | `JARVIS_REMOTE_HOSTS` in `.env` |
-| Spotify-Konto, Client-ID | `nutzer`, `xxxxxxxx` | eigene App auf developer.spotify.com, ID in `.env` |
-| Geräte- und Raumnamen | Beispiele in `config/*.example.json` | eigene Kopien ohne `.example` |
+| Name | "User" | `JARVIS_USER_NAME` in `.env` |
+| Home town, coordinates, warning cell | "Sampletown", `000000000` | `JARVIS_PLACE`, `JARVIS_WEATHER_LAT`, `JARVIS_WEATHER_LON` in `.env` |
+| Addresses in the home network | `10.0.0.x` as examples in comments and defaults | the matching `*_URL` or `*_HOST` variable in `.env`. The links to monitoring and docs are fixed in `ui/index.html` and are changed there. |
+| Tailscale names | `…tailxxxx.ts.net` | `JARVIS_REMOTE_HOSTS` in `.env` |
+| Spotify account, client id | `user`, `xxxxxxxx` | your own app on developer.spotify.com, id in `.env` |
+| Device and room names | examples in `config/*.example.json` | your own copies without `.example` |
 
-Der Ordner `pi/` ist ein Schnappschuss von Monitoring-Seite und Pi-Doku mit denselben Platzhaltern. Er
-dient als Anschauung und wird nicht automatisch ausgeliefert.
+The `pi/` folder is a snapshot of the monitoring page and the Pi docs with the same placeholders. It is there
+for illustration and is not deployed automatically.
 
-## Unterwegs: iPhone, iPad, Handy
+## On the go: iPhone, iPad, phone
 
-Der PC bleibt das Gehirn. iPhone und iPad greifen über **Tailscale** per HTTPS zu, von überall und ohne offenen Port im Router: `JARVIS_REMOTE=1`, einmal `tailscale serve --bg 8721`, dann die Adresse auf dem Gerät zum Home-Bildschirm legen und mit einem sechsstelligen Code koppeln. Das iPad zeigt ein eigenes Raum-Display mit Kacheln (Wetter, Haus, Energie, Tokens), das iPhone das HUD im Hochformat; Tippen auf das Mikrofon schaltet Live, Gedrückthalten ist Push-to-Talk. Vorschläge beim Verlassen der Wohnung und vor dem Losfahren kommen mit **Ja/Nein-Knöpfen** aufs Handy (Home-Assistant-App), die Antwort zählt wie die Karte. Einrichtung Schritt für Schritt: [Bedienung → Unterwegs](docs/bedienung.md#unterwegs-iphone-und-ipad).
+The PC stays the brain. iPhone and iPad connect through **Tailscale** over HTTPS, from anywhere and without an open port in the router: `JARVIS_REMOTE=1`, once `tailscale serve --bg 8721`, then add the address to the Home Screen on the device and pair it with a six-digit code. The iPad shows its own room display with tiles (weather, house, energy, tokens), the iPhone the HUD in portrait; tapping the microphone switches live on, holding it is push-to-talk. Suggestions when you leave the flat and before you set off come to the phone with **yes/no buttons** (Home Assistant app), and the answer counts like the card. Step-by-step setup: [Usage → On the go](docs/usage.md#on-the-go-iphone-and-ipad).
 
 ---
 
-## Projektstruktur
+## Project structure
 
 ```
-├─ server.py           Start (Supervisor + HTTP-Server), lädt paths.py
+├─ server.py           start (supervisor + HTTP server), loads paths.py
 ├─ jarvis/
 │  ├─ core/            router · runtime · commands · events · scheduler · context · tasks · focus · whereabouts
 │  ├─ safety/          policy · privacy · audit · emergency · proposals
-│  ├─ tools/           jarvis_mcp (Werkzeug-Server) · desktop · infra · pc · lists · routines · devices ·
+│  ├─ tools/           jarvis_mcp (tool server) · desktop · infra · pc · lists · routines · devices ·
 │  │                   commute · parcels · icloud_calendar · spotify · speakers · paperless · unifi · jellyfin …
 │  ├─ memory/          memory · memory_intel · learning · skill_factory · answer_cache · episodes · docsearch
 │  ├─ voice/           voice_engine · voice_ws · voice_vad · tts_chain · local_tts_server · wakeword · sonos · alexa_voice
 │  ├─ llm/             fallback_llm · resources
 │  └─ watch/           watchers · briefing · weekly_review · energy_coach · departure · weather_alerts · wellbeing …
 ├─ ui/                 HUD: index.html · app.js · voice-client.js · graph.js · styles.css · pair.html
-├─ config/             *.example.json (eigene Dateien bleiben lokal) · voice.yaml
-├─ docs/               Handbuch in Kapiteln · screenshots/
-├─ pi/                 Monitoring und Doku des Raspberry Pi (anonymisierte Kopien)
-├─ tests/              ein Testmodul pro Bereich, isolate.py zuerst
+├─ config/             *.example.json (your own files stay local) · voice.yaml
+├─ docs/               handbook in chapters · screenshots/
+├─ pi/                 monitoring and docs of the Raspberry Pi (anonymised copies)
+├─ tests/              one test module per area, isolate.py first
 └─ scripts/            measure_tokens · router_report · fetch_voice_models · install-ha-remote.ps1 …
 ```
 
 ---
 
-## Dokumentation
+## Documentation
 
-| Seite | Inhalt |
+| Page | Content |
 |---|---|
-| [Funktionen](docs/funktionen.md) | Alle Highlights, alles was möglich ist, Funktionsliste |
-| [Installation und Konfiguration](docs/installation.md) | Schnellstart, lokale Stimmen, alle `.env`-Einstellungen, Entwicklung und Diagnose |
-| [Bedienung](docs/bedienung.md) | Sprechen und tippen, Karten, Persönlichkeit, Alltag, Windows, iPhone/iPad, Handy |
-| [Stimme und Sprach-Engine](docs/sprache.md) | Anbieter-Kette, Zuhören/Unterbrechen/Weitersprechen mit Messwerten, Notbetrieb |
-| [Gedächtnis und Lernen](docs/gedaechtnis.md) | Ressourcen, Kontext, Aufgaben, lernfähige Module, Vault |
-| [Architektur und Effizienz](docs/architektur.md) | Alle Komponenten, Router und schlanker Modus, Projektstruktur |
-| [Sicherheitsmodell](docs/sicherheit.md) | Die Regeln im Code; Details in [SECURITY.md](SECURITY.md) |
-| [ARCHITECTURE.md](ARCHITECTURE.md) · [SECURITY.md](SECURITY.md) · [ROADMAP.md](ROADMAP.md) | Modulkarte, Sicherheitsregeln und Ausbauplan für die Arbeit am Code |
-| [pi/](pi/README.md) | Monitoring und Doku des Raspberry Pi, der Jarvis das Haus, das Netz und DNS liefert |
+| [Features](docs/features.md) | All highlights, everything that is possible, feature list |
+| [Installation and configuration](docs/installation.md) | Quick start, local voices, all `.env` settings, development and diagnosis |
+| [Usage](docs/usage.md) | Speaking and typing, cards, personality, everyday life, Windows, iPhone/iPad, phone |
+| [Voice and voice engine](docs/voice.md) | Provider chain, listening/interrupting/resuming with measurements, fallback mode |
+| [Memory and learning](docs/memory.md) | Resources, context, tasks, learning modules, vault |
+| [Architecture and efficiency](docs/architecture.md) | All components, router and lean mode, project structure |
+| [Security model](docs/security.md) | The rules in code; details in [SECURITY.md](SECURITY.md) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) · [SECURITY.md](SECURITY.md) · [ROADMAP.md](ROADMAP.md) | Module map, security rules and the build-out plan for working on the code |
+| [INVENTORY.md](INVENTORY.md) · [SERVER-REBUILD.md](SERVER-REBUILD.md) · [VOICE-ANALYSIS.md](VOICE-ANALYSIS.md) · [PORTING.md](PORTING.md) | Inventory, the server rebuild, the voice analysis and porting notes |
+| [pi/](pi/README.md) | Monitoring and docs of the Raspberry Pi that gives Jarvis the house, the network and DNS |
 
 ---
 
-## Raspberry Pi: Monitoring und Doku
+## Raspberry Pi: monitoring and docs
 
-Der Pi im Heimnetz liefert Jarvis Home Assistant, DNS und das Monitoring; das HUD verlinkt beide Seiten oben rechts. Die Kopien unter [`pi/`](pi/README.md) sind anonymisiert.
+The Pi in the home network gives Jarvis Home Assistant, DNS and the monitoring; the HUD links both pages at the top right. The copies under [`pi/`](pi/README.md) are anonymised.
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/monitoring.png" alt="ORBIT Monitor, Geräteseite"></td>
-<td width="50%"><img src="docs/screenshots/doku.png" alt="Pi-Dokumentation, Übersicht"></td>
+<td width="50%"><img src="docs/screenshots/monitoring.png" alt="ORBIT Monitor, device page"></td>
+<td width="50%"><img src="docs/screenshots/pi-docs.png" alt="Pi documentation, overview"></td>
 </tr>
 <tr>
-<td align="center"><sub>ORBIT Monitor (Port 8092): Geräteinventar mit Live-Status</sub></td>
-<td align="center"><sub>Pi-Dokumentation (Port 8091): Hardware, Dienste, Abschnitt Jarvis</sub></td>
+<td align="center"><sub>ORBIT Monitor (port 8092): device inventory with live status</sub></td>
+<td align="center"><sub>Pi documentation (port 8091): hardware, services, Jarvis section</sub></td>
 </tr>
 </table>
 
 ---
 
-<sub>Ursprünglich inspiriert von <a href="https://github.com/Itsme23476/jarvis-claude-code">jarvis-claude-code</a>. Für eine eigenständige Weitergabe vorher die Lizenzlage der Vorlage klären.</sub>
+<sub>Originally inspired by <a href="https://github.com/Itsme23476/jarvis-claude-code">jarvis-claude-code</a>. Before passing it on independently, clarify the licence situation of the original.</sub>

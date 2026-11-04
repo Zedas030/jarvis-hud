@@ -11,7 +11,7 @@ from unittest import mock
 import sonos  # noqa: E402
 
 # server.py may have imported sonos already (other test files), so the speakers are read here, not at import
-with mock.patch.dict(os.environ, JARVIS_SONOS="media_player.schlafzimmer=Sonos Schlafzimmer, kaputt, media_player.bad"):
+with mock.patch.dict(os.environ, JARVIS_SONOS="media_player.bedroom=Sonos Bedroom, broken, media_player.bathroom"):
     SPEAKERS = sonos._speakers()
 _PATCHES = [mock.patch.object(sonos, "SPEAKERS", SPEAKERS), mock.patch.object(sonos, "HOST", "127.0.0.1"),
             mock.patch.object(sonos, "PORT", 0)]
@@ -35,8 +35,8 @@ def _mp3(seconds, kbps=128):
 class Speakers(unittest.TestCase):
     def test_parsed_from_env(self):
         self.assertEqual(sonos.SPEAKERS, [
-            {"id": "media_player.schlafzimmer", "label": "Sonos Schlafzimmer"},
-            {"id": "media_player.bad", "label": "Sonos Bad"}])
+            {"id": "media_player.bedroom", "label": "Sonos Bedroom"},
+            {"id": "media_player.bathroom", "label": "Sonos Bathroom"}])
 
     def test_off_without_home_assistant(self):
         self.assertFalse(sonos.configured())
@@ -47,8 +47,8 @@ class Speakers(unittest.TestCase):
 @mock.patch.object(sonos, "HA_TOKEN", "t")
 class PerDevice(unittest.TestCase):
     def test_each_device_keeps_its_own(self):
-        sonos.set_output("8c2fcc86", "media_player.schlafzimmer")
-        self.assertEqual(sonos.output_for("8c2fcc86"), "media_player.schlafzimmer")
+        sonos.set_output("8c2fcc86", "media_player.bedroom")
+        self.assertEqual(sonos.output_for("8c2fcc86"), "media_player.bedroom")
         self.assertEqual(sonos.output_for("pc"), "")
         sonos.set_output("8c2fcc86", "")
         self.assertEqual(sonos.output_for("8c2fcc86"), "")
@@ -79,7 +79,7 @@ class Play(unittest.TestCase):
     def test_announces_through_home_assistant_and_serves_the_clip_once_named(self):
         calls = []
         with mock.patch.object(sonos, "_ha", side_effect=lambda path, body: calls.append((path, body))):
-            secs = sonos.play("media_player.schlafzimmer", _mp3(3.0), "audio/mpeg", "Hallo")
+            secs = sonos.play("media_player.bedroom", _mp3(3.0), "audio/mpeg", "Hello")
         path, body = calls[0]
         self.assertEqual(path, "/api/services/media_player/play_media")
         self.assertTrue(body["announce"])
@@ -98,7 +98,7 @@ class Play(unittest.TestCase):
     def test_quiet_hours_are_quieter(self):
         calls = []
         with mock.patch.object(sonos, "_ha", side_effect=lambda path, body: calls.append(body)):
-            sonos.play("media_player.schlafzimmer", _mp3(1.0), "audio/mpeg", quiet=True)
+            sonos.play("media_player.bedroom", _mp3(1.0), "audio/mpeg", quiet=True)
         self.assertEqual(calls[0]["extra"]["volume"], round(sonos.NIGHT_VOLUME * 100))
 
     def test_volume_as_percent(self):
@@ -113,7 +113,7 @@ class Play(unittest.TestCase):
 @mock.patch.object(sonos, "HA_TOKEN", "t")
 @mock.patch.object(sonos, "LIVE_IDLE_S", 0.3)
 class Live(unittest.TestCase):
-    EID = "media_player.schlafzimmer"
+    EID = "media_player.bedroom"
 
     def test_silent_frame_matches_the_voice(self):
         bps, silence = sonos._mp3_frame(_mp3(0.1))
@@ -170,7 +170,7 @@ class Live(unittest.TestCase):
             raise OSError("house away")
         with mock.patch.object(sonos, "_ha", side_effect=boom):
             with self.assertRaises(sonos.Fallback) as e:
-                sonos.say("media_player.bad", iter([_mp3(0.1), b"rest"]), "audio/mpeg")
+                sonos.say("media_player.bathroom", iter([_mp3(0.1), b"rest"]), "audio/mpeg")
         self.assertEqual(e.exception.data, _mp3(0.1) + b"rest")
 
     def test_other_formats_go_as_one_clip(self):
@@ -194,7 +194,7 @@ class FakeSpeaker:
 
 @mock.patch.object(sonos, "HA_TOKEN", "t")
 class Hold(unittest.TestCase):
-    EID = "media_player.schlafzimmer"
+    EID = "media_player.bedroom"
 
     def run_with(self, fake, *steps):
         with mock.patch.object(sonos, "_ha", fake):

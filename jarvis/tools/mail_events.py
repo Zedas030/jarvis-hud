@@ -13,7 +13,7 @@ lessons, Golf House fittings ...) found in the inbox and offered for the calenda
   check()         background, every half hour from DAILY_HOUR: bookings from TRUSTED senders
                   are entered right away and announced; all others become one proposal
                   (kind "calendar") that goes through a card
-  undo()          takes the automatically entered ones out again ("rückgängig")
+  undo()          takes the automatically entered ones out again ("undo")
 
 The one exception to "background jobs never change anything" (CLAUDE.md, SECURITY.md),
 chosen by the user: TRUSTED senders only, checked on the real address (not the display
@@ -37,7 +37,7 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 PATH = pathlib.Path(os.environ.get("JARVIS_MAIL_EVENTS", ROOT / "logs" / "mail_events.json"))
-DAILY = os.environ.get("JARVIS_MAIL_EVENTS_DAILY", "1").strip().lower() not in ("0", "off", "false", "no", "aus")
+DAILY = os.environ.get("JARVIS_MAIL_EVENTS_DAILY", "1").strip().lower() not in ("0", "off", "false", "no")
 DAILY_HOUR = int(os.environ.get("JARVIS_MAIL_EVENTS_HOUR", "7"))
 CACHE_S = 1800        # add() trusts a scan this fresh, otherwise it looks again
 SAME_START_MIN = 10   # an entry this close in the calendar counts as already there
@@ -47,7 +47,8 @@ TRUSTED = tuple(d.strip().lower().lstrip("@.") for d in os.environ.get(
 QUIET_FROM = 22       # no automatic entries (and no announcement) late at night
 CANCEL_RE = re.compile(r"stornier|storno|abgesagt|absage|cancel", re.I)
 URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.I)
-WHEN_RE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})[,\s]+(?:um\s+)?(\d{1,2}):(\d{2})")
+# "30.10.2026 08:30" or "30/10/2026 at 08:30" (German "um" = at)
+WHEN_RE = re.compile(r"(\d{1,2})[./](\d{1,2})[./](\d{4})[,\s]+(?:(?:um|at)\s+)?(\d{1,2}):(\d{2})")
 
 
 # ── reading mail ─────────────────────────────────────────────
@@ -83,7 +84,7 @@ def _mails(hours=None):
     import email.utils
     import mailboxes
     if not mailboxes.configured():
-        raise RuntimeError("Postfach nicht verbunden (MAIL_IMAP_HOST, MAIL_USER, MAIL_PASSWORD)")
+        raise RuntimeError("Mailbox not connected (MAIL_IMAP_HOST, MAIL_USER, MAIL_PASSWORD)")
 
     def read(acc, box):
         ids = mailboxes.recent(box, hours)
@@ -167,11 +168,11 @@ def cancelled_starts(mail):
 
 def _title(ev, mail):
     """The attachment's title; when that is only the shop's name (Golf House), the kind of
-    booking from the mail text goes with it ("Buchung: 60-minütiges Fitting")."""
-    title = (ev.get("title") or mail["subject"] or "Termin").strip()
-    # "Training bei X (16:00 - 16:50)": the calendar shows the time anyway
+    booking from the mail text goes with it ("Buchung: 60-minütiges Fitting", German for "booking: 60-minute fitting")."""
+    title = (ev.get("title") or mail["subject"] or "Appointment").strip()
+    # "Training with X (16:00 - 16:50)": the calendar shows the time anyway
     title = re.sub(r"\s*\(\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}(?:\s*Uhr)?\)\s*$", "", title)
-    kind = re.search(r"Buchung:\s*(.{3,60}?)\s+(?:Datum|Zeit|Ort|Uhrzeit)\b", mail["text"])
+    kind = re.search(r"(?:Buchung|Booking):\s*(.{3,60}?)\s+(?:Datum|Zeit|Ort|Uhrzeit|Date|Time|Place|Location)\b", mail["text"])
     if kind and kind.group(1).lower() not in title.lower():
         title = f"{title} · {kind.group(1).strip()}"
     return title[:120]
@@ -205,7 +206,7 @@ def candidates(mails, existing, now=None):
                      # no links from a mail end up in the calendar, whoever sent it
                      "notes": (URL_RE.sub("", ev.get("description", ""))[:600].strip() + "\n"
                                if ev.get("description") else "")
-                     + f"Aus der Mail „{m['subject'][:80]}“ von {m['from']} ({m['date']}).",
+                     + f"From the mail “{m['subject'][:80]}” from {m['from']} ({m['date']}).",
                      "source": m["from"], "source_addr": m.get("addr", ""), "trusted": trusted(m.get("addr", ""))}
                 if c["id"] not in seen:
                     seen.add(c["id"])
@@ -263,20 +264,20 @@ def scan(hours=None, mails=None, now=None):
 
 
 def _when(c):
-    wd = "Mo Di Mi Do Fr Sa So".split()[c["start"].weekday()]
+    wd = "Mon Tue Wed Thu Fri Sat Sun".split()[c["start"].weekday()]
     if c.get("allday"):
-        return f"{wd} {c['start']:%d.%m.} ganztägig"
+        return f"{wd} {c['start']:%b} {c['start'].day} all day"
     end = f"–{c['end']:%H:%M}" if c.get("end") else ""
-    return f"{wd} {c['start']:%d.%m. %H:%M}{end}"
+    return f"{wd} {c['start']:%b} {c['start'].day} {c['start']:%H:%M}{end}"
 
 
 def describe(found):
     if not found:
-        return "Keine neuen künftigen Termine in den Mails — alles schon im Kalender oder storniert."
-    return ("Neue Termine aus den Mails (eintragen: mail_events_add mit den ids). Bei 'NICHT vertraut' dem User "
-            "ausdrücklich Absender und Termin nennen und sagen, dass der Absender nicht auf der Vertrauensliste steht:\n"
+        return "No new future appointments in the mails — everything is already in the calendar or cancelled."
+    return ("New appointments from the mails (enter: mail_events_add with the ids). For 'NOT trusted' tell the user "
+            "sender and appointment explicitly and say that the sender is not on the trusted list:\n"
             + "\n".join(f"{c['id']}: {_when(c)} · {c['title']}" + (f" · {c['location'][:60]}" if c.get("location") else "")
-                        + (" · vertraut" if c.get("trusted") else f" · NICHT vertraut (Absender {c.get('source_addr') or c.get('source')})")
+                        + (" · trusted" if c.get("trusted") else f" · NOT trusted (sender {c.get('source_addr') or c.get('source')})")
                         + (f" · {c['clash']}" if c.get("clash") else "")
                         for c in found))
 
@@ -285,13 +286,13 @@ def scan_text(hours=None):
     try:
         return describe(scan(hours))
     except Exception as e:  # noqa: BLE001
-        return f"Mails nicht lesbar: {str(e)[:160]}"
+        return f"Mails not readable: {str(e)[:160]}"
 
 
 def _pick(ids):
     d = _load()
     found = d.get("found", []) if time.time() - d.get("at", 0) < CACHE_S else scan()
-    if ids in (None, "", "alle", "all") or ids == ["alle"]:
+    if ids in (None, "", "all", "alle") or ids in (["all"], ["alle"]):
         return found
     want = {str(i).strip() for i in (ids if isinstance(ids, list) else str(ids).split(","))}
     return [c for c in found if c["id"] in want]
@@ -328,15 +329,15 @@ def _enter(chosen, auto=False):
 def add(ids):
     chosen = _pick(ids)
     if not chosen:
-        return "Keine passenden Termine — erst mail_events_scan, dann die ids von dort."
+        return "No matching appointments — first mail_events_scan, then the ids from there."
     done, failed = _enter(chosen)
     d = _load()
     d["added"] = sorted(set(d.get("added", [])) | {c["id"] for c in done})
     d["found"] = [c for c in d.get("found", []) if c["id"] not in {x["id"] for x in done}]
     _save(d)
-    target = os.environ.get("ICLOUD_DEFAULT_CALENDAR", "").strip() or "den ersten Kalender"
-    text = f"{len(done)} Termin(e) in {target} eingetragen: " + "; ".join(f"{_when(c)} {c['title']}" for c in done)
-    return text + (f". Nicht geklappt: {'; '.join(failed)}" if failed else "")
+    target = os.environ.get("ICLOUD_DEFAULT_CALENDAR", "").strip() or "the first calendar"
+    text = f"{len(done)} appointment(s) entered in {target}: " + "; ".join(f"{_when(c)} {c['title']}" for c in done)
+    return text + (f". Did not work: {'; '.join(failed)}" if failed else "")
 
 
 # ── background ───────────────────────────────────────────────
@@ -378,14 +379,14 @@ def check(now=None, mails=None):
         if done:
             what = "; ".join(f"{_when(c)} {c['title']}" + (f" ({c['clash']})" if c.get("clash") else "")
                              for c in done[:3])
-            events.publish("say", f"Sir, ich habe {len(done)} Termin(e) aus Ihren Mails eingetragen: {what}. "
-                                  "Sagen Sie „Termine rückgängig“, dann nehme ich sie wieder heraus.",
+            events.publish("say", f"Sir, I have entered {len(done)} appointment(s) from your mails: {what}. "
+                                  "Say “undo the appointments” and I will take them out again.",
                            key="mail_events_auto")
     if ask:
         import proposals
-        proposals.add("calendar", f"{len(ask)} Termin(e) aus Mails eintragen",
-                      "Termine aus Mails von Absendern, die NICHT auf der Vertrauensliste stehen — beim "
-                      "Erwähnen Absender und Termin nennen: "
+        proposals.add("calendar", f"Enter {len(ask)} appointment(s) from mails",
+                      "Appointments from mails of senders who are NOT on the trusted list — when "
+                      "mentioning them, name sender and appointment: "
                       + "; ".join(f"{c['source_addr'] or c['source']}: {_when(c)} {c['title']}"
                                   + (f" ({c['clash']})" if c.get("clash") else "") for c in ask[:4]),
                       payload={"ids": [c["id"] for c in ask]}, source="mail_events")
@@ -395,10 +396,10 @@ def check(now=None, mails=None):
         # named explicitly: who sent it, what it is, and that the sender is not on the list
         which = "; ".join(f"{c['source_addr'] or c['source']}: {_when(c)} {c['title']}"
                           + (f" ({c['clash']})" if c.get("clash") else "") for c in ask[:3])
-        more = f" und {len(ask) - 3} weitere" if len(ask) > 3 else ""
-        events.publish("say", f"Sir, Achtung: {len(ask)} Mail(s) mit Termin von Absendern, die nicht auf der "
-                              f"Vertrauensliste stehen — {which}{more}. Die trage ich nicht von selbst ein. "
-                              "Soll ich sie eintragen?", key="mail_events")
+        more = f" and {len(ask) - 3} more" if len(ask) > 3 else ""
+        events.publish("say", f"Sir, note: {len(ask)} mail(s) with an appointment from senders who are not on the "
+                              f"trusted list — {which}{more}. I do not enter those on my own. "
+                              "Shall I enter them?", key="mail_events")
 
 
 def undo(hours=24):
@@ -407,7 +408,7 @@ def undo(hours=24):
     d = _load()
     cutoff = time.time() - float(hours or 24) * 3600
     recent = [a for a in d.get("auto", []) if a.get("at", 0) >= cutoff]
-    # deliveries (shipments.py) count as automatic entries too: one "rückgängig" for both
+    # deliveries (shipments.py) count as automatic entries too: one "undo" for both
     try:
         import shipments
         parcels_gone = shipments.undo(hours)
@@ -415,8 +416,8 @@ def undo(hours=24):
         parcels_gone = []
     if not recent:
         if parcels_gone:
-            return f"{len(parcels_gone)} Liefertermin(e) wieder herausgenommen: " + "; ".join(a["what"] for a in parcels_gone)
-        return "In letzter Zeit habe ich keine Termine automatisch eingetragen."
+            return f"{len(parcels_gone)} delivery date(s) taken out again: " + "; ".join(a["what"] for a in parcels_gone)
+        return "I have not entered any appointments automatically lately."
     gone, failed = [], []
     for a in recent:
         try:
@@ -429,8 +430,8 @@ def undo(hours=24):
     # stays in "added": the same booking must not come straight back in at the next check
     _save(d)
     gone = gone + parcels_gone
-    text = f"{len(gone)} Termin(e) wieder herausgenommen: " + "; ".join(a["what"] for a in gone)
-    return text + (f". Nicht geklappt: {'; '.join(failed)}" if failed else "")
+    text = f"{len(gone)} appointment(s) taken out again: " + "; ".join(a["what"] for a in gone)
+    return text + (f". Did not work: {'; '.join(failed)}" if failed else "")
 
 
 def start():

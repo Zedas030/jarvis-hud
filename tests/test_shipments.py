@@ -11,23 +11,23 @@ from unittest import mock
 import shipments
 
 SENT = dt.datetime(2026, 10, 23, 10, 0)
-FAIRWAY = {"shop": "Fairway.de", "addr": "shop@fairway.de", "subject": "Eine Sendung aus der Bestellung #100001 ist unterwegs",
-         "date": SENT, "account": "privat",
-         "text": "Deine Bestellung ist auf dem Weg Bestellung #100001 DHL Germany Trackingnummer: 00340400000000000017"}
+FAIRWAY = {"shop": "Fairway.de", "addr": "shop@fairway.de", "subject": "A shipment from order #100001 is on its way",
+           "date": SENT, "account": "private",
+           "text": "Your order is on its way Order #100001 DHL Germany Tracking number: 00340400000000000017"}
 
 
 def mail(subject, text, shop="Shop", date=SENT):
-    return {"shop": shop, "addr": "x@shop.de", "subject": subject, "date": date, "text": text, "account": "privat"}
+    return {"shop": shop, "addr": "x@shop.de", "subject": subject, "date": date, "text": text, "account": "private"}
 
 
 class Parse(unittest.TestCase):
     def test_shopify_shipping_mail(self):
         p = shipments.parse(FAIRWAY)
         self.assertEqual((p["carrier"], p["tracking"], p["order"], p["status"]),
-                         ("DHL", "00340400000000000017", "100001", "unterwegs"))
+                         ("DHL", "00340400000000000017", "100001", "on the way"))
 
-    def test_newsletter_with_sendung_is_no_parcel(self):
-        self.assertIsNone(shipments.parse(mail("Der 7,5-kg-Erfolg aus der Sendung - 50% Rabatt", "Jetzt Rabatt sichern")))
+    def test_newsletter_with_shipment_is_no_parcel(self):
+        self.assertIsNone(shipments.parse(mail("The shipment of savings: 50% off everything", "Grab the discount now")))
 
     def test_same_day_services_are_ignored(self):
         self.assertTrue(shipments.ignored("noreply@uber.com"))
@@ -35,74 +35,81 @@ class Parse(unittest.TestCase):
         self.assertFalse(shipments.ignored("shop@fairway.de"))
 
     def test_expected_day_from_the_text(self):
-        p = shipments.parse(mail("Ihre Bestellung wurde versendet", "Mit DHL, voraussichtliche Zustellung am 27.10."))
+        p = shipments.parse(mail("Your order has been dispatched", "With DHL, estimated delivery: October 27"))
         self.assertEqual(p["eta"], dt.date(2026, 10, 27))
 
     def test_will_be_delivered_is_not_delivered(self):
-        p = shipments.parse(mail("Ihr Paket ist unterwegs", "DHL: Ihr Paket wird morgen zugestellt."))
-        self.assertEqual(p["status"], "unterwegs")
+        p = shipments.parse(mail("Your parcel is on its way", "DHL: your parcel will be delivered tomorrow."))
+        self.assertEqual(p["status"], "on the way")
+        p = shipments.parse(mail("Your parcel has been delivered", "DHL shipment 00340400000000000017"))
+        self.assertEqual(p["status"], "delivered")
+
+    def test_german_carrier_mails_still_parse(self):
+        # carriers in Germany write German whatever language Jarvis speaks
         p = shipments.parse(mail("Ihr Paket wurde zugestellt", "DHL Sendung 00340400000000000017"))
-        self.assertEqual(p["status"], "zugestellt")
+        self.assertEqual(p["status"], "delivered")
+        p = shipments.parse(mail("Ihre Bestellung wurde versendet", "Mit DHL, voraussichtliche Zustellung am 27.10."))
+        self.assertEqual((p["status"], p["eta"]), ("on the way", dt.date(2026, 10, 27)))
 
     def test_work_stays_out(self):
-        self.assertIsNone(shipments.parse(mail("Versand Ihrer Firmen-Bestellung", "DHL 00340400000000000017",
-                                               shop="Contoso Einkauf")))
+        self.assertIsNone(shipments.parse(mail("Shipping of your company order", "DHL 00340400000000000017",
+                                               shop="Contoso Purchasing")))
 
 
 SUN = dt.datetime(2026, 10, 25, 18, 0)     # a Sunday
 
 
 def notice(subject, text, addr, date=SUN):
-    return {"shop": "Paketdienst", "addr": addr, "subject": subject, "date": date, "text": text, "account": "privat"}
+    return {"shop": "Parcel service", "addr": addr, "subject": subject, "date": date, "text": text, "account": "private"}
 
 
 class CarrierNotices(unittest.TestCase):
     def test_dhl_tomorrow_and_the_shop_from_the_text(self):
-        p = shipments.parse(notice("Ihr Paket kommt morgen", "Ihr Paket von Fairway kommt morgen. "
-                                   "Sendungsnummer 00340400000000000017", "noreply@dhl.de"))
+        p = shipments.parse(notice("Your parcel arrives tomorrow", "Your parcel from Fairway arrives tomorrow. "
+                                   "Tracking number 00340400000000000017", "noreply@dhl.de"))
         self.assertEqual((p["eta"], p["shop"], p["carrier"]), (dt.date(2026, 10, 26), "Fairway", "DHL"))
 
     def test_dpd_predict_with_month_name_and_window(self):
-        p = shipments.parse(notice("Ihre DPD Paketzustellung", "Ihr Paket von Zalando wird am Dienstag, 27. Oktober 2026 "
-                                   "zwischen 10:15 und 11:15 Uhr zugestellt. Paketnummer: 01234567890123", "info@dpd.de"))
+        p = shipments.parse(notice("Your DPD parcel delivery", "Your parcel from Zalando will be delivered on Tuesday, "
+                                   "27 October 2026 between 10:15 and 11:15. Parcel number: 01234567890123", "info@dpd.de"))
         self.assertEqual((p["eta"], p["window"], p["carrier"], p["tracking"]),
                          (dt.date(2026, 10, 27), "10:15–11:15", "DPD", "01234567890123"))
 
     def test_hermes_numeric_date_without_year(self):
-        p = shipments.parse(notice("Ihre Sendung ist unterwegs", "Hermes: Ihre Sendung H1001234567890123456 wird "
-                                   "voraussichtlich am 28.10. zugestellt.", "noreply@hermesworld.com"))
+        p = shipments.parse(notice("Your shipment is on its way", "Hermes: your shipment H1001234567890123456 is "
+                                   "expected to be delivered on 28.10.", "noreply@hermesworld.com"))
         self.assertEqual(p["eta"], dt.date(2026, 10, 28))
 
     def test_gls_today_with_whole_hours(self):
-        p = shipments.parse(notice("Zustellung heute", "GLS: Ihr Paket 12345678901 wird heute zwischen 13 und 15 Uhr "
-                                   "zugestellt.", "noreply@gls-pakete.de"))
+        p = shipments.parse(notice("Delivery today", "GLS: your parcel 12345678901 will be delivered today between 13 "
+                                   "and 15 h.", "noreply@gls-pakete.de"))
         self.assertEqual((p["eta"], p["window"]), (dt.date(2026, 10, 25), "13:00–15:00"))
 
-    def test_ups_in_english(self):
+    def test_ups(self):
         p = shipments.parse(notice("UPS Update: Scheduled Delivery", "Scheduled delivery: Thursday, October 29 between "
                                    "9:00 and 12:00 h. Tracking Number: 1Z999AA10123456784", "mcinfo@ups.com"))
         self.assertEqual((p["eta"], p["window"], p["tracking"]), (dt.date(2026, 10, 29), "09:00–12:00", "1Z999AA10123456784"))
 
     def test_weekday_only(self):
-        self.assertEqual(shipments.expected_day("DHL: Ihr Paket kommt am Mittwoch.", SUN), dt.date(2026, 10, 28))
+        self.assertEqual(shipments.expected_day("DHL: your parcel arrives on Wednesday.", SUN), dt.date(2026, 10, 28))
 
     def test_dates_without_a_delivery_word_do_not_count(self):
-        self.assertIsNone(shipments.expected_day("Ihre Bestellung vom 20.10.2026 ist eingegangen.", SUN))
-        self.assertIsNone(shipments.expected_day("Guten Morgen! Neue Angebote für Sie.", SUN))
-        self.assertEqual(shipments.time_window("Unser Laden hat von 10 bis 18 Uhr geöffnet."), "")
+        self.assertIsNone(shipments.expected_day("Your order of 20.10.2026 has been received.", SUN))
+        self.assertIsNone(shipments.expected_day("Good morning! New offers for you.", SUN))
+        self.assertEqual(shipments.time_window("Our shop is open from 10 to 18 h."), "")
 
     def test_relative_days_count_from_the_mail_not_today(self):
         friday = dt.datetime(2026, 10, 23, 20, 0)
-        self.assertEqual(shipments.expected_day("Ihr Paket wird morgen zugestellt.", friday), dt.date(2026, 10, 24))
+        self.assertEqual(shipments.expected_day("Your parcel will be delivered tomorrow.", friday), dt.date(2026, 10, 24))
 
     def test_december_mail_about_january(self):
-        self.assertEqual(shipments.expected_day("Lieferung voraussichtlich am 02.01.", dt.datetime(2026, 12, 28)),
+        self.assertEqual(shipments.expected_day("Delivery expected on 02.01.", dt.datetime(2026, 12, 28)),
                          dt.date(2027, 1, 2))
 
     def test_shop_mail_and_carrier_notice_become_one(self):
         items = shipments.merge({}, [shipments.parse(FAIRWAY)])
-        dhl = shipments.parse(notice("Ihr Paket kommt morgen", "Ihr DHL Paket kommt morgen zwischen 10 und 13 Uhr. "
-                                     "Sendungsnummer 00340400000000000017", "noreply@dhl.de"))
+        dhl = shipments.parse(notice("Your parcel arrives tomorrow", "Your DHL parcel arrives tomorrow between 10 and 13 h. "
+                                     "Tracking number 00340400000000000017", "noreply@dhl.de"))
         shipments.merge(items, [dhl])
         self.assertEqual(len(items), 1)
         it = items["00340400000000000017"]
@@ -112,55 +119,54 @@ class CarrierNotices(unittest.TestCase):
 
 
 def amazon(subject, text, date=SUN, addr="shipment-tracking@amazon.de"):
-    return {"shop": "Amazon.de", "addr": addr, "subject": subject, "date": date, "text": text, "account": "privat"}
+    return {"shop": "Amazon.de", "addr": addr, "subject": subject, "date": date, "text": text, "account": "private"}
 
 
-ORDER_TEXT = ("Bestellt Versendet In Zustellung Zugestellt Zustellung: Mittwoch DHL Packstation 101, Musterstadt "
-              "Bestellnr. 303-0000001-0000001 Bestellung ansehen")
+ORDER_TEXT = "Arriving: Wednesday DHL Parcel locker 101, Sampletown Order # 303-0000001-0000001 View or edit order"
 
 
 class Amazon(unittest.TestCase):
     def test_order_confirmation_names_the_day(self):
-        p = shipments.parse(amazon("Bestellt: 3 „Wilson Golfbälle, Ultra...“", ORDER_TEXT, addr="bestellbestaetigung@amazon.de"))
+        p = shipments.parse(amazon('Ordered: 3 "Wilson golf balls, Ultra..."', ORDER_TEXT, addr="auto-confirm@amazon.de"))
         self.assertEqual((p["shop"], p["order"], p["eta"]),
-                         ("Amazon: Wilson Golfbälle, Ultra", "303-0000001-0000001", dt.date(2026, 10, 28)))
+                         ("Amazon: Wilson golf balls, Ultra", "303-0000001-0000001", dt.date(2026, 10, 28)))
 
-    def test_packstation_address_is_not_ready_for_pickup(self):
-        p = shipments.parse(amazon("Bestellt: „Wilson Golfbälle...“", ORDER_TEXT, addr="bestellbestaetigung@amazon.de"))
-        self.assertEqual(p["status"], "unterwegs")
+    def test_parcel_locker_address_is_not_ready_for_pickup(self):
+        p = shipments.parse(amazon('Ordered: "Wilson golf balls..."', ORDER_TEXT, addr="auto-confirm@amazon.de"))
+        self.assertEqual(p["status"], "on the way")
 
     def test_button_is_no_order_number(self):
-        p = shipments.parse(amazon("Bestellt: „Schloss...“", "Zustellung: Freitag Bestellung ansehen",
-                                   addr="bestellbestaetigung@amazon.de"))
-        self.assertNotEqual(p["order"], "ansehen")
+        p = shipments.parse(amazon('Ordered: "Lock..."', "Arriving: Friday View or edit order",
+                                   addr="auto-confirm@amazon.de"))
+        self.assertNotEqual(p["order"], "edit")
 
-    def test_out_for_delivery_with_window_without_uhr(self):
-        p = shipments.parse(amazon("In Zustellung: „Callaway Golf Syntech...“",
-                                   "In Zustellung Zustellung heute 14:15 - 17:15 Bestellnr. 303-0000002-0000002"))
-        self.assertEqual((p["status"], p["eta"], p["window"]), ("heute", dt.date(2026, 10, 25), "14:15–17:15"))
+    def test_out_for_delivery_with_window_without_h(self):
+        p = shipments.parse(amazon('Out for delivery: "Callaway Golf Syntech..."',
+                                   "Out for delivery Arriving today 14:15 - 17:15 Order # 303-0000002-0000002"))
+        self.assertEqual((p["status"], p["eta"], p["window"]), ("today", dt.date(2026, 10, 25), "14:15–17:15"))
 
     def test_attempted_delivery(self):
-        p = shipments.parse(amazon("Versuchte Zustellung: „BioBizz All-Mix...“",
-                                   "Zustellung wurde versucht heute um 11:37 Bestellnr. 303-0000003-0000003",
+        p = shipments.parse(amazon('Delivery attempted: "BioBizz All-Mix..."',
+                                   "We tried to deliver your package today at 11:37 Order # 303-0000003-0000003",
                                    addr="order-update@amazon.de"))
-        self.assertEqual(p["status"], "zustellversuch")
+        self.assertEqual(p["status"], "attempt")
 
     def test_one_order_from_ordered_to_delivered(self):
-        mails = [amazon("Bestellt: „Callaway Golf Syntech...“", "Zustellung: Montag Bestellnr. 303-0000002-0000002",
-                        date=dt.datetime(2026, 9, 5), addr="bestellbestaetigung@amazon.de"),
-                 amazon("Geliefert: \"Callaway Golf Syntech...“", "Zugestellt Bestellnr. 303-0000002-0000002",
+        mails = [amazon('Ordered: "Callaway Golf Syntech..."', "Arriving: Monday Order # 303-0000002-0000002",
+                        date=dt.datetime(2026, 9, 5), addr="auto-confirm@amazon.de"),
+                 amazon('Delivered: "Callaway Golf Syntech..."', "Delivered Order # 303-0000002-0000002",
                         date=dt.datetime(2026, 9, 7), addr="order-update@amazon.de")]
         items = shipments.merge({}, [shipments.parse(m) for m in mails])
         self.assertEqual(len(items), 1)
-        self.assertEqual(list(items.values())[0]["status"], "zugestellt")
+        self.assertEqual(list(items.values())[0]["status"], "delivered")
 
     def test_digital_purchases_and_account_mails_stay_out(self):
-        self.assertIsNone(shipments.parse(amazon("Ihre Amazon.de Bestellung von Shazam! [dt./OV]",
-                                                 "Vielen Dank für Ihren Kauf bei Prime Video.")))
-        self.assertIsNone(shipments.parse(amazon("Amazon Passwort Unterstützung", "Ihr Bestätigungscode")))
+        self.assertIsNone(shipments.parse(amazon("Your Amazon.de order of Shazam! [OV]",
+                                                 "Thank you for your purchase on Prime Video.")))
+        self.assertIsNone(shipments.parse(amazon("Amazon password assistance", "Your verification code")))
 
     def test_title_says_amazon_once(self):
-        self.assertEqual(shipments._title({"shop": "Amazon: BioBizz All-Mix", "carrier": "Amazon", "status": "unterwegs"}),
+        self.assertEqual(shipments._title({"shop": "Amazon: BioBizz All-Mix", "carrier": "Amazon", "status": "on the way"}),
                          "📦 Amazon: BioBizz All-Mix")
 
 
@@ -177,8 +183,8 @@ class Calendar(unittest.TestCase):
         return added, deleted, said
 
     def state(self, **it):
-        base = {"key": "T1", "shop": "Fairway.de", "carrier": "DHL", "tracking": "T1", "status": "unterwegs",
-                "subject": "Sendung", "eta": "2026-10-26"}
+        base = {"key": "T1", "shop": "Fairway.de", "carrier": "DHL", "tracking": "T1", "status": "on the way",
+                "subject": "Shipment", "eta": "2026-10-26"}
         return {"items": {"T1": dict(base, **it)}, "auto": []}
 
     def test_entry_without_links_and_announced(self):
@@ -186,7 +192,7 @@ class Calendar(unittest.TestCase):
         added, _, said = self.run_sync(d, dt.datetime(2026, 10, 23, 9))
         self.assertEqual(added[0][:3], ("📦 Fairway.de · DHL", "2026-10-26", True))
         self.assertNotIn("http", added[0][3])
-        self.assertTrue(any("eingetragen" in s for s in said))
+        self.assertTrue(any("entered" in s for s in said))
         self.assertEqual(self.run_sync(d, dt.datetime(2026, 10, 23, 10))[0], [], "no second entry")
 
     def test_moves_with_the_day(self):
@@ -195,32 +201,32 @@ class Calendar(unittest.TestCase):
         d["items"]["T1"]["eta"] = "2026-10-27"
         added, deleted, said = self.run_sync(d, dt.datetime(2026, 10, 24, 9))
         self.assertEqual((len(deleted), added[0][1]), (1, "2026-10-27"))
-        self.assertTrue(any("verschiebt" in s for s in said))
+        self.assertTrue(any("moves" in s for s in said))
 
     def test_delivered_entry_is_marked(self):
         d = self.state()
         self.run_sync(d, dt.datetime(2026, 10, 23, 9))
-        d["items"]["T1"]["status"] = "zugestellt"
+        d["items"]["T1"]["status"] = "delivered"
         added, deleted, _ = self.run_sync(d, dt.datetime(2026, 10, 26, 12))
-        self.assertTrue(added[0][0].startswith("✓ zugestellt"))
+        self.assertTrue(added[0][0].startswith("✓ delivered"))
 
     def test_reminder_names_the_window(self):
         d = self.state(eta="2026-10-26", window="10:15–11:15")
         _, _, said = self.run_sync(d, dt.datetime(2026, 10, 26, 7, 30))
-        self.assertTrue(any("zwischen 10:15 und 11:15 Uhr" in s for s in said), said)
+        self.assertTrue(any("between 10:15 and 11:15" in s for s in said), said)
 
     def test_reminder_on_the_day_once(self):
         d = self.state(eta="2026-10-26")
         self.run_sync(d, dt.datetime(2026, 10, 25, 9))
         _, _, said = self.run_sync(d, dt.datetime(2026, 10, 26, 7, 30))
-        self.assertTrue(any("heute kommt" in s for s in said))
+        self.assertTrue(any("arrives today" in s for s in said))
         self.assertEqual(self.run_sync(d, dt.datetime(2026, 10, 26, 8))[2], [], "once a day")
 
     def test_quiet_at_night(self):
         self.assertEqual(self.run_sync(self.state(), dt.datetime(2026, 10, 23, 23)), ([], [], []))
 
     def test_no_entry_for_a_day_already_past(self):
-        # 23.10.: old Amazon orders whose "Geliefert" mail was outside the window got entries for 6.–12.10.
+        # 23.10.: old Amazon orders whose "delivered" mail was outside the window got entries for 6.–12.10.
         d = self.state(eta="2026-10-08")
         added, _, said = self.run_sync(d, dt.datetime(2026, 10, 23, 9))
         self.assertEqual((added, said), ([], []))
@@ -244,7 +250,7 @@ class Calendar(unittest.TestCase):
 class Track17(unittest.TestCase):
     INFO = {"data": {"accepted": [{"number": "H1", "track_info": {
         "latest_status": {"status": "InTransit"},
-        "latest_event": {"description": "Die Sendung ist im Hermes Verteilzentrum eingetroffen"},
+        "latest_event": {"description": "The shipment has arrived at the Hermes distribution centre"},
         "time_metrics": {"estimated_delivery_date": {"from": "2026-10-27T00:00:00+02:00", "to": None}},
         "tracking": {"providers": [{"provider": {"name": "Hermes"}}]}}}], "rejected": []}}
 
@@ -260,11 +266,11 @@ class Track17(unittest.TestCase):
         seen, fake = self.calls({"register": {"data": {"accepted": [{}], "rejected": []}}, "gettrackinfo": self.INFO})
         with mock.patch.object(shipments, "TRACK17_KEY", "k"), mock.patch.object(shipments, "_t17", fake):
             r = shipments.track17("H1")
-        self.assertEqual((r["status"], r["eta"], r["carrier"]), ("unterwegs", dt.date(2026, 10, 27), "Hermes"))
+        self.assertEqual((r["status"], r["eta"], r["carrier"]), ("on the way", dt.date(2026, 10, 27), "Hermes"))
         self.assertEqual(seen, ["register", "gettrackinfo"])
 
     def test_registered_once_then_only_asked(self):
-        items = {"H1": {"key": "H1", "tracking": "H1", "shop": "Shop", "status": "unterwegs"}}
+        items = {"H1": {"key": "H1", "tracking": "H1", "shop": "Shop", "status": "on the way"}}
         seen, fake = self.calls({"register": {"data": {"accepted": [{}], "rejected": []}}, "gettrackinfo": self.INFO})
         with mock.patch.object(shipments, "TRACK17_KEY", "k"), mock.patch.object(shipments, "_t17", fake):
             shipments.refresh(items, now=shipments.REFRESH_S + 1000.0)
@@ -278,10 +284,10 @@ class Track17(unittest.TestCase):
         _, fake = self.calls({"gettrackinfo": info})
         with mock.patch.object(shipments, "TRACK17_KEY", "k"), mock.patch.object(shipments, "_t17", fake):
             r = shipments.track17("H1", registered=True)
-        self.assertEqual((r["status"], r["eta"]), ("heute", dt.date.today()))
+        self.assertEqual((r["status"], r["eta"]), ("today", dt.date.today()))
 
     def test_odd_answer_keeps_what_the_mail_said(self):
-        items = {"H1": {"key": "H1", "tracking": "H1", "shop": "Shop", "status": "unterwegs", "eta": "2026-10-28"}}
+        items = {"H1": {"key": "H1", "tracking": "H1", "shop": "Shop", "status": "on the way", "eta": "2026-10-28"}}
 
         def broken(path, body):
             raise ValueError("unexpected")
@@ -293,19 +299,19 @@ class Track17(unittest.TestCase):
     def test_without_key_nothing_leaves_the_house(self):
         with mock.patch.object(shipments, "TRACK17_KEY", ""), mock.patch.object(shipments, "_t17") as call:
             self.assertIsNone(shipments.track17("H1"))
-            shipments.refresh({"H1": {"tracking": "H1", "status": "unterwegs", "carrier": "Hermes"}})
+            shipments.refresh({"H1": {"tracking": "H1", "status": "on the way", "carrier": "Hermes"}})
         call.assert_not_called()
 
 
 class Dhl(unittest.TestCase):
     def test_expected_day_and_status(self):
-        body = (b'{"shipments":[{"status":{"statusCode":"transit","description":"Die Sendung wurde im Start-Paketzentrum '
-                b'bearbeitet."},"estimatedTimeOfDelivery":"2026-10-26T09:00:00+02:00"}]}')
+        body = (b'{"shipments":[{"status":{"statusCode":"transit","description":"The shipment has been processed in the '
+                b'parcel centre of origin."},"estimatedTimeOfDelivery":"2026-10-26T09:00:00+02:00"}]}')
         resp = mock.MagicMock()
         resp.__enter__.return_value.read.return_value = body
         with mock.patch.object(shipments, "DHL_KEY", "k"), mock.patch("urllib.request.urlopen", return_value=resp):
             r = shipments.dhl("00340400000000000017")
-        self.assertEqual((r["status"], r["eta"]), ("unterwegs", dt.date(2026, 10, 26)))
+        self.assertEqual((r["status"], r["eta"]), ("on the way", dt.date(2026, 10, 26)))
 
     def test_without_key_nothing_is_asked(self):
         with mock.patch.object(shipments, "DHL_KEY", ""), mock.patch("urllib.request.urlopen") as call:

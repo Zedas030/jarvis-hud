@@ -29,7 +29,7 @@ _PENDING = {}               # entity -> {"text"} the next block, not sent yet: n
 
 
 def outputs():
-    """[{"id": notify entity, "label": "Echo Wohnzimmer"}] from config/home.json → speakers."""
+    """[{"id": notify entity, "label": "Echo Living room"}] from config/home.json → speakers."""
     import jarvis_profile as profile
     out = []
     for room, sp in sorted((profile.ha("speakers", {}) or {}).items()):

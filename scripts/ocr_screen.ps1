@@ -1,5 +1,5 @@
 ﻿# Screenshot (whole screen or a rectangle) -> text, with the OCR built into Windows.
-# Called by desktop.py (Jarvis, "Was steht auf meinem Bildschirm?"). The image is a
+# Called by desktop.py (Jarvis, "What is on my screen?"). The image is a
 # temporary file that is deleted at the end; nothing leaves this PC.
 # -ImagePath reads an existing image instead (used by the tests).
 # -SaveTo only saves the screenshot (scaled to -MaxWidth) for vision.py and skips the OCR.
@@ -55,7 +55,7 @@ try {
     $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
     $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
     $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
-    if (-not $engine) { throw "Keine OCR-Sprache installiert" }
+    if (-not $engine) { throw "No OCR language installed" }
     $result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
     $result.Lines | ForEach-Object { $_.Text }
     $stream.Dispose()

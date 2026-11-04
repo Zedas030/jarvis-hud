@@ -40,7 +40,7 @@ import hostos
 CHAIN = [p.strip().lower() for p in os.environ.get(
     "TTS_CHAIN", "fish,elevenlabs,local,azure,google,edge").split(",") if p.strip()]
 ANNOUNCE = os.environ.get("TTS_ANNOUNCE_SWITCH", "1").strip() not in ("0", "false", "no", "off")
-LABELS = {"fish": "Fish Audio", "elevenlabs": "ElevenLabs", "local": "lokale Stimme",
+LABELS = {"fish": "Fish Audio", "elevenlabs": "ElevenLabs", "local": "local voice",
           "azure": "Azure", "google": "Google", "edge": "Microsoft Edge"}
 AUTH_BLOCK_S = 6 * 3600          # wrong/expired key: retry a few hours later
 UNKNOWN_RESET_S = 24 * 3600      # empty, but the provider gives no reset date
@@ -74,7 +74,7 @@ def _http(req, timeout=30):
     try:
         return r.read(), r.headers
     except (TimeoutError, OSError) as e:
-        raise Transient(f"Netzwerk: {e}")
+        raise Transient(f"network: {e}")
     finally:
         r.close()
 
@@ -89,10 +89,10 @@ def _open(req, timeout=30):
         if e.code == 402 or re.search(r"quota|credit|insufficient|exceed|payment|balance|billing", low):
             raise Exhausted(f"HTTP {e.code}: {body[:120]}")
         if e.code in (401, 403):
-            raise Exhausted(f"Zugang abgelehnt (HTTP {e.code}) — Key prüfen", time.time() + AUTH_BLOCK_S)
+            raise Exhausted(f"access refused (HTTP {e.code}) — check the key", time.time() + AUTH_BLOCK_S)
         raise Transient(f"HTTP {e.code}: {body[:120]}")
     except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise Transient(f"Netzwerk: {e}")
+        raise Transient(f"network: {e}")
 
 
 # ── adapters ──────────────────────────────────────────────────
@@ -133,10 +133,10 @@ class Fish:
             first = r.read1(16384)
         except (TimeoutError, OSError) as e:
             r.close()
-            raise Transient(f"Netzwerk: {e}")
+            raise Transient(f"network: {e}")
         if not first:
             r.close()
-            raise Transient("leere Antwort")
+            raise Transient("empty answer")
 
         def chunks():
             try:
@@ -188,7 +188,7 @@ class ElevenLabs:
     def synth(self, text):
         b = _BAL.get(self.name)
         if b and b.get("left") is not None and b["left"] < len(text):
-            raise Exhausted(f"Nur noch {b['left']} Zeichen frei", b.get("reset"))
+            raise Exhausted(f"only {b['left']} characters left", b.get("reset"))
         req = urllib.request.Request(
             f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice}?output_format=mp3_44100_128",
             data=json.dumps({"text": text[:2500], "model_id": self.model}).encode(), method="POST",
@@ -212,19 +212,19 @@ class ElevenLabs:
         left = int(d.get("character_limit", 0)) - int(d.get("character_count", 0))
         reset = d.get("next_character_count_reset_unix")
         return {"left": left, "limit": d.get("character_limit"), "reset": reset, "empty": left <= 0,
-                "text": f"{left:,} von {d.get('character_limit', 0):,} Zeichen".replace(",", ".")
+                "text": f"{left:,} of {d.get('character_limit', 0):,} characters"
                         + (f", Reset {dt.datetime.fromtimestamp(reset):%d.%m.}" if reset else "")}
 
 
 class Local:
-    """Piper on this PC (de_DE thorsten) — unlimited, offline. A GPU model can
+    """Piper on this PC (en_GB alan) — unlimited, offline. A GPU model can
     later replace it behind the same interface (LOCAL_TTS_ENGINE)."""
     name, supports_tags = "local", False
     _voice, _vlock = None, threading.Lock()
 
     def __init__(self):
         root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        self.model = os.environ.get("LOCAL_TTS_MODEL", os.path.join(root, "models", "piper", "de_DE-thorsten-high.onnx"))
+        self.model = os.environ.get("LOCAL_TTS_MODEL", os.path.join(root, "models", "piper", "en_GB-alan-medium.onnx"))
         self.speed = float(os.environ.get("LOCAL_TTS_SPEED", "0.95"))   # <1 = faster speech
 
     def configured(self):
@@ -245,7 +245,7 @@ class Local:
                 with urllib.request.urlopen(req, timeout=30) as r:
                     return r.read(), "audio/wav"
             except Exception as e:  # noqa: BLE001 — fall back to Piper for this sentence
-                print(f"  GPU-Stimme fehlgeschlagen, Piper übernimmt: {str(e)[:100]}", flush=True)
+                print(f"  GPU voice failed, Piper takes over: {str(e)[:100]}", flush=True)
         return self._piper(text)
 
     def stream(self, text):
@@ -378,13 +378,13 @@ class Azure:
     def __init__(self):
         self.key = os.environ.get("AZURE_SPEECH_KEY", "").strip()
         self.region = os.environ.get("AZURE_SPEECH_REGION", "westeurope").strip()
-        self.voice = os.environ.get("AZURE_VOICE", "de-DE-FlorianMultilingualNeural").strip()
+        self.voice = os.environ.get("AZURE_VOICE", "en-GB-RyanNeural").strip()
 
     def configured(self):
         return bool(self.key)
 
     def synth(self, text):
-        ssml = (f"<speak version='1.0' xml:lang='de-DE'><voice name='{self.voice}'>"
+        ssml = (f"<speak version='1.0' xml:lang='en-GB'><voice name='{self.voice}'>"
                 f"{escape(text[:2500])}</voice></speak>")
         req = urllib.request.Request(
             f"https://{self.region}.tts.speech.microsoft.com/cognitiveservices/v1", data=ssml.encode("utf-8"),
@@ -399,7 +399,7 @@ class Azure:
         return data, "audio/mpeg"
 
     def balance(self):
-        return {"text": "Free Tier 0,5 Mio. Zeichen/Monat (keine Restanzeige)", "empty": False}
+        return {"text": "free tier 0.5 million characters/month (no remaining count)", "empty": False}
 
 
 class Google:
@@ -407,13 +407,13 @@ class Google:
 
     def __init__(self):
         self.key = os.environ.get("GOOGLE_TTS_API_KEY", "").strip()
-        self.voice = os.environ.get("GOOGLE_TTS_VOICE", "de-DE-Chirp3-HD-Charon").strip()
+        self.voice = os.environ.get("GOOGLE_TTS_VOICE", "en-GB-Chirp3-HD-Charon").strip()
 
     def configured(self):
         return bool(self.key)
 
     def synth(self, text):
-        body = {"input": {"text": text[:2500]}, "voice": {"languageCode": "de-DE", "name": self.voice},
+        body = {"input": {"text": text[:2500]}, "voice": {"languageCode": "en-GB", "name": self.voice},
                 "audioConfig": {"audioEncoding": "MP3"}}
         req = urllib.request.Request(f"https://texttospeech.googleapis.com/v1/text:synthesize?key={self.key}",
                                      data=json.dumps(body).encode(), method="POST",
@@ -426,7 +426,7 @@ class Google:
         return base64.b64decode(json.loads(data)["audioContent"]), "audio/mpeg"
 
     def balance(self):
-        return {"text": "Free Tier (keine Restanzeige)", "empty": False}
+        return {"text": "free tier (no remaining count)", "empty": False}
 
 
 class Edge:
@@ -470,7 +470,7 @@ def refresh_balances():
         _BAL[name] = b
         if b.get("empty"):
             until = b.get("reset") or time.time() + UNKNOWN_RESET_S
-            _block(name, "Guthaben laut Anbieter leer", until)
+            _block(name, "credit used up according to the provider", until)
 
 
 def _balance_loop():
@@ -497,7 +497,7 @@ def _block(name, reason, until):
         t = d.setdefault("tts", {})
         t.setdefault("blocked", {})[name] = {"until": until, "reason": reason[:160]}
     commands.update_state(mut)
-    print(f"  Stimme: {LABELS.get(name, name)} gesperrt bis {dt.datetime.fromtimestamp(until):%d.%m. %H:%M} — {reason[:80]}",
+    print(f"  voice: {LABELS.get(name, name)} blocked until {dt.datetime.fromtimestamp(until):%Y-%m-%d %H:%M} — {reason[:80]}",
           flush=True)
 
 
@@ -548,7 +548,7 @@ def _speak(text, stream):
             if switching:
                 commands.update_state(lambda d: d.setdefault("tts", {}).__setitem__("active", name))
         if switching and ANNOUNCE:
-            say = f"Wechsle auf {LABELS.get(name, name)}. " + say
+            say = f"Switching to {LABELS.get(name, name)}. " + say
         try:
             if stream and hasattr(a, "stream"):
                 data, mime = a.stream(say)
@@ -558,7 +558,7 @@ def _speak(text, stream):
                     data = iter([data])
         except Exhausted as e:
             _block(name, e.reason, e.until or time.time() + UNKNOWN_RESET_S)
-            errors.append(f"{name}: leer ({e.reason[:60]})")
+            errors.append(f"{name}: empty ({e.reason[:60]})")
             continue
         except Transient as e:
             errors.append(f"{name}: {str(e)[:60]}")
@@ -566,7 +566,7 @@ def _speak(text, stream):
         if prev is None:
             commands.update_state(lambda d: d.setdefault("tts", {}).__setitem__("active", name))
         return data, mime, name
-    raise RuntimeError("Keine Stimme verfügbar: " + "; ".join(errors))
+    raise RuntimeError("No voice available: " + "; ".join(errors))
 
 
 def status():

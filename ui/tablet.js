@@ -84,7 +84,7 @@
   q('#tDock').appendChild(bar);
   var keys = document.createElement('button');
   keys.className = 'tkeys';
-  keys.title = 'Tippen statt sprechen';
+  keys.title = 'Type instead of speaking';
   keys.textContent = '⌨';
   bar.insertBefore(keys, q('#btnStop'));
   keys.onclick = function () {
@@ -107,8 +107,8 @@
   pick(q('#tLayout'));
 
   // a few things one says often, one tap each (sent as if typed)
-  [['Was steht heute an?', 'Was steht heute an?'], ['Licht an', 'Licht an'], ['Licht aus', 'Licht aus'],
-   ['Wetter morgen', 'Wie wird das Wetter morgen?']].forEach(function (a) {
+  [['What is on today?', 'What is on today?'], ['Light on', 'Light on'], ['Light off', 'Light off'],
+   ['Weather tomorrow', 'What will the weather be like tomorrow?']].forEach(function (a) {
     var b = document.createElement('button');
     b.textContent = a[0];
     b.onclick = function () { if (typeof transmit === 'function') transmit(a[1], { typed: true }); };
@@ -118,10 +118,10 @@
   // ── clock and greeting ──────────────────────────────────
   function tick() {
     var now = new Date(), h = now.getHours();
-    q('#tTime').textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    q('#tDate').textContent = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
-    q('#tHello').textContent = (h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 17 ? 'Guten Tag'
-      : h < 22 ? 'Guten Abend' : 'Gute Nacht') + ', Sir.';
+    q('#tTime').textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    q('#tDate').textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    q('#tHello').textContent = (h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon'
+      : h < 22 ? 'Good evening' : 'Good night') + ', Sir.';
   }
   tick();
   setInterval(tick, 5000);
@@ -167,9 +167,9 @@
                speaking: 'speak', 'needs-click': 'alert', blocked: 'alert' };
   function syncState() {
     var st = mic.dataset.state || 'off';
-    // a stray "ja" from the room must not approve anything — so say which word counts
+    // a stray "yes" from the room must not approve anything — so say which word counts
     var asking = typeof pendingConfirm !== 'undefined' && pendingConfirm;
-    stateEl.textContent = asking ? 'Freigeben? Sag „bestätigt“ oder „nein“ — oder tippe unten' : q('#micLabel').textContent;
+    stateEl.textContent = asking ? 'Approve? Say “confirmed” or “no” — or tap below' : q('#micLabel').textContent;
     stateEl.className = 'tstate ' + (asking ? 'hearing' : st);
     Orb.mode = MODE[st] || 'idle';
     var c = Orb.colour();
@@ -269,11 +269,11 @@
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
 
   /* One line per day, the same for today and the next days, 0 to 24 h:
-     "Regen 6–12 Uhr (30–100 %), 23–24 Uhr (18 %) · ~1,8 mm" — each stretch with its own chance */
+     "rain 6–12 h (30–100 %), 23–24 h (18 %) · ~1.8 mm" — each stretch with its own chance */
   function rainText(d) {
     if (!d) return '';
     var mm = d.mm >= 0.1 ? ' · ~' + num(d.mm, d.mm < 10 ? 1 : 0) + ' mm' : '';
-    return d.rain_when ? 'Regen ' + d.rain_when + mm : 'kein Regen' + (d.rain ? ' (höchstens ' + d.rain + ' %)' : '');
+    return d.rain_when ? 'rain ' + d.rain_when + mm : 'no rain' + (d.rain ? ' (at most ' + d.rain + ' %)' : '');
   }
 
   function weather(w) {
@@ -282,18 +282,18 @@
     q('#tTemp').textContent = num(w.now) + '°';
     q('#tSkyText').textContent = w.sky;
     q('#tRange').textContent = num(w.tmin) + '° – ' + num(w.tmax) + '° · ' + rainText((w.days || [])[0]) + ' · ' + w.golf
-      + ' (Golf ' + (w.golf_day || 'heute') + ')';
+      + ' (golf ' + (w.golf_day || 'today') + ')';
     q('#tDays').innerHTML = (w.days || []).map(function (d, i) {
       return '<li data-day="' + i + '"><b>' + esc(d.day) + '</b><span>' + SKY(d.code) + '</span><em>' + num(d.tmax) + '°<small>'
-        + num(d.tmin) + '°</small></em><i>' + (d.rain_times ? 'bis ' + d.rain + ' %' : '') + '</i>'
+        + num(d.tmin) + '°</small></em><i>' + (d.rain_times ? 'up to ' + d.rain + ' %' : '') + '</i>'
         + '<i class="twhen">' + esc(d.rain_times || '') + '</i></li>';
     }).join('');
   }
 
   function agenda(a) {
     var ol = q('#tAgenda');
-    if (a == null) { ol.innerHTML = '<li class="tempty">Kalender nicht verbunden</li>'; return; }
-    if (!a.length) { ol.innerHTML = '<li class="tempty">Die Woche ist frei.</li>'; return; }
+    if (a == null) { ol.innerHTML = '<li class="tempty">Calendar not connected</li>'; return; }
+    if (!a.length) { ol.innerHTML = '<li class="tempty">The week is free.</li>'; return; }
     ol.innerHTML = a.map(function (e) {
       return '<li class="' + (e.now ? 'now' : '') + '"><b>' + esc(e.day) + (e.time ? ' · ' + esc(e.time) : '') + '</b><span>'
         + esc(e.title) + '</span></li>';
@@ -309,33 +309,33 @@
   function tiles(d) {
     var h = d.house || {}, m = d.mail || {}, me = d.me || {}, out = [];
     if (!h.error && h.solar_w != null) {
-      out.push(tile(h.solar_w > 50 ? 'good' : '', 'Solar', num(h.solar_w), 'W', 'heute ' + num(h.gen_kwh, 1) + ' kWh', null, 'energy'));
-      out.push(tile(h.soc != null && h.soc < 20 ? 'warn' : '', 'Speicher', num(h.soc), '%',
-        h.charge_w > 5 ? 'lädt ' + num(h.charge_w) + ' W' : h.out_w > 5 ? 'gibt ' + num(h.out_w) + ' W' : 'ruht', h.soc, 'energy'));
+      out.push(tile(h.solar_w > 50 ? 'good' : '', 'Solar', num(h.solar_w), 'W', 'today ' + num(h.gen_kwh, 1) + ' kWh', null, 'energy'));
+      out.push(tile(h.soc != null && h.soc < 20 ? 'warn' : '', 'Battery', num(h.soc), '%',
+        h.charge_w > 5 ? 'charging ' + num(h.charge_w) + ' W' : h.out_w > 5 ? 'giving ' + num(h.out_w) + ' W' : 'idle', h.soc, 'energy'));
     }
     if (h.rooms && h.rooms.length) {
-      out.push('<div class="ttile rooms" data-kind="rooms" role="button"><span>Räume</span><ul>' + h.rooms.slice(0, 3).map(function (r) {
+      out.push('<div class="ttile rooms" data-kind="rooms" role="button"><span>Rooms</span><ul>' + h.rooms.slice(0, 3).map(function (r) {
         return '<li class="' + (r.heating ? 'heat' : '') + '">' + esc(r.name) + '<b>' + num(r.temp, 1) + '°</b></li>';
       }).join('') + '</ul></div>');
     }
-    if (h.pm25 != null) out.push(tile(h.air === 'gut' ? 'good' : h.air === 'schlecht' ? 'bad' : 'warn', 'Luft', esc(h.air || '—'), '',
+    if (h.pm25 != null) out.push(tile(h.air === 'good' ? 'good' : h.air === 'poor' ? 'bad' : 'warn', 'Air', esc(h.air || '—'), '',
       'PM2,5 · ' + num(h.pm25), null, 'air'));
     if (!m.error && m.unread != null) {
       var first = (m.latest || [])[0];
-      out.push(tile(m.unread ? '' : 'good', 'Post', num(m.unread), 'neu', first ? esc(first.sender) : 'alles gelesen', null, 'mail'));
+      out.push(tile(m.unread ? '' : 'good', 'Mail', num(m.unread), 'new', first ? esc(first.sender) : 'all read', null, 'mail'));
     }
     if (!me.error && (me.sleep_h != null || me.battery != null)) {
-      out.push(tile(me.battery != null && me.battery < 30 ? 'warn' : '', 'Schlaf', num(me.sleep_h, 1), 'h',
-        'Energie ' + num(me.battery) + (me.sleep_score != null ? ' · Score ' + me.sleep_score : ''), me.battery, 'sleep'));
+      out.push(tile(me.battery != null && me.battery < 30 ? 'warn' : '', 'Sleep', num(me.sleep_h, 1), 'h',
+        'energy ' + num(me.battery) + (me.sleep_score != null ? ' · score ' + me.sleep_score : ''), me.battery, 'sleep'));
     }
     var tech = techState(d);
-    if (tech.total) out.push(tile(tech.bad ? 'warn' : 'good', 'Technik', tech.bad ? tech.bad : '✓', tech.bad ? 'Probleme' : '',
-      tech.total + ' Geräte geprüft', null, 'tech'));
+    if (tech.total) out.push(tile(tech.bad ? 'warn' : 'good', 'Tech', tech.bad ? tech.bad : '✓', tech.bad ? 'problems' : '',
+      tech.total + ' devices checked', null, 'tech'));
     var u = d.usage || {};
     if (u.total) {
       var trend = u.trend_pct == null ? '' : ' · ' + (u.trend_pct > 0 ? '+' : '') + u.trend_pct + ' %';
       out.push(tile(u.trend_pct != null && u.trend_pct > 25 ? 'warn' : '', 'Tokens', num(Math.round(u.tokens / 1000)), 'k',
-        (u.local_pct != null ? u.local_pct + ' % lokal' : '') + trend, u.local_pct, 'usage'));
+        (u.local_pct != null ? u.local_pct + ' % local' : '') + trend, u.local_pct, 'usage'));
     }
     q('#tTiles').innerHTML = out.join('');
   }
@@ -358,7 +358,7 @@
   var DETAIL = {
     weather: function (d) {
       var w = d.weather || {};
-      if (w.error) return ['Wetter', note('Wetter gerade nicht abrufbar.')];
+      if (w.error) return ['Weather', note('Weather cannot be fetched right now.')];
       var hour = new Date().getHours();
       // every day the same: a line, then its 24 hours as bars (today's past hours dimmed)
       var dayBlock = function (x, k) {
@@ -371,85 +371,85 @@
               + Math.round(y.mm / max * 100) + '%"></u><em>' + (y.h % 3 === 0 ? y.h : '') + '</em></div>';
           }).join('') + '</div>' : '') + '</div>';
       };
-      return ['Wetter', '<p class="tdlead">' + SKY(w.code) + ' ' + num(w.now) + '° · ' + esc(w.sky) + '</p>'
-        + list([row('Wind bis', num(w.wind) + ' km/h'), row('Sonnenuntergang', esc(w.sunset)),
-                row('Golf ' + esc(w.golf_day || 'heute'), esc(w.golf))])
-        + '<p class="tdnote"><i class="k1"></i> Regenwahrscheinlichkeit je Stunde · <i class="k2"></i> Menge · Zahl = Regenstunde (ab 30 %, mit Menge ab 10 %)</p>'
+      return ['Weather', '<p class="tdlead">' + SKY(w.code) + ' ' + num(w.now) + '° · ' + esc(w.sky) + '</p>'
+        + list([row('Wind up to', num(w.wind) + ' km/h'), row('Sunset', esc(w.sunset)),
+                row('Golf ' + esc(w.golf_day || 'today'), esc(w.golf))])
+        + '<p class="tdnote"><i class="k1"></i> chance of rain per hour · <i class="k2"></i> amount · number = rain hour (from 30 %, with an amount from 10 %)</p>'
         + (w.days || []).map(dayBlock).join('')];
     },
     energy: function (d) {
       var h = d.house || {};
-      var rows = [row('Solar jetzt', num(h.solar_w) + ' W', h.solar_w > 50 ? 'good' : ''),
-                  row('Erzeugt heute', num(h.gen_kwh, 1) + ' kWh'),
-                  row('Speicher', num(h.soc) + ' %', h.soc != null && h.soc < 20 ? 'warn' : ''),
-                  row('Lädt mit', h.charge_w > 5 ? num(h.charge_w) + ' W' : '—'),
-                  row('Gibt ab', h.out_w > 5 ? num(h.out_w) + ' W' : '—')];
-      (h.bats || []).forEach(function (b, i) { rows.push(row('Batterie ' + (i + 1), num(b) + ' %', b < 20 ? 'warn' : '')); });
-      return ['Solar und Speicher', list(rows)];
+      var rows = [row('Solar now', num(h.solar_w) + ' W', h.solar_w > 50 ? 'good' : ''),
+                  row('Generated today', num(h.gen_kwh, 1) + ' kWh'),
+                  row('Battery', num(h.soc) + ' %', h.soc != null && h.soc < 20 ? 'warn' : ''),
+                  row('Charging at', h.charge_w > 5 ? num(h.charge_w) + ' W' : '—'),
+                  row('Giving', h.out_w > 5 ? num(h.out_w) + ' W' : '—')];
+      (h.bats || []).forEach(function (b, i) { rows.push(row('Battery ' + (i + 1), num(b) + ' %', b < 20 ? 'warn' : '')); });
+      return ['Solar and battery', list(rows)];
     },
     rooms: function (d) {
       var rs = (d.house || {}).rooms || [];
-      return ['Räume', list(rs.map(function (r) {
+      return ['Rooms', list(rs.map(function (r) {
         // a target of 5-7 degrees is the thermostat's frost guard: heating off, as far as a person cares
-        var set = r.target == null ? '' : r.target <= 7 ? ' <small>Heizung aus</small>' : ' <small>Soll ' + num(r.target, 1) + '°</small>';
+        var set = r.target == null ? '' : r.target <= 7 ? ' <small>heating off</small>' : ' <small>set ' + num(r.target, 1) + '°</small>';
         return row(esc(r.name), num(r.temp, 1) + '°' + set
-          + (r.heating ? ' <small>heizt</small>' : ''), r.heating ? 'warn' : '');
+          + (r.heating ? ' <small>heating</small>' : ''), r.heating ? 'warn' : '');
       }))];
     },
     air: function (d) {
       var h = d.house || {};
-      return ['Luft', list([row('Bewertung', esc(h.air || '—'), h.air === 'gut' ? 'good' : h.air === 'schlecht' ? 'bad' : 'warn'),
-                            row('Feinstaub PM2,5', num(h.pm25, 1) + ' µg/m³')])
-        + note('Bis 12 µg/m³ gut, bis 35 mäßig, darüber schlecht.')];
+      return ['Air', list([row('Rating', esc(h.air || '—'), h.air === 'good' ? 'good' : h.air === 'poor' ? 'bad' : 'warn'),
+                            row('Fine dust PM2.5', num(h.pm25, 1) + ' µg/m³')])
+        + note('Up to 12 µg/m³ good, up to 35 moderate, above that poor.')];
     },
     mail: function (d) {
       var m = d.mail || {};
       if (m.error) return ['Post', note(m.error)];
-      return ['Post', list([row('Ungelesen', num(m.unread)), row('Postfächer', num(m.accounts))])
-        + '<h4>Ungelesen' + (m.inbox && m.unread > m.inbox.length ? ' · neueste ' + m.inbox.length : '') + '</h4>'
+      return ['Mail', list([row('Unread', num(m.unread)), row('Mailboxes', num(m.accounts))])
+        + '<h4>Unread' + (m.inbox && m.unread > m.inbox.length ? ' · newest ' + m.inbox.length : '') + '</h4>'
         + '<ul class="tdmail">' + (m.inbox || m.latest || []).map(function (x) {
           return '<li><b>' + esc(x.sender) + '</b><span>' + esc(x.subject) + '</span><em>' + esc(x.when) + ' · ' + esc(x.account) + '</em></li>';
         }).join('') + '</ul>'
-        + ((m.errors || []).length ? note('Nicht erreichbar: ' + m.errors.join('; ')) : '')
-        + note('Stand ' + (m.at || '') + ' · nichts wird als gelesen markiert.')];
+        + ((m.errors || []).length ? note('Not reachable: ' + m.errors.join('; ')) : '')
+        + note('As of ' + (m.at || '') + ' · nothing is marked as read.')];
     },
     sleep: function (d) {
       var me = d.me || {};
       if (me.error) return ['Schlaf', note(me.error)];
-      return ['Schlaf und Energie', list([row('Schlaf', num(me.sleep_h, 1) + ' h'), row('Schlaf-Score', num(me.sleep_score)),
+      return ['Sleep and energy', list([row('Sleep', num(me.sleep_h, 1) + ' h'), row('Sleep score', num(me.sleep_score)),
         row('Body Battery', num(me.battery), me.battery != null && me.battery < 30 ? 'warn' : ''),
-        row('Schritte', me.steps != null ? Number(me.steps).toLocaleString('de-DE') : '—'),
-        row('Ruhepuls', me.rhr != null ? me.rhr + ' bpm' : '—'), row('Stress', num(me.stress))])
-        + note('Garmin, Stand ' + (me.at || ''))];
+        row('Steps', me.steps != null ? Number(me.steps).toLocaleString('en-GB') : '—'),
+        row('Resting pulse', me.rhr != null ? me.rhr + ' bpm' : '—'), row('Stress', num(me.stress))])
+        + note('Garmin, as of ' + (me.at || ''))];
     },
     tech: function (d) {
       var h = d.house || {}, n = d.nas || {}, p = d.pi || {}, r = h.router || {}, out = '';
       if (n.model || n.error) out += '<h4>NAS</h4>' + (n.error ? note(n.error) : list([
-        row('Zustand', n.ok ? 'in Ordnung' : 'prüfen', n.ok ? 'good' : 'bad'), row('Modell', esc(n.model)),
-        row('Belegt', num(n.used_tb, 1) + ' / ' + num(n.total_tb, 1) + ' TB (' + num(n.used_pct) + ' %)', n.used_pct > 85 ? 'warn' : ''),
-        row('Temperatur', num(n.temp) + ' °C'), row('Festplatten', num(n.disks))]));
+        row('State', n.ok ? 'fine' : 'check', n.ok ? 'good' : 'bad'), row('Model', esc(n.model)),
+        row('Used', num(n.used_tb, 1) + ' / ' + num(n.total_tb, 1) + ' TB (' + num(n.used_pct) + ' %)', n.used_pct > 85 ? 'warn' : ''),
+        row('Temperature', num(n.temp) + ' °C'), row('Disks', num(n.disks))]));
       if (p.temp != null || p.error) out += '<h4>Raspberry Pi</h4>' + (p.error ? note(p.error) : list([
-        row('Container', p.up + ' / ' + p.containers + ' laufen', p.up < p.containers ? 'bad' : 'good'),
+        row('Container', p.up + ' / ' + p.containers + ' running', p.up < p.containers ? 'bad' : 'good'),
         row('Temperatur', num(p.temp, 1) + ' °C', p.temp > 70 ? 'warn' : ''), row('Last', num(p.load, 2)),
-        row('Speicherkarte', num(p.disk) + ' % belegt'), row('Läuft seit', esc(p.uptime || '—'))]));
-      if (h.router && !h.error) out += '<h4>Internet</h4>' + list([row('Verbindung', r.online ? 'online' : 'offline', r.online ? 'good' : 'bad'),
+        row('Memory card', num(p.disk) + ' % used'), row('Running for', esc(p.uptime || '—'))]));
+      if (h.router && !h.error) out += '<h4>Internet</h4>' + list([row('Connection', r.online ? 'online' : 'offline', r.online ? 'good' : 'bad'),
         row('Download', num(r.down * 8 / 1000, 1) + ' Mbit/s'), row('Upload', num(r.up * 8 / 1000, 1) + ' Mbit/s')]);   // the router counts kB/s
-      return ['Technik', out || note('Keine Geräte verbunden.')];
+      return ['Tech', out || note('No devices connected.')];
     },
     usage: function (d) {
       var u = d.usage || {};
-      if (!u.total) return ['Tokens', note('Noch keine Anfragen diese Woche.')];
-      var rows = [row('Anfragen (7 Tage)', num(u.total)), row('Lokal erledigt', u.local_pct != null ? u.local_pct + ' %' : '—', u.local_pct >= 60 ? 'good' : ''),
-                  row('Ans Modell', num(u.llm)), row('Tokens diese Woche', Number(u.tokens || 0).toLocaleString('de-DE')),
-                  row('Vorwoche', Number(u.prev_tokens || 0).toLocaleString('de-DE')),
+      if (!u.total) return ['Tokens', note('No requests this week yet.')];
+      var rows = [row('Requests (7 days)', num(u.total)), row('Handled locally', u.local_pct != null ? u.local_pct + ' %' : '—', u.local_pct >= 60 ? 'good' : ''),
+                  row('To the model', num(u.llm)), row('Tokens this week', Number(u.tokens || 0).toLocaleString('en-GB')),
+                  row('Week before', Number(u.prev_tokens || 0).toLocaleString('en-GB')),
                   row('Trend', u.trend_pct == null ? '—' : (u.trend_pct > 0 ? '+' : '') + u.trend_pct + ' %', u.trend_pct > 25 ? 'warn' : u.trend_pct < 0 ? 'good' : ''),
-                  row('Gelernte Formulierungen', num(u.aliases) + (u.drafts ? ' (+' + u.drafts + ' Entwürfe)' : ''))];
-      if (u.misses != null) rows.push(row('Gleich nochmal gefragt', num(u.misses), u.misses > 3 ? 'warn' : ''));
+                  row('Learned wordings', num(u.aliases) + (u.drafts ? ' (+' + u.drafts + ' drafts)' : ''))];
+      if (u.misses != null) rows.push(row('Asked again right away', num(u.misses), u.misses > 3 ? 'warn' : ''));
       var top = (u.top || []).map(function (t) {
-        return '<li><b>' + esc(t.msg) + '</b><span>' + t.count + '× · ' + Number(t.tokens || 0).toLocaleString('de-DE') + ' Tokens</span></li>';
+        return '<li><b>' + esc(t.msg) + '</b><span>' + t.count + '× · ' + Number(t.tokens || 0).toLocaleString('en-GB') + ' tokens</span></li>';
       }).join('');
-      return ['Tokens und Router', list(rows) + (top ? '<h4>Teuerste Wiederholungen</h4><ul class="tdmail">' + top + '</ul>'
-        + note('Wiederholte Fragen, die noch ans Modell gehen — Kandidaten für den Router.') : '')];
+      return ['Tokens and router', list(rows) + (top ? '<h4>Most expensive repeats</h4><ul class="tdmail">' + top + '</ul>'
+        + note('Repeated questions that still go to the model — candidates for the router.') : '')];
     }
   };
   /* day: a tapped day in the forecast row — the sheet opens on that day, not on today */

@@ -29,49 +29,49 @@ class Profiles(unittest.TestCase):
         return r["reply"]
 
     def test_switch_by_voice(self):
-        self.assertIn("Profi-Modus", self.say("Jarvis, Profi-Modus"))
-        self.assertEqual(personality.current(), "profi")
-        self.assertIn("locker", self.say("sei mal locker"))
-        self.assertEqual(personality.current(), "locker")
-        self.say("technischer Modus")
-        self.assertEqual(personality.current(), "technisch")
-        self.say("zurück zum Normalen")
+        self.assertIn("Professional mode", self.say("Jarvis, professional mode"))
+        self.assertEqual(personality.current(), "professional")
+        self.assertIn("casual", self.say("be casual"))
+        self.assertEqual(personality.current(), "casual")
+        self.say("technical mode")
+        self.assertEqual(personality.current(), "technical")
+        self.say("back to normal")
         self.assertEqual(personality.current(), "standard")
-        self.assertIn("Standard", self.say("Welcher Modus?"))
+        self.assertIn("Standard", self.say("Which mode?"))
 
     def test_for_some_hours(self):
-        self.assertIn("Für 2 Stunden", self.say("Profi-Modus für zwei Stunden"))
-        self.assertIn("noch bis", self.say("welcher Modus"))
+        self.assertIn("For 2 hours", self.say("Professional mode for two hours"))
+        self.assertIn("until", self.say("which mode"))
         commands.update_state(lambda d: d["persona"].__setitem__("until", time.time() - 1))
         self.assertEqual(personality.current(), "standard")
 
     def test_no_false_trigger(self):
-        self.assertNotEqual(router.route("Spiel lockere Musik").get("handler"), "personality")
+        self.assertNotEqual(router.route("Play some relaxed music").get("handler"), "personality")
         self.assertEqual(personality.current(), "standard")
 
     def test_prompt_text(self):
         base = commands.LEAN_PERSONA
         std = personality.persona(base)
-        self.assertIn('gelegentlich "Sir"', std)
-        self.assertIn("Humor nur, wenn er passt", std)
-        personality.set_profile("locker")
+        self.assertIn('now and then "Sir"', std)
+        self.assertIn("Humour only when it fits", std)
+        personality.set_profile("casual")
         loose = commands.lean_system([])
-        self.assertIn("du duzt ihn", loose)
-        self.assertNotIn("britisch-höflich", loose)
-        self.assertIn("Humor nur, wenn er passt", loose)
-        personality.set_profile("technisch")
-        self.assertIn("bis zu fünf Sätze", personality.persona(base))
+        self.assertIn("call him by his first name", loose)
+        self.assertNotIn("British-polite", loose)
+        self.assertIn("Humour only when it fits", loose)
+        personality.set_profile("technical")
+        self.assertIn("up to five sentences", personality.persona(base))
 
     def test_custom_profile(self):
-        personality.PATH.write_text(json.dumps({"abend": {"label": "Abend", "ton": "Ton: ruhig und leise.",
-                                                          "triggers": ["abend[- ]?modus"]}}), encoding="utf-8")
-        self.say("Abendmodus")
-        self.assertEqual(personality.current(), "abend")
-        self.assertIn("Ton: ruhig und leise.", personality.persona(commands.LEAN_PERSONA))
-        self.assertIn("Abend", self.say("welcher modus"))
+        personality.PATH.write_text(json.dumps({"evening": {"label": "Evening", "tone": "Tone: calm and quiet.",
+                                                            "triggers": ["evening[- ]?mode"]}}), encoding="utf-8")
+        self.say("Evening mode")
+        self.assertEqual(personality.current(), "evening")
+        self.assertIn("Tone: calm and quiet.", personality.persona(commands.LEAN_PERSONA))
+        self.assertIn("Evening", self.say("which mode"))
 
     def test_typed_hint(self):
-        self.assertIn("getippt", personality.TYPED_HINT)
+        self.assertIn("typed", personality.TYPED_HINT)
 
 
 if __name__ == "__main__":

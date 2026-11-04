@@ -12,10 +12,9 @@ now on the server so the engine can decide before the model is called.
 import re
 
 # spellings Whisper produces for "Jarvis"; "arvis" lost its first sound
-NAME = (r"(?:jarvis|jarviz|jarves|javis|jarwis|jervis|yarvis|garvis|tscharvis|tschawis|dschawis|dschavis|"
-        r"charvis|chavis|arvis|jarvi)")
-START = re.compile(r"^\W*(?:(?:hey|hi|hallo|ok|okay|he|ey|du)\W+)?" + NAME + r"\b[\s,.!?:;-]*", re.I)
-END = re.compile(r"[\s,;-]+(?:bitte\W+)?" + NAME + r"\W*$", re.I)
+NAME = (r"(?:jarvis|jarviz|jarves|javis|jarwis|jervis|yarvis|garvis|charvis|chavis|arvis|jarvi|jarvas)")
+START = re.compile(r"^\W*(?:(?:hey|hi|hello|ok|okay|yo|oi)\W+)?" + NAME + r"\b[\s,.!?:;-]*", re.I)
+END = re.compile(r"[\s,;-]+(?:please\W+)?" + NAME + r"\W*$", re.I)
 MID = re.compile(r"(^|[\s,.!?;:-]+)" + NAME + r"(?![^\W\d_])[\s,.!?:;-]*", re.I)
 ANY = re.compile(r"(^|[^^\w])" + NAME + r"(?![^\W\d_])", re.I)
 WORD = re.compile(r"[^\W\d_]|\d", re.U)

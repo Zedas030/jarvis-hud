@@ -58,7 +58,7 @@ class Splitter:
                 take = m.end()
                 self.first_done = True
         if not self.first_done and not out and len(plain(rest)) >= self.first_max:
-            # the longest run of clauses that still fits: "Guten Abend, Sir, die Solaranlage liefert gerade zwei Komma vier Kilowatt,"
+            # the longest run of clauses that still fits: "Good evening, Sir, the solar system is delivering two point four kilowatts,"
             cut = 0
             for m in CLAUSE_RE.finditer(rest):
                 if m.start() != cut:
@@ -157,7 +157,7 @@ class Synth:
                 self._one(s)
             except Exception as e:  # noqa: BLE001
                 s.error = str(e)[:160]
-                log.warning("Stimme fehlgeschlagen: %s", s.error)
+                log.warning("voice failed: %s", s.error)
             finally:
                 s.done = True
                 s.ev.set()

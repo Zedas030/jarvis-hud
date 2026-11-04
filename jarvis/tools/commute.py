@@ -1,5 +1,5 @@
 """
-"Wann muss ich los?" — travel time to the next appointment with a place.
+"When do I have to leave?" — travel time to the next appointment with a place.
 
 Car routing over OpenStreetMap: addresses via Nominatim, driving time via the
 public OSRM server. Both free, no account, no LLM. OSRM knows no traffic, so
@@ -7,7 +7,7 @@ JARVIS_TRAFFIC_FACTOR (default 1.25) pads it, plus JARVIS_COMMUTE_BUFFER_MIN
 for parking and walking. Start point: JARVIS_HOME_LAT/LON (else the weather
 coordinates). The watcher reminds you when it is time to leave.
 
-    "Wann muss ich los?", "Wie lange brauche ich zum Hauptbahnhof?"
+    "When do I have to leave?", "How long does it take me to the central station?"
 """
 import datetime as dt
 import json
@@ -37,7 +37,7 @@ def geocode(place):
     if place in _GEO:
         return _GEO[place]
     near = f"&viewbox={float(HOME[1]) - 1},{float(HOME[0]) + 0.7},{float(HOME[1]) + 1},{float(HOME[0]) - 0.7}"
-    res = _get("https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=de&q="
+    res = _get("https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=en&q="
                + urllib.parse.quote(place) + near)
     _GEO[place] = (res[0]["lat"], res[0]["lon"]) if res else None
     return _GEO[place]
@@ -85,8 +85,8 @@ def _hm(t):
     return f"{t.hour}:{t.minute:02d}"
 
 
-_WHEN = re.compile(r"\b(wann muss ich (los|losfahren|fahren|aufbrechen)|wann sollte ich (los|losfahren)|wann fahr\w* ich los)\b")
-_HOWLONG = re.compile(r"\bwie lange (brauch\w*|fahr\w*) ich (zu[mr]?|nach|bis zu[mr]?|in die|ins)\s+(?P<to>.+?)\s*\??$", re.I)
+_WHEN = re.compile(r"\b(when (do|should|must) i (have to )?(leave|go|set off|head out)|when do i need to (leave|go|set off))\b")
+_HOWLONG = re.compile(r"\bhow long (does it take( me)?|do i need|will it take( me)?) to (get to|drive to|go to|reach)\s+(?:the\s+)?(?P<to>.+?)\s*\??$", re.I)
 
 
 def handle(n, raw=""):
@@ -96,13 +96,13 @@ def handle(n, raw=""):
         except Exception:  # noqa: BLE001 — calendar or map service down
             return None
         if not trip:
-            return "Heute und morgen steht kein Termin mit Ort im Kalender, Sir. Sie können also bleiben."
+            return "There is no appointment with a place in the calendar today or tomorrow, Sir. So you can stay."
         e, mins, leave = trip
-        day = "" if e["start"].date() == dt.date.today() else "morgen "
+        day = "" if e["start"].date() == dt.date.today() else "tomorrow "
         late = leave <= dt.datetime.now()
-        when = "sofort" if late else f"{day}um {_hm(leave)}"
-        return (f"Für {e.get('title', 'Ihren Termin')} um {_hm(e['start'])} brauchen Sie mit dem Auto etwa {mins} "
-                f"Minuten. Losfahren {when}" + (", Sie sind eigentlich schon spät dran." if late else ", Sir."))
+        when = "right away" if late else f"{day}at {_hm(leave)}"
+        return (f"For {e.get('title', 'your appointment')} at {_hm(e['start'])} you need about {mins} "
+                f"minutes by car. Leave {when}" + (", you are actually running late already." if late else ", Sir."))
     m = _HOWLONG.search(raw or "")
     if m:
         to = m.group("to").strip(" ?.!")
@@ -113,5 +113,5 @@ def handle(n, raw=""):
             return None
         if mins is None:
             return None                     # unknown place: the LLM can ask back
-        return f"Mit dem Auto etwa {mins} Minuten bis {to}, Sir."
+        return f"About {mins} minutes by car to {to}, Sir."
     return None

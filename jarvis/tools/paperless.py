@@ -1,9 +1,9 @@
 """
-Paperless-ngx: the scanned post. "Was zahle ich für die Haftpflicht?", "Wann läuft der
-Handyvertrag?" — full-text search over the archive, read-only, through its REST API.
+Paperless-ngx: the scanned post. "What do I pay for the liability insurance?", "When does the
+phone contract end?" — full-text search over the archive, read-only, through its REST API.
 
   PAPERLESS_URL    e.g. http://10.0.0.110:8010
-  PAPERLESS_TOKEN  an API token (Paperless → Benutzer → Token)
+  PAPERLESS_TOKEN  an API token (Paperless → Users → Token)
 
   search(query)   documents matching the query: title, correspondent, date, tags, type and the
                   search hit's highlight — the tool paperless_search
@@ -67,41 +67,41 @@ def describe_hit(d, names):
     if tags:
         line += f" [{tags}]"
     if high:
-        line += f" — „{high}“"
+        line += f" — “{high}”"
     return line
 
 
 def search(query):
     if not configured():
-        return "Paperless ist nicht eingerichtet (PAPERLESS_URL und PAPERLESS_TOKEN in .env)."
+        return "Paperless is not set up (PAPERLESS_URL and PAPERLESS_TOKEN in .env)."
     q = " ".join((query or "").split())
     if not q:
-        return "Wonach soll ich im Archiv suchen?"
+        return "What should I search the archive for?"
     try:
         data = _get("/api/documents/", query=q, page_size=MAX_HITS, ordering="-created",
                     fields="id,title,created,created_date,correspondent,tags,document_type")
     except Exception as e:  # noqa: BLE001
-        return f"Paperless nicht erreichbar: {str(e)[:120]}"
+        return f"Paperless not reachable: {str(e)[:120]}"
     rows = data.get("results") or []
     if not rows:
-        return f"Im Archiv findet sich nichts zu „{q}“."
+        return f"The archive has nothing on “{q}”."
     names = _names()
-    head = f"{data.get('count', len(rows))} Dokument(e) zu „{q}“" + (f", die neuesten {len(rows)}" if data.get("count", 0) > len(rows) else "")
-    return head + ":\n" + "\n".join(describe_hit(d, names) for d in rows) + "\nText eines Dokuments: paperless_read mit der Nummer."
+    head = f"{data.get('count', len(rows))} document(s) on “{q}”" + (f", the newest {len(rows)}" if data.get("count", 0) > len(rows) else "")
+    return head + ":\n" + "\n".join(describe_hit(d, names) for d in rows) + "\nText of a document: paperless_read with the number."
 
 
 def read(doc_id):
     if not configured():
-        return "Paperless ist nicht eingerichtet (PAPERLESS_URL und PAPERLESS_TOKEN in .env)."
+        return "Paperless is not set up (PAPERLESS_URL and PAPERLESS_TOKEN in .env)."
     try:
         did = int(str(doc_id).lstrip("#"))
     except (TypeError, ValueError):
-        return "Welche Dokumentnummer?"
+        return "Which document number?"
     try:
         d = _get(f"/api/documents/{did}/")
     except Exception as e:  # noqa: BLE001
-        return f"Dokument {did} nicht lesbar: {str(e)[:120]}"
+        return f"Document {did} not readable: {str(e)[:120]}"
     names = _names()
     text = " ".join((d.get("content") or "").split())
     return (describe_hit(d, names) + "\n" + text[:READ_CHARS]
-            + (f" … [gekürzt, {len(text)} Zeichen]" if len(text) > READ_CHARS else ""))
+            + (f" … [shortened, {len(text)} characters]" if len(text) > READ_CHARS else ""))

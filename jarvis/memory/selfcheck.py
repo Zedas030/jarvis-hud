@@ -4,12 +4,12 @@ within RETRY_S seconds, the first answer most likely missed. Those moments are l
 (logs/selfcheck.jsonl) with the route that answered first — a local handler that fired
 wrongly, or a model turn — and feed two things:
 
-  reflection.py   the next evaluation sees them as "Mögliche Fehlschläge" (with the wording),
-                  so the learned rules and the Lernprotokoll cover them
-  the report      "Wie gut warst du diese Woche?" / the usage report names how often it happened
+  reflection.py   the next evaluation sees them as "possible misses" (with the wording),
+                  so the learned rules and the learning log cover them
+  the report      "How well did you do this week?" / the usage report names how often it happened
                   and which local handler misfires most
 
-Follow-ups that are meant as follow-ups ("heller", "und im Schlafzimmer auch", a plain yes)
+Follow-ups that are meant as follow-ups ("brighter", "and in the bedroom too", a plain yes)
 do not count; nor does anything that looks like work (privacy.py).
 """
 import collections
@@ -24,18 +24,17 @@ PATH = pathlib.Path(os.environ.get("JARVIS_SELFCHECK", ROOT / "logs" / "selfchec
 RETRY_S = int(os.environ.get("JARVIS_SELFCHECK_SECONDS", "25"))
 KEEP = 500
 _LAST = {"at": 0.0, "message": "", "route": ""}
-_FOLLOW = re.compile(r"^\W*(ja|nein|ok(ay)?|danke|heller|dunkler|lauter|leiser|wieder (an|aus)|auch|und .{0,25} auch|"
-                     r"nochmal|noch ?mal|weiter|stopp|bestätigt)\W*$", re.I)
+_FOLLOW = re.compile(r"^\W*(yes|no|ok(ay)?|thanks|thank you|brighter|darker|louder|quieter|(on|off) again|too|and .{0,25} too|"
+                     r"again|once more|next|continue|stop|confirmed)\W*$", re.I)
 
 
-_STOP = {"jarvis", "bitte", "mal", "kannst", "wie", "wird", "das", "der", "die", "den", "dem", "des", "ist", "sind",
-         "ich", "mir", "mich", "wir", "uns", "was", "wer", "wann", "und", "oder", "noch", "mit", "für", "auf", "von",
-         "ein", "eine", "einen", "einem", "nochmal", "jetzt", "heute", "denn", "doch", "eigentlich", "gerade", "sag",
-         "sage", "hab", "habe", "hast", "haben"}
+_STOP = {"jarvis", "please", "can", "could", "you", "how", "will", "the", "this", "that", "is", "are", "was",
+         "me", "my", "we", "us", "what", "whats", "who", "when", "and", "or", "still", "with", "for", "on", "from",
+         "again", "now", "today", "then", "actually", "just", "tell", "say", "have", "has", "had", "does", "did"}
 
 
 def _words(text):
-    return {w for w in re.findall(r"[\wäöüß]{3,}", (text or "").lower()) if w not in _STOP}
+    return {w for w in re.findall(r"\w{3,}", (text or "").lower()) if w not in _STOP}
 
 
 def similar(a, b):
@@ -49,8 +48,8 @@ def similar(a, b):
 
 def _route_name(route):
     if route.get("kind") == "local":
-        return "lokal:" + str(route.get("handler", "?"))
-    return "modell:" + ",".join(g for g in route.get("groups") or [] if g not in ("memory", "web")) or "modell"
+        return "local:" + str(route.get("handler", "?"))
+    return "model:" + ",".join(g for g in route.get("groups") or [] if g not in ("memory", "web")) or "model"
 
 
 def note(message, route, now=None):
@@ -86,22 +85,22 @@ def misses(days=7, now=None):
 
 def hints(days=2, limit=8):
     """Lines for the reflection prompt."""
-    return [f"[{r['at'][:16]}] „{r['first']}“ ({r['route']}) → gleich darauf: „{r['second']}“" for r in misses(days)[-limit:]]
+    return [f"[{r['at'][:16]}] “{r['first']}” ({r['route']}) → right after: “{r['second']}”" for r in misses(days)[-limit:]]
 
 
 def spoken_report(days=7):
     rows = misses(days)
     if not rows:
-        return f"In den letzten {days} Tagen mussten Sie keine Frage gleich noch einmal stellen — gut für mich."
+        return f"In the last {days} days you did not have to ask a question twice — good for me."
     by = collections.Counter(r["route"] for r in rows)
     route, n = by.most_common(1)[0]
-    kind = "mein lokaler Handler " + route.split(":", 1)[1] if route.startswith("lokal:") else "das Sprachmodell"
-    return (f"{len(rows)} Mal haben Sie eine Frage innerhalb von Sekunden umformuliert — vermutlich war meine Antwort "
-            f"daneben. Am häufigsten danebengelegen hat {kind} ({n} Mal), zuletzt bei „{rows[-1]['first']}“.")
+    kind = "my local handler " + route.split(":", 1)[1] if route.startswith(("local:", "lokal:")) else "the language model"
+    return (f"{len(rows)} times you rephrased a question within seconds — my answer probably "
+            f"missed. Most often it was {kind} ({n} times), last at “{rows[-1]['first']}”.")
 
 
-_ASK = re.compile(r"\b(wie gut warst du|wie oft (lagst|hast) du (daneben|falsch)|selbstkontrolle|fehlschläge|"
-                  r"wo lagst du (falsch|daneben)|was lief (schief|falsch))\b")
+_ASK = re.compile(r"\b(how well did you do|how (often|many times) (were you|did you get it) wrong|self ?check|misses|"
+                  r"where were you wrong|what went wrong)\b")
 
 
 def handle(n):

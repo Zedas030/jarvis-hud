@@ -2,13 +2,13 @@
 Infrastructure and smart home checks — all read-only, 0 tokens.
 
   pc_status()      CPU, RAM, GPU/VRAM (nvidia-smi), disks, uptime, biggest processes
-  net_diagnose()   "Warum ist das Internet langsam?" step by step: router, internet,
+  net_diagnose()   "Why is the internet slow?" step by step: router, internet,
                    DNS, HTTP — with a verdict where the problem sits (no speed test,
                    that would download data from a third party)
   backup_status()  Hyper Backup tasks on the Synology (SYNO.Backup.Task). The Jarvis
                    DSM user may need rights to see them; if none are visible it says so.
   home_check()     Home Assistant: unavailable devices, low batteries, sensors silent
-                   for a day ("Sind alle Sensoren online?")
+                   for a day ("Are all sensors online?")
   phone_notify()   push to the phone through the Home Assistant app
                    (JARVIS_PHONE_NOTIFY = notify service, e.g. notify.mobile_app_iphone)
   pc_metrics()     values for the homelab observer (VRAM, GPU temperature, free disk)
@@ -88,21 +88,21 @@ def pc_status():
     import psutil
     vm = psutil.virtual_memory()
     up = dt.timedelta(seconds=int(time.time() - psutil.boot_time()))
-    lines = [f"CPU {psutil.cpu_percent(interval=0.5):.0f} % ({psutil.cpu_count()} Threads), "
-             f"RAM {vm.used / 2**30:.1f} von {vm.total / 2**30:.0f} GB ({vm.percent:.0f} %), "
-             f"läuft seit {up.days} Tagen {up.seconds // 3600} Stunden"]
+    lines = [f"CPU {psutil.cpu_percent(interval=0.5):.0f} % ({psutil.cpu_count()} threads), "
+             f"RAM {vm.used / 2**30:.1f} of {vm.total / 2**30:.0f} GB ({vm.percent:.0f} %), "
+             f"running for {up.days} days {up.seconds // 3600} hours"]
     for g in gpu():
-        lines.append(f"GPU {g['name']}: {g['util']:.0f} % Last, VRAM {g['vram_used'] / 1024:.1f} von "
-                     f"{g['vram_total'] / 1024:.0f} GB, {g['temp']:.0f} Grad")
+        lines.append(f"GPU {g['name']}: {g['util']:.0f} % load, VRAM {g['vram_used'] / 1024:.1f} of "
+                     f"{g['vram_total'] / 1024:.0f} GB, {g['temp']:.0f} degrees")
     apps = gpu_apps()
     if apps:
-        lines.append("VRAM belegt von: " + ", ".join(f"{n} ({m / 1024:.1f} GB)" if m else n for n, m in apps[:6]))
+        lines.append("VRAM used by: " + ", ".join(f"{n} ({m / 1024:.1f} GB)" if m else n for n, m in apps[:6]))
     for part in psutil.disk_partitions(all=False):
         try:
             u = psutil.disk_usage(part.mountpoint)
         except OSError:
             continue
-        lines.append(f"Laufwerk {part.device.rstrip(chr(92))} {u.free / 2**30:.0f} GB frei von {u.total / 2**30:.0f} GB")
+        lines.append(f"Drive {part.device.rstrip(chr(92))} {u.free / 2**30:.0f} GB free of {u.total / 2**30:.0f} GB")
     procs = []
     for p in psutil.process_iter(["name", "memory_info"]):
         try:
@@ -113,7 +113,7 @@ def pc_status():
     for rss, name in procs:
         agg[name] = agg.get(name, 0) + rss
     top = sorted(agg.items(), key=lambda x: -x[1])[:5]
-    lines.append("Größte Programme (RAM): " + ", ".join(f"{n} {r / 2**30:.1f} GB" for n, r in top))
+    lines.append("Biggest programs (RAM): " + ", ".join(f"{n} {r / 2**30:.1f} GB" for n, r in top))
     return "\n".join(lines)
 
 
@@ -129,7 +129,7 @@ def gateway():
 def ping(host, count=3):
     """(lost %, average ms) — None ms if nothing came back."""
     code, out = _run(["ping", "-n", str(count), "-w", "1500", host], timeout=count * 3 + 5)
-    times = [int(t) for t in re.findall(r"(?:Zeit|time)[=<](\d+)\s*ms", out, re.I)]
+    times = [int(t) for t in re.findall(r"(?:time|Zeit)[=<](\d+)\s*ms", out, re.I)]   # English or German Windows
     lost = round(100 * (count - len(times)) / count)
     return lost, (sum(times) / len(times) if times else None)
 
@@ -158,29 +158,29 @@ def net_diagnose():
     gw = gateway()
     if gw:
         lost, ms = ping(gw)
-        rows.append(f"Router {gw}: " + (f"{ms:.0f} ms, {lost} % Verlust" if ms is not None else "antwortet nicht"))
+        rows.append(f"Router {gw}: " + (f"{ms:.0f} ms, {lost} % loss" if ms is not None else "does not answer"))
         if ms is None or lost >= 34:
-            verdict = "Das Problem liegt im Heimnetz: der Router antwortet schlecht (WLAN oder Kabel prüfen)."
+            verdict = "The problem is in the home network: the router answers badly (check WiFi or cable)."
         elif ms > 30:
-            verdict = verdict or "Die Verbindung zum Router ist träge — oft WLAN-Empfang oder ein überlasteter Kanal."
+            verdict = verdict or "The connection to the router is sluggish — often WiFi reception or a crowded channel."
     else:
-        rows.append("Router: kein Standard-Gateway gefunden")
-        verdict = "Der PC hat gerade keine Netzwerkverbindung."
+        rows.append("Router: no default gateway found")
+        verdict = "The PC has no network connection right now."
     lost, ms = ping("1.1.1.1")
-    rows.append("Internet (1.1.1.1): " + (f"{ms:.0f} ms, {lost} % Verlust" if ms is not None else "nicht erreichbar"))
+    rows.append("Internet (1.1.1.1): " + (f"{ms:.0f} ms, {lost} % loss" if ms is not None else "not reachable"))
     if not verdict and (ms is None or lost >= 34):
-        verdict = "Das Heimnetz ist in Ordnung, aber das Internet dahinter nicht — Router-Internetverbindung oder Anbieter."
+        verdict = "The home network is fine, but the internet behind it is not — the router's internet connection or the provider."
     elif not verdict and ms > 80:
-        verdict = "Das Internet ist erreichbar, aber langsam (hohe Latenz) — eher beim Anbieter oder eine volle Leitung."
+        verdict = "The internet is reachable but slow (high latency) — more likely the provider or a full line."
     dns = _dns()
-    rows.append("DNS: " + (f"{dns} ms" if dns is not None else "Namensauflösung fehlgeschlagen"))
+    rows.append("DNS: " + (f"{dns} ms" if dns is not None else "name resolution failed"))
     if not verdict and (dns is None or dns > 300):
-        verdict = ("Namensauflösung (DNS) ist das Problem" + (" — vielleicht der Pi-hole." if os.environ.get("JARVIS_PI_HOST") else "."))
+        verdict = ("Name resolution (DNS) is the problem" + (" — maybe the Pi-hole." if os.environ.get("JARVIS_PI_HOST") else "."))
     http = _http()
-    rows.append("Webseiten-Abruf: " + (f"{http} ms" if http is not None else "fehlgeschlagen"))
+    rows.append("Web page fetch: " + (f"{http} ms" if http is not None else "failed"))
     if not verdict and (http is None or http > 1500):
-        verdict = "Router, Internet und DNS sind ok, aber der Seitenabruf ist langsam — evtl. Browser, Proxy oder Gegenstelle."
-    return "\n".join(rows) + "\nUrteil: " + (verdict or "Alles im grünen Bereich.")
+        verdict = "Router, internet and DNS are fine, but fetching pages is slow — maybe the browser, a proxy or the other side."
+    return "\n".join(rows) + "\nVerdict: " + (verdict or "All green.")
 
 
 # ── Synology Hyper Backup ───────────────────────────────────
@@ -188,7 +188,7 @@ def net_diagnose():
 def backup_status():
     import jarvis_mcp as j
     if not (j.SYNO_URL and j.SYNO_USER and j.SYNO_PASSWORD):
-        return "NAS nicht verbunden (SYNOLOGY_URL, SYNOLOGY_USER, SYNOLOGY_PASSWORD in .env)."
+        return "NAS not connected (SYNOLOGY_URL, SYNOLOGY_USER, SYNOLOGY_PASSWORD in .env)."
     sid = j._syno({"api": "SYNO.API.Auth", "version": 6, "method": "login", "account": j.SYNO_USER,
                    "passwd": j.SYNO_PASSWORD, "session": "jarvis", "format": "sid"})["sid"]
     try:
@@ -201,15 +201,15 @@ def backup_status():
             pass
     tasks = data.get("task_list") or []
     if not tasks:
-        return ("Keine Hyper-Backup-Aufgaben sichtbar. Entweder ist keine eingerichtet, oder dem Jarvis-Benutzer auf "
-                "dem NAS fehlt die Berechtigung (Hyper Backup zeigt Aufgaben nur Administratoren).")
+        return ("No Hyper Backup tasks visible. Either none is set up, or the Jarvis user on "
+                "the NAS lacks the permission (Hyper Backup shows tasks to administrators only).")
     rows = []
     for t in tasks:
-        name = t.get("name") or t.get("task_name") or f"Aufgabe {t.get('task_id')}"
+        name = t.get("name") or t.get("task_name") or f"Task {t.get('task_id')}"
         result = str(t.get("last_bkp_result") or t.get("status") or t.get("state") or "?")
         when = t.get("last_bkp_time") or ""
         nxt = t.get("next_bkp_time") or ""
-        rows.append(f"{name}: {result}" + (f", zuletzt {when}" if when else "") + (f", nächstes {nxt}" if nxt else ""))
+        rows.append(f"{name}: {result}" + (f", last {when}" if when else "") + (f", next {nxt}" if nxt else ""))
     return "\n".join(rows)
 
 
@@ -223,7 +223,7 @@ def home_check(states=None, now=None):
     import briefing
     states = briefing._ha_states() if states is None else states
     if not states:
-        return "Home Assistant liefert gerade keine Geräte."
+        return "Home Assistant delivers no devices right now."
     now = now or dt.datetime.now(dt.timezone.utc)
     devices = {"light", "switch", "climate", "fan", "media_player", "cover"}
     sensor_classes = {"temperature", "humidity", "door", "window", "motion", "smoke", "moisture", "battery",
@@ -254,22 +254,22 @@ def home_check(states=None, now=None):
                     silent.append(name)
             except (TypeError, ValueError):
                 pass
-    out = [f"{len(states)} Einträge geprüft."]
-    out.append(f"Nicht erreichbar ({len(unavailable)}): " + ", ".join(unavailable[:12]) if unavailable
-               else "Alle Geräte erreichbar.")
+    out = [f"{len(states)} entries checked."]
+    out.append(f"Not reachable ({len(unavailable)}): " + ", ".join(unavailable[:12]) if unavailable
+               else "All devices reachable.")
     if low:
-        out.append("Batterie schwach: " + ", ".join(low[:10]))
+        out.append("Battery low: " + ", ".join(low[:10]))
     if silent:
-        out.append("Seit über einem Tag still: " + ", ".join(silent[:10]))
+        out.append("Silent for more than a day: " + ", ".join(silent[:10]))
     return "\n".join(out)
 
 
 # ── phone ────────────────────────────────────────────────────
 
 def phone_notify(text, title="Jarvis", actions=None):
-    """Push via the HA companion app. `actions`: [{action, title}] buttons (phone_actions.py). Returns German text."""
+    """Push via the HA companion app. `actions`: [{action, title}] buttons (phone_actions.py). Returns spoken text."""
     if not PHONE or not PHONE.startswith("notify."):
-        return "Handy-Benachrichtigung nicht eingerichtet (JARVIS_PHONE_NOTIFY, z. B. notify.mobile_app_iphone)."
+        return "Phone notification not set up (JARVIS_PHONE_NOTIFY, e.g. notify.mobile_app_iphone)."
     import jarvis_mcp as j
     body = {"title": title, "message": (text or "")[:500]}
     if actions:
@@ -277,8 +277,8 @@ def phone_notify(text, title="Jarvis", actions=None):
     try:
         j._ha(f"/api/services/notify/{PHONE.split('.', 1)[1]}", body)
     except Exception as e:  # noqa: BLE001
-        return f"Handy nicht erreichbar: {e}"
-    return "Ans Handy geschickt."
+        return f"Phone not reachable: {e}"
+    return "Sent to the phone."
 
 
 def push_if_needed(text, severity):

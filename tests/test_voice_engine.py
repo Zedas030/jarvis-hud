@@ -51,21 +51,21 @@ class StateMachine(unittest.TestCase):
 
 class Endpointing(unittest.TestCase):
     def test_rules(self):
-        self.assertTrue(voice_endpoint.looks_unfinished("Und dann, ähm,"))
-        self.assertTrue(voice_endpoint.looks_unfinished("Mach mal das Licht und"))
-        self.assertTrue(voice_endpoint.looks_unfinished("ich will"))
-        self.assertFalse(voice_endpoint.looks_unfinished("Mach das Licht im Wohnzimmer aus."))
-        self.assertTrue(voice_endpoint.looks_like_question("Wie wird das Wetter morgen"))
-        self.assertTrue(voice_endpoint.looks_like_question("Ist der Pi noch an?"))
+        self.assertTrue(voice_endpoint.looks_unfinished("And then, um,"))
+        self.assertTrue(voice_endpoint.looks_unfinished("Turn the light and"))
+        self.assertTrue(voice_endpoint.looks_unfinished("i want to"))
+        self.assertFalse(voice_endpoint.looks_unfinished("Turn off the light in the living room."))
+        self.assertTrue(voice_endpoint.looks_like_question("What will the weather be like tomorrow"))
+        self.assertTrue(voice_endpoint.looks_like_question("Is the Pi still on?"))
 
     def test_adaptive_wait(self):
         ep = voice_endpoint.Endpointer(voice_config.make().endpoint)
-        done, unfinished = ep.wait_for("Mach das Licht aus."), ep.wait_for("Und dann, ähm,")
+        done, unfinished = ep.wait_for("Turn off the light."), ep.wait_for("And then, um,")
         self.assertLess(done, unfinished)
         self.assertEqual(ep.wait_for(None), 700)
-        self.assertEqual(ep.wait_for("Wie spät ist es?"), 350)
+        self.assertEqual(ep.wait_for("What time is it?"), 350)
         ep.learn(True)
-        self.assertEqual(ep.wait_for("Mach das Licht aus."), done + 100)
+        self.assertEqual(ep.wait_for("Turn off the light."), done + 100)
         for _ in range(10):
             ep.learn(True)
         self.assertEqual(ep.learned, 600)
@@ -75,26 +75,26 @@ class Endpointing(unittest.TestCase):
 
 class WakeWord(unittest.TestCase):
     def test_check(self):
-        self.assertEqual(voice_wake.check("Jarvis, mach das Licht aus."), (True, "mach das Licht aus."))
-        self.assertEqual(voice_wake.check("Mach das Licht aus, Jarvis."), (True, "Mach das Licht aus."))
-        self.assertEqual(voice_wake.check("Kannst du, Jarvis, mal nachsehen?")[0], True)
-        self.assertEqual(voice_wake.check("Kannst du, Jarvis, mal nachsehen?", strict=True)[0], False)
-        self.assertEqual(voice_wake.check("Mach das Licht aus.", awake=True), (True, "Mach das Licht aus."))
-        self.assertFalse(voice_wake.check("Mach das Licht aus.")[0])
+        self.assertEqual(voice_wake.check("Jarvis, turn off the light."), (True, "turn off the light."))
+        self.assertEqual(voice_wake.check("Turn off the light, Jarvis."), (True, "Turn off the light."))
+        self.assertEqual(voice_wake.check("Could you, Jarvis, have a look?")[0], True)
+        self.assertEqual(voice_wake.check("Could you, Jarvis, have a look?", strict=True)[0], False)
+        self.assertEqual(voice_wake.check("Turn off the light.", awake=True), (True, "Turn off the light."))
+        self.assertFalse(voice_wake.check("Turn off the light.")[0])
         self.assertTrue(voice_wake.is_bare("Jarvis?"))
-        self.assertFalse(voice_wake.is_bare("Jarvis, wie spät ist es?"))
+        self.assertFalse(voice_wake.is_bare("Jarvis, what time is it?"))
         self.assertTrue(voice_wake.names("Danke, Jarvis"))
 
 
 class Splitter(unittest.TestCase):
     def test_sentences_and_first_clause(self):
         sp = voice_tts.Splitter(voice_config.make().tts)
-        text = "Guten Abend, Sir, die Anlage liefert gerade zwei Komma vier Kilowatt und der Speicher ist voll. Der Pi läuft. Noch etwas?"
+        text = "Good evening, Sir, the system is delivering two point four kilowatts right now and the battery is full. The Pi is running. Anything else?"
         got = []
         for i in range(0, len(text) + 4, 4):
             got += sp.feed(text[:i], final=i >= len(text))
-        self.assertEqual(got[0], "Guten Abend, Sir,")             # the voice starts on the first clause
-        self.assertEqual(got[-1], "Der Pi läuft. Noch etwas?")
+        self.assertEqual(got[0], "Good evening, Sir,")             # the voice starts on the first clause
+        self.assertEqual(got[-1], "The Pi is running. Anything else?")
         self.assertEqual(" ".join(got), text)
 
     def test_tags_do_not_count(self):
@@ -150,7 +150,7 @@ class Conversation(unittest.TestCase):
         if getattr(self, "session", None):
             self.session.close()
 
-    def speak_and_wait(self, finals, answer="Das Licht ist aus. Sonst noch etwas, Sir?", hold=False, **kw):
+    def speak_and_wait(self, finals, answer="The light is off. Anything else, Sir?", hold=False, **kw):
         self.session, self.client, _ = make_session(finals=finals, answer=answer, **kw)
         self.client.hold = hold
         s, c = self.session, self.client
@@ -178,31 +178,31 @@ class Conversation(unittest.TestCase):
         return False
 
     def test_turn_router_answer_is_spoken_and_window_opens(self):
-        s, c = self.speak_and_wait(["Jarvis, mach das Licht aus"])
+        s, c = self.speak_and_wait(["Jarvis, turn off the light"])
         self.assertTrue(c.wait_event("audio_begin", 3))
         self.assertTrue(c.wait_state(st.LISTENING, 4))
         self.assertIn(st.SPEAKING, c.states())
         self.assertEqual(s.posts[0][0], "/api/run")
-        self.assertEqual(s.posts[0][1]["message"], "mach das Licht aus")      # the name is stripped
+        self.assertEqual(s.posts[0][1]["message"], "turn off the light")      # the name is stripped
         self.assertGreater(s.awake_until, time.time())                       # conversation window
         done = c.of("speak_done")[-1]
         self.assertFalse(done["interrupted"])
-        self.assertIn("Sonst noch etwas", done["spoken"])
+        self.assertIn("Anything else", done["spoken"])
 
     def test_without_name_nothing_happens(self):
         import wakeword
         old = wakeword.MODE
         wakeword.MODE = "text"
         try:
-            s, c = self.speak_and_wait(["mach das Licht aus"])
+            s, c = self.speak_and_wait(["turn off the light"])
             self.assertTrue(c.wait_state(st.LISTENING, 2))
             self.assertEqual([p for p in s.posts if p[0] == "/api/run"], [])
         finally:
             wakeword.MODE = old
 
     def test_thinking_pause_mid_sentence_waits(self):
-        """'Und dann ...' (pause) '... mach die Musik leiser' is one request, not two."""
-        self.session, c, _ = make_session(finals=["und dann mach die Musik leiser"], partials=["und dann", "und dann"],
+        """'And then ...' (pause) '... turn the music down' is one request, not two."""
+        self.session, c, _ = make_session(finals=["and then turn the music down"], partials=["and then", "and then"],
                                           partials_enabled=True)
         s = self.session
         feed_ms(s, tone(700))
@@ -215,11 +215,11 @@ class Conversation(unittest.TestCase):
         self.assertTrue(self.passed(c, st.THINKING))
         self.assertTrue(c.wait_state(st.LISTENING, 3))
         self.assertEqual(len([p for p in s.posts if p[0] == "/api/run"]), 1)
-        self.assertEqual(s.posts[0][1]["message"], "und dann mach die Musik leiser")
+        self.assertEqual(s.posts[0][1]["message"], "and then turn the music down")
 
     def test_user_continues_after_turn_was_sent(self):
         """He already asked the model; the user goes on: the run is cancelled and both halves glued."""
-        self.session, c, _ = make_session(finals=["mach das Licht", "im Schlafzimmer aus"], run_delay=0.3)
+        self.session, c, _ = make_session(finals=["turn off the light", "in the bedroom"], run_delay=0.3)
         s = self.session
         s.awake_until = time.time() + 30
         feed_ms(s, tone(400))
@@ -231,11 +231,11 @@ class Conversation(unittest.TestCase):
         feed_ms(s, silence(500))
         self.assertTrue(c.wait_state(st.SPEAKING, 3))
         runs = [p for p in s.posts if p[0] == "/api/run"]
-        self.assertEqual(runs[-1][1]["message"], "mach das Licht im Schlafzimmer aus")
+        self.assertEqual(runs[-1][1]["message"], "turn off the light in the bedroom")
         self.assertIn("/api/cancel", [p[0] for p in s.posts])
         self.assertGreater(s.endpoint.learned, 0)
 
-    def interrupt(self, finals, answer="Erster Satz der Antwort ist hier. Zweiter Satz kommt danach noch. Dritter Satz zum Schluss.", **kw):
+    def interrupt(self, finals, answer="The first sentence of the answer is here. A second sentence comes after it. A third sentence to finish.", **kw):
         s, c = self.speak_and_wait(finals, answer=answer, hold=True, **kw)
         self.assertTrue(c.wait_event("audio_begin", 3))
         time.sleep(0.05)
@@ -248,23 +248,23 @@ class Conversation(unittest.TestCase):
 
     def test_interruption_with_question_starts_new_turn_and_keeps_spoken_part(self):
         commands.update_state(lambda d: d.__setitem__("window", []))
-        s, c = self.interrupt(["Jarvis, mach das Licht aus", "Wie spät ist es"],
-                              answer=["Erster Satz der Antwort ist hier. Zweiter Satz kommt danach noch.", "Es ist zehn Uhr."])
-        commands.remember_turn("mach das Licht aus", "Erster Satz der Antwort ist hier. Zweiter Satz kommt danach noch.")
+        s, c = self.interrupt(["Jarvis, turn off the light", "What time is it"],
+                              answer=["The first sentence of the answer is here. A second sentence comes after it.", "It is ten o'clock."])
+        commands.remember_turn("turn off the light", "The first sentence of the answer is here. A second sentence comes after it.")
         feed_ms(s, silence(300))                    # the clip ends
         self.assertTrue(self.passed(c, st.THINKING) and c.states().count(st.THINKING) == 2 or
                         self.wait_count(c, st.THINKING, 2), c.states())
         runs = [p for p in s.posts if p[0] == "/api/run"]
         self.assertEqual(len(runs), 2)
-        self.assertTrue(runs[1][1]["message"].startswith("Wie spät ist es"))
-        self.assertIn("unterbrochen", runs[1][1]["hint"])
-        self.assertNotIn("unterbrochen", runs[1][1]["message"])
+        self.assertTrue(runs[1][1]["message"].startswith("What time is it"))
+        self.assertIn("interrupted", runs[1][1]["hint"])
+        self.assertNotIn("interrupted", runs[1][1]["message"])
         win = commands.load()["window"]
-        self.assertIn("unterbrochen", win[-1]["a"])          # nothing had ended yet: no planned text leaks in
-        self.assertNotIn("Zweiter Satz", win[-1]["a"])
+        self.assertIn("interrupted", win[-1]["a"])          # nothing had ended yet: no planned text leaks in
+        self.assertNotIn("second sentence", win[-1]["a"])
 
     def test_backchannel_resumes_at_sentence_start(self):
-        s, c = self.interrupt(["Jarvis, mach das Licht aus", "mhm"])
+        s, c = self.interrupt(["Jarvis, turn off the light", "mhm"])
         first_begin = c.of("audio_begin")[0]
         before = len(c.of("audio_begin"))            # sentences already streamed ahead before the pause
         feed_ms(s, silence(300))
@@ -276,7 +276,7 @@ class Conversation(unittest.TestCase):
         self.assertEqual(len([p for p in s.posts if p[0] == "/api/run"]), 1)
 
     def test_cough_is_a_blip_and_short_noise_resumes(self):
-        s, c = self.speak_and_wait(["Jarvis, mach das Licht aus"], hold=True)
+        s, c = self.speak_and_wait(["Jarvis, turn off the light"], hold=True)
         self.assertTrue(c.wait_event("audio_begin", 3))
         feed_ms(s, noise_burst(60))                 # shorter than confirm_ms: duck, no pause
         feed_ms(s, silence(100))
@@ -290,7 +290,7 @@ class Conversation(unittest.TestCase):
         self.assertEqual(len([p for p in s.posts if p[0] == "/api/run"]), 1)
 
     def test_stop_word_ends_the_answer(self):
-        s, c = self.interrupt(["Jarvis, mach das Licht aus", "stopp"])
+        s, c = self.interrupt(["Jarvis, turn off the light", "stop"])
         feed_ms(s, silence(300))
         self.assertTrue(c.wait_state(st.LISTENING, 2), c.states())
         done = c.of("speak_done")[-1]
@@ -298,28 +298,28 @@ class Conversation(unittest.TestCase):
         self.assertEqual(len([p for p in s.posts if p[0] == "/api/run"]), 1)
         n_audio = len(c.audio)
         time.sleep(0.3)
-        self.assertEqual(len(c.audio), n_audio, "nothing more is sent after stopp")
+        self.assertEqual(len(c.audio), n_audio, "nothing more is sent after stop")
 
     def test_interrupted_then_silence_resumes(self):
-        s, c = self.interrupt(["Jarvis, mach das Licht aus", "Wie"])       # the clip: too short to be a request
+        s, c = self.interrupt(["Jarvis, turn off the light", "What"])       # the clip: too short to be a request
         feed_ms(s, silence(300))
         self.assertTrue(c.wait_state(st.SPEAKING, 2), c.states())
         self.assertIn(st.RESUMING, c.states())
 
     def test_typed_question_is_spoken_and_stop_button_works(self):
-        self.session, c, _ = make_session(answer="Eine getippte Antwort, die gesprochen wird. Und noch ein Satz dazu.")
+        self.session, c, _ = make_session(answer="A typed answer that is spoken. And one more sentence.")
         s = self.session
         c.hold = True
-        s.text("Wie spät ist es?", typed=True)
+        s.text("What time is it?", typed=True)
         self.assertTrue(c.wait_event("audio_begin", 3))
         s.stop()
         self.assertTrue(c.wait_state(st.LISTENING, 1))
         self.assertTrue(c.of("speak_done")[-1]["interrupted"])
 
     def test_notice_waits_for_a_quiet_moment(self):
-        self.session, c, _ = make_session(answer="Antwort.")
+        self.session, c, _ = make_session(answer="Answer.")
         s = self.session
-        s.say("Die Waschmaschine ist fertig.")
+        s.say("The washing machine is done.")
         self.assertTrue(c.wait_event("audio_begin", 3))
         self.assertTrue(c.wait_state(st.LISTENING, 3))
         self.assertEqual([p for p in s.posts if p[0] == "/api/run"], [])

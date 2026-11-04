@@ -1,5 +1,5 @@
 """
-UniFi network controller: who is in the WLAN right now, and how the access points are doing —
+UniFi network controller: who is on the WiFi right now, and how the access points are doing —
 read-only, a second presence source next to Home Assistant.
 
   UNIFI_URL        https://10.0.0.1 (the UniFi OS console; self-signed certificate is fine)
@@ -10,7 +10,7 @@ read-only, a second presence source next to Home Assistant.
 
   clients()        [{name, ip, wired, ssid, signal, since}] of the connected clients
   devices()        [{name, model, state, ip}] of the UniFi devices (APs, switches, gateway)
-  describe(topic)  spoken text for the tool unifi_status: clients | geraete | alles
+  describe(topic)  spoken text for the tool unifi_status: clients | devices | all
   online(names)    which of the given client names are online (presence for other modules)
 
 Client names come from the devices themselves (DHCP) — the tool's text is untrusted data.
@@ -69,7 +69,7 @@ def _site_id():
     if not _SESSION["site_id"]:
         sites = (_v1("/sites") or {}).get("data") or []
         if not sites:
-            raise RuntimeError("keine Site gefunden")
+            raise RuntimeError("no site found")
         _SESSION["site_id"] = sites[0]["id"]
     return _SESSION["site_id"]
 
@@ -132,7 +132,7 @@ def _devices_legacy():
 
 def clients(ttl=30):
     if not configured():
-        raise RuntimeError("UniFi nicht eingerichtet (UNIFI_URL und UNIFI_API_KEY oder UNIFI_USER/UNIFI_PASSWORD in .env)")
+        raise RuntimeError("UniFi not set up (UNIFI_URL and UNIFI_API_KEY or UNIFI_USER/UNIFI_PASSWORD in .env)")
     if _CACHE["clients"] is not None and time.time() - _CACHE["at"] < ttl:
         return _CACHE["clients"]
     rows = _clients_v1() if API_KEY else _clients_legacy()
@@ -142,7 +142,7 @@ def clients(ttl=30):
 
 def devices():
     if not configured():
-        raise RuntimeError("UniFi nicht eingerichtet")
+        raise RuntimeError("UniFi not set up")
     return _devices_v1() if API_KEY else _devices_legacy()
 
 
@@ -158,28 +158,28 @@ def online(names):
 
 def say_clients(rows):
     if not rows:
-        return "Gerade ist kein Gerät im Netz verbunden — oder der Controller sieht keines."
+        return "No device is connected to the network right now — or the controller sees none."
     wifi = [c for c in rows if not c["wired"]]
     wired = [c for c in rows if c["wired"]]
     by_ssid = {}
     for c in wifi:
-        by_ssid.setdefault(c["ssid"] or "WLAN", []).append(c["name"])
-    parts = [f"{len(rows)} Geräte verbunden, {len(wifi)} im WLAN, {len(wired)} per Kabel."]
+        by_ssid.setdefault(c["ssid"] or "WiFi", []).append(c["name"])
+    parts = [f"{len(rows)} devices connected, {len(wifi)} on WiFi, {len(wired)} by cable."]
     for ssid, names in sorted(by_ssid.items(), key=lambda kv: -len(kv[1])):
-        parts.append(f"{ssid}: " + ", ".join(sorted(names)[:12]) + (f" und {len(names) - 12} weitere" if len(names) > 12 else ""))
+        parts.append(f"{ssid}: " + ", ".join(sorted(names)[:12]) + (f" and {len(names) - 12} more" if len(names) > 12 else ""))
     if wired:
-        parts.append("Kabel: " + ", ".join(sorted(c["name"] for c in wired)[:10]))
+        parts.append("Cable: " + ", ".join(sorted(c["name"] for c in wired)[:10]))
     weak = [c for c in wifi if isinstance(c.get("signal"), (int, float)) and c["signal"] <= -75]
     if weak:
-        parts.append("Schwacher Empfang: " + ", ".join(f"{c['name']} ({c['signal']} dBm)" for c in weak[:5]))
+        parts.append("Weak signal: " + ", ".join(f"{c['name']} ({c['signal']} dBm)" for c in weak[:5]))
     return "\n".join(parts)
 
 
 def say_devices(rows):
     if not rows:
-        return "Keine UniFi-Geräte gefunden."
+        return "No UniFi devices found."
     off = [d for d in rows if d["state"] not in ("online", "1")]
-    head = f"{len(rows)} UniFi-Geräte, " + (f"{len(off)} nicht online: " + ", ".join(d["name"] for d in off) if off else "alle online")
+    head = f"{len(rows)} UniFi devices, " + (f"{len(off)} not online: " + ", ".join(d["name"] for d in off) if off else "all online")
     return head + ". " + ", ".join(f"{d['name']} ({d['model']})" for d in rows[:8]) + "."
 
 
@@ -192,15 +192,15 @@ def describe(topic="clients"):
             return say_clients(clients()) + "\n" + say_devices(devices())
         return say_clients(clients())
     except Exception as e:  # noqa: BLE001
-        return f"UniFi nicht lesbar: {str(e)[:160]}"
+        return f"UniFi not readable: {str(e)[:160]}"
 
 
-_ASK = re.compile(r"\b(wer ist (gerade |alles )?(im|in meinem) (wlan|netz|netzwerk)|welche geräte (sind|hängen) "
-                  r"(gerade )?(im|am) (wlan|netz|netzwerk)|wie viele geräte (sind )?(im|am) (wlan|netz)|unifi|"
-                  r"access ?points?)\b")
+_ASK = re.compile(r"\b(who is (currently |right now )?(on|in) (my |the )?(wifi|wlan|network)|which devices are "
+                  r"(currently |right now )?(on|in|connected to) (the |my )?(wifi|wlan|network)|how many devices (are )?(on|in) "
+                  r"(the |my )?(wifi|wlan|network)|unifi|access ?points?)\b")
 
 
 def handle(n):
     if not _ASK.search(n) or not configured():
         return None
-    return describe("geraete" if re.search(r"access ?point|unifi", n) else "clients")
+    return describe("devices" if re.search(r"access ?point|unifi", n) else "clients")

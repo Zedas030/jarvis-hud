@@ -25,50 +25,50 @@ class Index(unittest.TestCase):
     def setUp(self):
         if docsearch.DB.exists():
             docsearch.DB.unlink()
-        (ROOT / "Handbuecher").mkdir(parents=True, exist_ok=True)
-        self.manual = ROOT / "Handbuecher" / "Waschmaschine.md"
-        self.manual.write_text("# Waschmaschine\n\nDas Flusensieb unten rechts alle vier Wochen reinigen.\n"
-                               + "Fülltext. " * 300 + "\nFehlercode E21: Abpumpen gestört.\n", encoding="utf-8")
-        with zipfile.ZipFile(ROOT / "Garantie.docx", "w") as z:
-            z.writestr("word/document.xml", "<w:document><w:body><w:p><w:r><w:t>Garantie bis 2028 für den "
-                                            "Trockner</w:t></w:r></w:p></w:body></w:document>")
-        (ROOT / "Kunde Contoso Vertrag.txt").write_text("Vertrag mit Flusensieb-Klausel", encoding="utf-8")
+        (ROOT / "Manuals").mkdir(parents=True, exist_ok=True)
+        self.manual = ROOT / "Manuals" / "Washing machine.md"
+        self.manual.write_text("# Washing machine\n\nClean the lint filter at the bottom right every four weeks.\n"
+                               + "Filler text. " * 240 + "\nError code E21: pumping out disturbed.\n", encoding="utf-8")
+        with zipfile.ZipFile(ROOT / "Warranty.docx", "w") as z:
+            z.writestr("word/document.xml", "<w:document><w:body><w:p><w:r><w:t>Warranty until 2028 for the "
+                                            "dryer</w:t></w:r></w:p></w:body></w:document>")
+        (ROOT / "Customer Contoso contract.txt").write_text("Contract with lint filter clause", encoding="utf-8")
 
     def test_search_with_sources(self):
         n, _, skipped = docsearch.index()
         self.assertGreaterEqual(n, 2)
         self.assertGreaterEqual(skipped, 1)                       # the work file
-        out = docsearch.search("Flusensieb reinigen")
-        self.assertIn("Waschmaschine.md (Zeichen 0)", out)
-        self.assertIn("»Flusensieb«", out)
+        out = docsearch.search("clean lint filter")
+        self.assertIn("Washing machine.md (character 0)", out)
+        self.assertIn("»lint«", out)
         self.assertNotIn("Contoso", out)
-        self.assertIn("(Zeichen 2400)", docsearch.search("Fehlercode E21"))   # third chunk, cited with its position
-        self.assertIn("Garantie.docx", docsearch.search("Garantie Trockner"))
+        self.assertIn("(character 2400)", docsearch.search("error code E21"))   # third chunk, cited with its position
+        self.assertIn("Warranty.docx", docsearch.search("warranty dryer"))
 
     def test_incremental(self):
         docsearch.index()
         self.assertEqual(docsearch.index()[0], 0)                 # nothing changed
         time.sleep(0.05)
-        self.manual.write_text("Neue Anleitung: Türdichtung trocknen lassen.", encoding="utf-8")
+        self.manual.write_text("New instructions: let the door seal dry.", encoding="utf-8")
         os.utime(self.manual, (time.time() + 5, time.time() + 5))
         self.assertEqual(docsearch.index()[0], 1)
-        self.assertIn("Waschmaschine.md", docsearch.search("Türdichtung"))
-        self.assertIn("Nichts", docsearch.search("Flusensieb"))
+        self.assertIn("Washing machine.md", docsearch.search("door seal"))
+        self.assertIn("Nothing", docsearch.search("lint filter"))
         self.manual.unlink()
         self.assertGreaterEqual(docsearch.index()[1], 1)          # removed from the index
-        self.assertIn("Nichts", docsearch.search("Türdichtung"))
+        self.assertIn("Nothing", docsearch.search("door seal"))
 
     def test_status_and_empty(self):
-        self.assertIn("noch leer", docsearch.search("irgendwas"))
+        self.assertIn("still empty", docsearch.search("anything"))
         docsearch.index()
         st = docsearch.status()
-        self.assertIn("Dokumente", st)
+        self.assertIn("documents", st)
         if not docsearch.pdf_available():
-            self.assertIn("pypdf nicht installiert", st)
+            self.assertIn("pypdf not installed", st)
 
     @unittest.skipUnless(docsearch.pdf_available(), "pypdf not installed")
     def test_pdf_with_page(self):
-        pages = ["Inhaltsverzeichnis", "Entkalken: alle drei Monate mit Zitronensaeure"]
+        pages = ["Table of contents", "Descaling: every three months with citric acid"]
         objs, kids = [], []
         objs.append("<< /Type /Catalog /Pages 2 0 R >>")
         objs.append(None)                                   # pages, filled below
@@ -88,16 +88,16 @@ class Index(unittest.TestCase):
         out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
         out += "".join(f"{o:010d} 00000 n \n" for o in offsets).encode()
         out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
-        (ROOT / "Kaffeemaschine.pdf").write_bytes(out)
+        (ROOT / "Coffee machine.pdf").write_bytes(out)
         docsearch.index()
-        self.assertIn("Kaffeemaschine.pdf (Seite 2)", docsearch.search("entkalken"))
-        self.assertIn("PDF wird gelesen", docsearch.status())
+        self.assertIn("Coffee machine.pdf (page 2)", docsearch.search("descaling"))
+        self.assertIn("PDFs are read", docsearch.status())
 
     def test_untrusted(self):
         docsearch.index()
         jarvis_mcp.TAINTED.update(on=False, by="")
-        out = jarvis_mcp.handle_call("doc_search", {"query": "Flusensieb"})
-        self.assertTrue(out.startswith("«FREMDE DATEN aus doc_search"))
+        out = jarvis_mcp.handle_call("doc_search", {"query": "lint filter"})
+        self.assertTrue(out.startswith("«THIRD-PARTY DATA from doc_search"))
         self.assertTrue(jarvis_mcp.TAINTED["on"])
         jarvis_mcp.TAINTED.update(on=False, by="")
         self.assertIn("doc_search", policy.UNTRUSTED)

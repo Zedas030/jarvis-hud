@@ -30,7 +30,7 @@ WORKDIR = os.path.expanduser(os.environ.get("JARVIS_WORKDIR", os.getcwd()))
 # bypassPermissions by default: a headless `claude -p` can't surface a permission
 # prompt, so any gated tool (MCP connectors, web search) would silently fail
 # otherwise. This also lets JARVIS take unattended actions (send/delete/shell) —
-# see docs/sicherheit.md and SECURITY.md. Set JARVIS_PERMISSION=acceptEdits to narrow it.
+# see docs/security.md and SECURITY.md. Set JARVIS_PERMISSION=acceptEdits to narrow it.
 PERMISSION = os.environ.get("JARVIS_PERMISSION", "acceptEdits").strip()
 # Tools JARVIS may use without a prompt. No Bash: a voice-driven assistant should
 # not run shell commands because something in the room said so. acceptEdits keeps
@@ -492,7 +492,7 @@ def _run_warm(message, session_id, system, prefix):
         p.proc.stdin.flush()
     except (OSError, ValueError) as e:
         p.kill()
-        yield dict(t="error", message=f"Claude-Prozess nicht erreichbar: {e}")
+        yield dict(t="error", message=f"Claude process not reachable: {e}")
         return
     ok = False
     try:
@@ -663,7 +663,7 @@ def run_lean(message, model, groups, system, prefix=""):
             p.proc.stdin.flush()
             yield from _consume(p, started, None)
         except (OSError, ValueError) as e:
-            yield dict(t="error", message=f"Claude-Prozess nicht erreichbar: {e}")
+            yield dict(t="error", message=f"Claude process not reachable: {e}")
         finally:
             p.kill()                                   # stateless: never reuse a process
             with _ACTIVE_LOCK:

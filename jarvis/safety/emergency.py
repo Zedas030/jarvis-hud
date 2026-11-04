@@ -1,14 +1,14 @@
 """
-Emergency stop: "Jarvis, stopp alles" / "Not-Aus".
+Emergency stop: "Jarvis, stop everything" / "emergency stop".
 
   - answers every open confirmation card with "no"
   - stops a running Claude process
   - pauses for JARVIS_PAUSE_HOURS (default 2): proactive messages, the
     background jobs of the learning modules, the homelab observer and planned
-    commands ("Licht in einer Stunde aus" is dropped while paused)
+    commands ("light off in an hour" is dropped while paused)
 
 Alarms, timers and reminders still ring — they are what the user asked for.
-"Jarvis, weitermachen" / "Not-Aus aufheben" ends the pause early. Handled by
+"Jarvis, carry on" / "cancel the emergency stop" ends the pause early. Handled by
 the local router: no LLM, works even when Claude is down.
 """
 import os
@@ -18,8 +18,8 @@ import time
 import commands
 
 HOURS = float(os.environ.get("JARVIS_PAUSE_HOURS", "2"))
-STOP = re.compile(r"^\W*(jarvis\W+)?(not[- ]?aus|stopp? alles|alles stopp(en)?|halt alles an|sofort aufhören)\W*$")
-RESUME = re.compile(r"^\W*(jarvis\W+)?(not[- ]?aus (aufheben|beenden|aus)|weitermachen|mach weiter|pause (aufheben|beenden|vorbei))\W*$")
+STOP = re.compile(r"^\W*(jarvis\W+)?(emergency stop|stop everything|stop it all|halt everything|stop all of it)\W*$")
+RESUME = re.compile(r"^\W*(jarvis\W+)?((cancel|end|lift) (the )?emergency stop|carry on|keep going|(end|lift) (the )?pause|pause (is )?over)\W*$")
 
 
 def paused(now=None):
@@ -37,14 +37,14 @@ def pause(hours=HOURS, cancel=None):
         except Exception:  # noqa: BLE001
             pass
     import audit
-    audit.write("pause", what=f"Not-Aus für {hours:g} h")
+    audit.write("pause", what=f"emergency stop for {hours:g} h")
     return until
 
 
 def resume():
     commands.update_state(lambda d: d.pop("paused_until", None))
     import audit
-    audit.write("pause", what="Not-Aus aufgehoben")
+    audit.write("pause", what="emergency stop lifted")
 
 
 def handle(n, deny_cards=None, cancel=None):
@@ -52,13 +52,13 @@ def handle(n, deny_cards=None, cancel=None):
     if STOP.search(n):
         denied = deny_cards() if deny_cards else 0
         until = pause(cancel=cancel)
-        return (f"Not-Aus, Sir. Alles angehalten" + (f", {denied} offene Bestätigung(en) abgelehnt" if denied else "")
-                + f". Bis {time.strftime('%H:%M', time.localtime(until))} melde ich mich nicht von selbst und "
-                "führe nichts Geplantes aus. Wecker und Erinnerungen klingeln weiter. "
-                "Sagen Sie „weitermachen“, wenn es vorbei ist.")
+        return (f"Emergency stop, Sir. Everything halted" + (f", {denied} open confirmation(s) declined" if denied else "")
+                + f". Until {time.strftime('%H:%M', time.localtime(until))} I will not speak up on my own and "
+                "will not run anything scheduled. Alarms and reminders still ring. "
+                "Say “carry on” when it is over.")
     if RESUME.search(n):
         if not paused():
-            return "Es war nichts angehalten, Sir."
+            return "Nothing was halted, Sir."
         resume()
-        return "Weiter geht's, Sir. Meldungen und geplante Befehle laufen wieder."
+        return "Carrying on, Sir. Notices and scheduled commands are running again."
     return None

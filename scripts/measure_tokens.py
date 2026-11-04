@@ -1,13 +1,13 @@
 """
-Token-Messung für Jarvis: ruft `claude -p` so auf wie der Server und zählt pro
-API-Aufruf input / cache_read / cache_write / output. Varianten schalten
-einzelne Bestandteile weg, damit sich ihr Gewicht als Differenz ablesen lässt.
+Token measurement for Jarvis: calls `claude -p` the way the server does and counts per
+API call input / cache_read / cache_write / output. Variants switch single parts
+off, so their weight can be read off as a difference.
 
     .venv\\Scripts\\python.exe scripts\\measure_tokens.py components
     .venv\\Scripts\\python.exe scripts\\measure_tokens.py requests
-    .venv\\Scripts\\python.exe scripts\\measure_tokens.py components --new   (nach dem Umbau)
+    .venv\\Scripts\\python.exe scripts\\measure_tokens.py components --new   (after the rebuild)
 
-Jeder Lauf startet einen frischen Prozess ohne --resume (Verlauf = 0).
+Every run starts a fresh process without --resume (history = 0).
 """
 import json
 import os
@@ -109,60 +109,60 @@ def strip(cmd, flag, has_value=True):
 
 
 def components_cde():
-    msg = "Sag nur: ok."
+    msg = "Just say: ok."
     runtime.HA["on"] = False
     base = current_cmd(msg)
     c = base + ["--strict-mcp-config"]
-    run(c, "C ohne claude.ai-Konnektoren")
+    run(c, "C without claude.ai connectors")
     d = c + ["--tools", ""]
-    run(d, "D + ohne eingebaute Tools")
+    run(d, "D + without built-in tools")
     sysp = commands.system_block(fresh=True)
     e = strip(d, "--append-system-prompt") + ["--system-prompt", sysp]
-    run(e, "E + eigener Systemprompt statt Standard")
-    h = strip(e, "--system-prompt") + ["--system-prompt", "Antworte kurz auf Deutsch."]
-    run(h, "H Mini-Prompt + nur Jarvis-Werkzeuge")
+    run(e, "E + own system prompt instead of the default")
+    h = strip(e, "--system-prompt") + ["--system-prompt", "Answer briefly in English."]
+    run(h, "H mini prompt + only Jarvis tools")
 
 
 def components():
-    msg = "Sag nur: ok."
+    msg = "Just say: ok."
     base = current_cmd(msg)
-    run(base, "A aktuell (Standardprompt+alle Tools+Konnektoren)")
-    run(current_cmd(msg, ha=True), "B aktuell + Home-Assistant-Server")
+    run(base, "A current (default prompt+all tools+connectors)")
+    run(current_cmd(msg, ha=True), "B current + Home Assistant server")
     runtime.HA["on"] = False
     runtime._mcp_config()   # B rewrote the shared config file with Home Assistant on
     c = base + ["--strict-mcp-config"]
-    run(c, "C ohne claude.ai-Konnektoren")
+    run(c, "C without claude.ai connectors")
     d = c + ["--tools", ""]
-    run(d, "D + ohne eingebaute Tools")
+    run(d, "D + without built-in tools")
     sysp = commands.system_block(fresh=True)
     e = strip(d, "--append-system-prompt") + ["--system-prompt", sysp]
-    run(e, "E + eigener Systemprompt statt Standard")
+    run(e, "E + own system prompt instead of the default")
     f = strip(strip(e, "--mcp-config"), "--permission-prompt-tool")
-    run(f, "F + ohne Jarvis-MCP-Werkzeuge")
-    g = strip(f, "--system-prompt") + ["--system-prompt", "Antworte kurz auf Deutsch."]
-    run(g, "G nackt (Mini-Prompt, keine Tools)")
+    run(f, "F + without Jarvis MCP tools")
+    g = strip(f, "--system-prompt") + ["--system-prompt", "Answer briefly in English."]
+    run(g, "G bare (mini prompt, no tools)")
     runtime.HA["on"] = True
     runtime._mcp_config()
-    h = strip(strip(e, "--system-prompt") + ["--system-prompt", "Antworte kurz auf Deutsch."], "--allowedTools")
-    run(h, "H nur Mini-Prompt + Jarvis- und HA-Werkzeuge")
+    h = strip(strip(e, "--system-prompt") + ["--system-prompt", "Answer briefly in English."], "--allowedTools")
+    run(h, "H only mini prompt + Jarvis and HA tools")
     runtime.HA["on"] = False
     runtime._mcp_config()
 
 
 def requests():
     for label, msg in [
-        ("Smalltalk", "Wie spät ist es?"),
-        ("Gedächtnis", "Welches Auto fahre ich?"),
-        ("Haus lesen", "Wie viel Strom erzeugt die Solaranlage gerade?"),
-        ("Wetter (Web)", "Wie wird das Wetter morgen?"),
+        ("small talk", "What time is it?"),
+        ("memory", "Which car do I drive?"),
+        ("reading the house", "How much power is the solar system generating right now?"),
+        ("weather (web)", "What will the weather be like tomorrow?"),
     ]:
-        run(current_cmd(msg), f"aktuell · {label}")
+        run(current_cmd(msg), f"current · {label}")
 
 
 def requests_old_extra():
-    for label, msg in [("Mail", "Hab ich wichtige neue Mails?"),
-                       ("Recherche (Web)", "Wer hat das letzte Bundesliga-Spiel von Hertha gewonnen?")]:
-        run(current_cmd(msg), f"aktuell · {label}")
+    for label, msg in [("mail", "Do I have important new mails?"),
+                       ("research (web)", "Who won Arsenal's last Premier League match?")]:
+        run(current_cmd(msg), f"current · {label}")
 
 
 def requests_new():
@@ -170,16 +170,16 @@ def requests_new():
     import router
     rows = []
     for label, msg in [
-        ("Smalltalk", "Wie spät ist es?"),
-        ("Gedächtnis", "Welches Auto fahre ich?"),
-        ("Haus lesen", "Wie viel Strom erzeugt die Solaranlage gerade?"),
-        ("Wetter (Web)", "Wie wird das Wetter morgen?"),
-        ("Mail", "Hab ich wichtige neue Mails?"),
-        ("Recherche (Web)", "Wer hat das letzte Bundesliga-Spiel von Hertha gewonnen?"),
+        ("small talk", "What time is it?"),
+        ("memory", "Which car do I drive?"),
+        ("reading the house", "How much power is the solar system generating right now?"),
+        ("weather (web)", "What will the weather be like tomorrow?"),
+        ("mail", "Do I have important new mails?"),
+        ("research (web)", "Who won Arsenal's last Premier League match?"),
     ]:
         r = router.route(msg)
         if r["kind"] == "local":
-            print(f"neu · {label:40s} LOKAL ({r['handler']}) → 0 Tokens", flush=True)
+            print(f"new · {label:40s} LOCAL ({r['handler']}) → 0 tokens", flush=True)
             continue
         system, prefix = commands.lean_system(r["groups"]), commands.lean_prefix(msg, r["groups"])
         usage, t0 = {}, time.time()
@@ -187,12 +187,12 @@ def requests_new():
             if ev["t"] == "usage":
                 usage = ev
         tot = usage.get("input_tokens", 0) + usage.get("cache_read", 0) + usage.get("cache_write", 0)
-        row = dict(label="neu · " + label, model=r["model"], groups=r["groups"], total_in=tot,
+        row = dict(label="new · " + label, model=r["model"], groups=r["groups"], total_in=tot,
                    cache_write=usage.get("cache_write"), output=usage.get("output_tokens"),
                    api_calls=usage.get("api_calls"), secs=round(time.time() - t0, 1))
         with OUT.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(dict(row, at=time.strftime("%Y-%m-%d %H:%M:%S")), ensure_ascii=False) + "\n")
-        print(f"neu · {label:40s} {r['model']:6s} total_in={tot:>6} cw={usage.get('cache_write'):>5} "
+        print(f"new · {label:40s} {r['model']:6s} total_in={tot:>6} cw={usage.get('cache_write'):>5} "
               f"out={usage.get('output_tokens'):>4} calls={usage.get('api_calls')} {row['secs']}s", flush=True)
     runtime.lean_shutdown()
 

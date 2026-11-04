@@ -1,16 +1,16 @@
 """
 Before leaving: the calendar says where the user has to be, commute.py says when to leave —
 PREP_MIN minutes before that, Jarvis says what still runs at home and prepares the
-"Ausschalten" proposal, so one "ausschalten" (and the card) does it. Nothing is switched here.
+"switch off" proposal, so one "switch off" (and the card) does it. Nothing is switched here.
 
   check(events, states, now)   called by watchers.calendar with the cached appointments; once per
                                appointment (watchers.once). Lights, media and the plugs from
                                config/home.json → away_check (away_check.still_on), plus the
                                thermostats in config/home.json → "departure":
-                                 {"climate": ["climate.wohnzimmer"], "climate_away": 17}
+                                 {"climate": ["climate.living_room"], "climate_away": 17}
                                which the proposal sets to climate_away degrees; climate_away 0
                                switches them off instead (hvac_mode off).
-  With a phone set up the notice goes there too, with Ja/Nein buttons (phone_actions.py).
+  With a phone set up the notice goes there too, with yes/no buttons (phone_actions.py).
 """
 import datetime as dt
 import os
@@ -47,17 +47,17 @@ def plan(states, cfg_away, cfg_dep):
 
 
 def climate_label(name, temp):
-    return f"{name} aus" if temp <= 0 else f"{name} auf {temp:g} Grad"
+    return f"{name} off" if temp <= 0 else f"{name} to {temp:g} degrees"
 
 
 def message(event, leave_min, drive, found, climate, names):
-    title = event.get("title", "Ihr Termin")
-    head = (f"Sir, in etwa {max(1, round(leave_min))} Minuten sollten Sie los zu {title}, Fahrzeit etwa {drive} Minuten."
-            if leave_min > 1 else f"Sir, Zeit loszufahren zu {title}, Fahrzeit etwa {drive} Minuten.")
+    title = event.get("title", "your appointment")
+    head = (f"Sir, in about {max(1, round(leave_min))} minutes you should leave for {title}, about {drive} minutes by car."
+            if leave_min > 1 else f"Sir, time to leave for {title}, about {drive} minutes by car.")
     bits = [label for _, label in found] + [climate_label(names.get(e, e), t) for e, t in climate.items()]
     if not bits:
-        return head + " Zuhause ist alles aus."
-    return head + " Zuhause läuft noch: " + ", ".join(bits) + ". Sagen Sie „ausschalten“, dann kommt die Karte."
+        return head + " Everything at home is off."
+    return head + " Still running at home: " + ", ".join(bits) + ". Say “switch off” and the card comes up."
 
 
 def check(events_list, states_list, now, once):
@@ -84,13 +84,13 @@ def check(events_list, states_list, now, once):
             continue
         if found or climate:
             labels = [label for _, label in found] + [climate_label(names.get(x, x), t) for x, t in climate.items()]
-            pid = proposals.add("switch_off", "Vor dem Losfahren ausschalten: " + ", ".join(labels)[:90],
-                                f"Sie fahren gleich zu {e.get('title', 'einem Termin')} und das läuft noch.",
+            pid = proposals.add("switch_off", "Switch off before leaving: " + ", ".join(labels)[:90],
+                                f"You are about to leave for {e.get('title', 'an appointment')} and this is still running.",
                                 {"entities": [x for x, _ in found], "labels": labels, "climate": climate},
                                 source="departure")
             try:
                 import phone_actions
-                phone_actions.push_proposal(pid, text, title="Jarvis · gleich los")
+                phone_actions.push_proposal(pid, text, title="Jarvis · leaving soon")
             except Exception:  # noqa: BLE001 — the phone is a bonus
                 pass
         return text

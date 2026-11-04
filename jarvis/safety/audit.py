@@ -4,11 +4,11 @@ Audit log: what Jarvis did, when, and who allowed it.
 One JSON line per event in logs/audit.jsonl (JARVIS_AUDIT_LOG):
   tool      a Jarvis tool ran (from jarvis_mcp.py — Claude and the stand-ins alike)
   card      a confirmation card was answered (allowed / denied / timed out)
-  local     the local router did something without an LLM ("Licht aus")
+  local     the local router did something without an LLM ("light off")
   pause     emergency stop / resume
 
 Arguments are shortened and secrets masked (policy.redact); tool results are
-not stored, only whether they looked like success. "Was hast du heute gemacht?"
+not stored, only whether they looked like success. "What did you do today?"
 reads this file (today_summary). Lines older than JARVIS_AUDIT_DAYS (90) are
 dropped once a day.
 """
@@ -20,7 +20,7 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this file: jarvis/<group>/)
 PATH = pathlib.Path(os.environ.get("JARVIS_AUDIT_LOG", ROOT / "logs" / "audit.jsonl"))
 KEEP_DAYS = int(os.environ.get("JARVIS_AUDIT_DAYS", "90"))
-_FAIL = ("abgelehnt", "fehler", "nicht erreichbar", "nicht bestätigt", "ungültig", "gibt es nicht", "nicht gespeichert")
+_FAIL = ("refused", "error", "not reachable", "not confirmed", "invalid", "does not exist", "not saved", "failed")
 
 
 def write(kind, **fields):
@@ -58,28 +58,28 @@ def read(day=None):
 
 
 def today_summary(day=None):
-    """Plain German for 'Was hast du heute gemacht?': actions first, reading only counted."""
+    """Plain words for 'What did you do today?': actions first, reading only counted."""
     rows = read(day)
     if not rows:
-        return "Heute habe ich noch nichts ausgeführt."
+        return "I have not run anything today yet."
     acts, reads, cards = [], 0, []
     for r in rows:
         if r["kind"] == "tool" and r.get("cls") == "READ":
             reads += 1
         elif r["kind"] == "tool":
             what = ", ".join(f"{v}" for v in r.get("args", {}).values())[:80]
-            acts.append(f"{r['at'][11:16]} {r['tool']}" + (f" ({what})" if what else "") + ("" if r.get("ok") else " — fehlgeschlagen"))
+            acts.append(f"{r['at'][11:16]} {r['tool']}" + (f" ({what})" if what else "") + ("" if r.get("ok") else " — failed"))
         elif r["kind"] == "local":
-            acts.append(f"{r['at'][11:16]} lokal: {r.get('message', '')[:60]}")
+            acts.append(f"{r['at'][11:16]} local: {r.get('message', '')[:60]}")
         elif r["kind"] == "card":
-            cards.append(f"{r['at'][11:16]} {r.get('tool')}: {'erlaubt' if r.get('allow') else 'abgelehnt'}")
+            cards.append(f"{r['at'][11:16]} {r.get('tool')}: {'allowed' if r.get('allow') else 'declined'}")
         elif r["kind"] == "pause":
             acts.append(f"{r['at'][11:16]} {r.get('what')}")
-    out = [f"Heute {len(acts)} Aktion(en), {reads} Mal nur gelesen."]
+    out = [f"Today {len(acts)} action(s), {reads} times only read."]
     if acts:
-        out.append("Aktionen:\n" + "\n".join(f"- {a}" for a in acts[-25:]))
+        out.append("Actions:\n" + "\n".join(f"- {a}" for a in acts[-25:]))
     if cards:
-        out.append("Bestätigungskarten:\n" + "\n".join(f"- {c}" for c in cards[-10:]))
+        out.append("Confirmation cards:\n" + "\n".join(f"- {c}" for c in cards[-10:]))
     return "\n".join(out)
 
 

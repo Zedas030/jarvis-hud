@@ -11,7 +11,7 @@ import re
 import threading
 import time
 
-ON = os.environ.get("JARVIS_AMBIENCE", "1").strip().lower() not in ("0", "off", "aus", "false", "no", "nein")
+ON = os.environ.get("JARVIS_AMBIENCE", "1").strip().lower() not in ("0", "off", "false", "no")
 EVERY = float(os.environ.get("JARVIS_AMBIENCE_EVERY", "20"))
 # Players that never make sound in the room (a phone's media session, a cast group's copy, …).
 IGNORE = re.compile(os.environ.get("JARVIS_AMBIENCE_IGNORE", r"^$"), re.I)
@@ -19,7 +19,8 @@ STALE_S = 120            # an answer older than this counts as "nothing known"
 
 # Titles, channels and apps that mean a match is on; everything else with video is TV.
 SPORT = re.compile(
-    r"sport|bundesliga|champions league|fu(ss|ß)ball|dazn|sky sport|magentasport|sportschau|"
+    r"sport|premier league|bundesliga|champions league|football|soccer|fu(ss|ß)ball|dazn|sky sports?|"
+    r"tnt sports|match of the day|magentasport|sportschau|"
     r"sportstudio|formel ?1|formula ?1|\bf1\b|motogp|tennis|handball|basketball|\bnba\b|\bnfl\b|"
     r"eishockey|\bnhl\b|darts|boxen|\bufc\b|tour de france|olympia|wm 20\d\d|em 20\d\d|eurosport|ran\.de",
     re.I)

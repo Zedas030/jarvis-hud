@@ -52,7 +52,7 @@ def _num(v):
 GOLF_DAYLIGHT_MIN = 90
 # Working hours (JARVIS_WORK_END): the activity only fits in after that.
 WORK_END = dt.time(16, 0)
-WEEKDAYS = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
+WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
 def _golf_day_index(sunsets):
@@ -68,10 +68,10 @@ def _golf_day_index(sunsets):
 
 def _golf_verdict(code, rain, wind, tmax):
     if code >= 95 or rain >= 70 or wind >= 45 or tmax < 3:
-        return ("nein", "bad")
+        return ("no", "bad")
     if rain >= 40 or wind >= 30 or tmax < 9:
-        return ("mit Jacke", "warn")
-    return ("ja", "ok")
+        return ("with jacket", "warn")
+    return ("yes", "ok")
 
 
 RAIN_CHANCE = 30         # % from which an hour counts as a rain hour, even without a forecast amount
@@ -90,8 +90,8 @@ def _pct(lo, hi):
 
 def rain_day(hours):
     """hours: one day's [(hour, probability %, mm)], 0-23. Each stretch of rain hours with its own
-    chance — the same line for every day: "6–12 Uhr (30–100 %), 23–24 Uhr (18 %)" /
-    "ganztägig (40–100 %)" / "" (no rain hour)."""
+    chance — the same line for every day: "6–12 h (30–100 %), 23–24 h (18 %)" /
+    "all day (40–100 %)" / "" (no rain hour)."""
     spans, cur = [], None
     for h, p, mm in hours:
         if rain_hour(p, mm):
@@ -102,9 +102,9 @@ def rain_day(hours):
     if cur:
         spans.append(cur)
     if spans and sum(e - s for s, e, _, _ in spans) >= 20:
-        when = f"ganztägig ({_pct(min(sp[2] for sp in spans), max(sp[3] for sp in spans))})"
+        when = f"all day ({_pct(min(sp[2] for sp in spans), max(sp[3] for sp in spans))})"
     else:
-        when = ", ".join(f"{s}–{e} Uhr ({_pct(lo, hi)})" for s, e, lo, hi in spans[:4])
+        when = ", ".join(f"{s}–{e} h ({_pct(lo, hi)})" for s, e, lo, hi in spans[:4])
     return dict(when=when, peak=max([p or 0 for _, p, _ in hours] or [0]),
                 mm=round(sum(m or 0 for _, _, m in hours), 1),
                 times=", ".join(f"{s}–{e}" for s, e, _, _ in spans[:3]))
@@ -127,7 +127,7 @@ def _weather():
     else:
         golf = _golf_verdict(day["weather_code"][i], day["precipitation_probability_max"][i] or 0,
                              day["wind_speed_10m_max"][i] or 0, day["temperature_2m_max"][i])
-    golf_day = "heute" if i == 0 else "morgen" if i == 1 else \
+    golf_day = "today" if i == 0 else "tomorrow" if i == 1 else \
         WEEKDAYS[dt.date.fromisoformat(day["sunset"][i][:10]).weekday()]
     # the next days for the iPad's forecast row (the PC only shows today)
     hr = d.get("hourly") or {}
@@ -137,8 +137,8 @@ def _weather():
     days = []
     for k in range(min(5, len(day.get("time", [])))):
         hours = by_day.get(day["time"][k], [])
-        days.append(dict(day="Heute" if k == 0 else WEEKDAYS[dt.date.fromisoformat(day["time"][k]).weekday()][:2],
-                         code=day["weather_code"][k], sky=briefing.WEATHER_CODES.get(day["weather_code"][k], "wechselhaft"),
+        days.append(dict(day="Today" if k == 0 else WEEKDAYS[dt.date.fromisoformat(day["time"][k]).weekday()][:2],
+                         code=day["weather_code"][k], sky=briefing.WEATHER_CODES.get(day["weather_code"][k], "changeable"),
                          tmin=day["temperature_2m_min"][k], tmax=day["temperature_2m_max"][k],
                          rain=day["precipitation_probability_max"][k] or 0,
                          rain_min=(day.get("precipitation_probability_min") or [None] * 7)[k] or 0,
@@ -146,11 +146,16 @@ def _weather():
                          rain_when=rain_day(hours)["when"], rain_times=rain_day(hours)["times"],
                          hours=[dict(h=h, p=p, mm=m, rain=rain_hour(p, m)) for h, p, m in hours]))
     return dict(now=now.get("temperature_2m"), tmin=day["temperature_2m_min"][0], tmax=tmax, code=code,
-                sky=briefing.WEATHER_CODES.get(code, "wechselhaft"), rain=rain, wind=round(wind),
+                sky=briefing.WEATHER_CODES.get(code, "changeable"), rain=rain, wind=round(wind),
                 sunset=day["sunset"][0][-5:], golf=golf[0], golf_cls=golf[1], golf_day=golf_day, days=days,
                 location=dict(latitude=float(briefing.LAT), longitude=float(briefing.LON), timezone=profile.TIMEZONE),
                 sun_times=[dict(date=stamp[:10], sunrise=(day.get("sunrise") or [None] * len(day["sunset"]))[k],
                                 sunset=stamp) for k, stamp in enumerate(day["sunset"])])
+
+
+# calendars of waste collection dates: their timed entries are reminders, not appointments
+WASTE_CALENDARS = {c.strip().lower() for c in os.environ.get("JARVIS_WASTE_CALENDARS", "waste collection,abfuhrtermine").split(",")
+                   if c.strip()}
 
 
 def _agenda(limit=5):
@@ -160,14 +165,14 @@ def _agenda(limit=5):
         return None
     now, out = dt.datetime.now(), []
     for e in cal.events(dt.date.today(), 7):
-        if e.get("calendar", "").lower() == "abfuhrtermine" and not e.get("allday"):
+        if e.get("calendar", "").lower() in WASTE_CALENDARS and not e.get("allday"):
             continue
         if (e.get("end") or e["start"]) < now:
             continue
         d = e["start"].date()
-        out.append(dict(title=e.get("title", "(ohne Titel)"), allday=bool(e.get("allday")),
-                        day="Heute" if d == now.date() else "Morgen" if d == now.date() + dt.timedelta(days=1)
-                        else WEEKDAYS[d.weekday()][:2] + e["start"].strftime(" %d.%m."),
+        out.append(dict(title=e.get("title", "(no title)"), allday=bool(e.get("allday")),
+                        day="Today" if d == now.date() else "Tomorrow" if d == now.date() + dt.timedelta(days=1)
+                        else WEEKDAYS[d.weekday()][:3] + f" {d.day} " + d.strftime("%b"),
                         time="" if e.get("allday") else e["start"].strftime("%H:%M"),
                         now=e["start"] <= now))
         if len(out) >= limit:
@@ -181,16 +186,16 @@ def _next_event():
         return None
     now = dt.datetime.now()
     for e in cal.events(dt.date.today(), 7):
-        if e.get("calendar", "").lower() == "abfuhrtermine" and not e.get("allday"):
+        if e.get("calendar", "").lower() in WASTE_CALENDARS and not e.get("allday"):
             continue
         end = e.get("end") or e["start"]
         if end >= now:
-            day = "heute" if e["start"].date() == now.date() else \
-                "morgen" if e["start"].date() == now.date() + dt.timedelta(days=1) else \
-                ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")[e["start"].weekday()] + e["start"].strftime(" %d.%m.")
-            return dict(title=e.get("title", "(ohne Titel)"),
+            day = "today" if e["start"].date() == now.date() else \
+                "tomorrow" if e["start"].date() == now.date() + dt.timedelta(days=1) else \
+                ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")[e["start"].weekday()] + f" {e['start'].day} " + e["start"].strftime("%b")
+            return dict(title=e.get("title", "(no title)"),
                         when=day + ("" if e.get("allday") else e["start"].strftime(" %H:%M")))
-    return {"title": "", "when": "keine Termine"}
+    return {"title": "", "when": "no appointments"}
 
 
 def _house():
@@ -216,8 +221,8 @@ def _house():
         gen_kwh=round(total(profile.ha("generation_today")), 1),
         charge_w=val(profile.ha("charge_power")), out_w=val(profile.ha("output_power")),
         rooms=rooms, pm25=pm,
-        air="gut" if pm is not None and pm <= 12 else "mäßig" if pm is not None and pm <= 35 else
-        "schlecht" if pm is not None else None,
+        air="good" if pm is not None and pm <= 12 else "moderate" if pm is not None and pm <= 35 else
+        "poor" if pm is not None else None,
         router=dict(online=by.get(rt.get("online"), {}).get("state") == "on",
                     down=val(rt.get("down")), up=val(rt.get("up")), temp=val(rt.get("temp"))),
         person=by.get(profile.ha("person") or "", {}).get("state"),
@@ -229,7 +234,7 @@ def _house():
 def _garmin():
     import jarvis_mcp as j
     if not (j.GARMIN_EMAIL and j.GARMIN_PASSWORD):
-        return {"error": "nicht verbunden"}
+        return {"error": "not connected"}
     import os
     from garminconnect import Garmin
     g = Garmin(j.GARMIN_EMAIL, j.GARMIN_PASSWORD, return_on_mfa=True)
@@ -253,7 +258,7 @@ def _mail():
     import email.utils
     import mailboxes
     if not mailboxes.configured():
-        return {"error": "nicht verbunden"}
+        return {"error": "not connected"}
     dec = lambda v: str(email.header.make_header(email.header.decode_header(v or ""))).strip()  # noqa: E731
 
     def read(acc, box):                       # box is read-only: nothing gets marked as read
@@ -270,14 +275,14 @@ def _mail():
             msg = email.message_from_bytes(part[1])
             name, addr = email.utils.parseaddr(dec(msg.get("From")))
             sent = email.utils.parsedate_to_datetime(msg["Date"]) if msg.get("Date") else None
-            latest.append(dict(sender=name or addr, subject=dec(msg.get("Subject")) or "(ohne Betreff)",
-                               when=sent.strftime("%d.%m. %H:%M") if sent else "", ts=sent.timestamp() if sent else 0,
+            latest.append(dict(sender=name or addr, subject=dec(msg.get("Subject")) or "(no subject)",
+                               when=sent.strftime("%m-%d %H:%M") if sent else "", ts=sent.timestamp() if sent else 0,
                                account=acc["name"]))
         return len(ids), latest
 
     results, errors = mailboxes.each(read, timeout=15)
     if not results:
-        return {"error": "; ".join(errors) or "nicht erreichbar"}
+        return {"error": "; ".join(errors) or "not reachable"}
     newest = sorted((m for _, ms in results for m in ms), key=lambda m: -m["ts"])
     # latest stays four for the small tiles; the tablet's mail sheet scrolls through the whole page
     return dict(unread=sum(n for n, _ in results), latest=newest[:4], inbox=newest[:MAIL_LIST], at=time.strftime("%H:%M"),
@@ -286,7 +291,7 @@ def _mail():
 def _nas():
     import jarvis_mcp as j
     if not (j.SYNO_USER and j.SYNO_PASSWORD):
-        return {"error": "nicht verbunden"}
+        return {"error": "not connected"}
     sid = j._syno({"api": "SYNO.API.Auth", "version": 6, "method": "login", "account": j.SYNO_USER,
                    "passwd": j.SYNO_PASSWORD, "session": "jarvis", "format": "sid"})["sid"]
     try:
@@ -312,8 +317,8 @@ def _nas():
 def _pi():
     import jarvis_mcp as j
     out = j._pi_status()
-    if out.startswith("Pi nicht erreichbar"):
-        return {"error": "nicht erreichbar"}
+    if out.startswith("Pi not reachable"):
+        return {"error": "not reachable"}
     grab = lambda pat: (m.group(1) if (m := re.search(pat, out)) else None)  # noqa: E731
     containers = re.findall(r"container (\S+): (.*)", out)
     return dict(temp=_num(grab(r"temp: ([\d.]+)")), load=_num(grab(r"load: ([\d.]+)")),

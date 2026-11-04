@@ -1,7 +1,7 @@
 """
 Which requests still go to the LLM — and what they cost.
 
-    .venv\\Scripts\\python.exe scripts\\router_report.py [Tage]
+    .venv\\Scripts\\python.exe scripts\\router_report.py [days]
 
 Lists recurring LLM requests (candidates for a new router rule or a routine)
 and the wordings the router has already learned (config/learned.json).
@@ -16,14 +16,14 @@ import learning  # noqa: E402
 days = int(sys.argv[1]) if len(sys.argv) > 1 else 30
 r = learning.report(days)
 if not r.get("total"):
-    sys.exit(f"Keine Einträge in den letzten {days} Tagen ({learning.USAGE}).")
-print(f"Letzte {days} Tage: {r['total']} Anfragen, {r['local']} lokal "
-      f"({round(100 * r['local'] / r['total'])} %), {r['llm']} ans LLM, ~{r['tokens']:,} Tokens.\n".replace(",", "."))
-print("Wiederkehrende LLM-Anfragen (Kandidaten für eine Regel oder Routine):")
+    sys.exit(f"No entries in the last {days} days ({learning.USAGE}).")
+print(f"Last {days} days: {r['total']} requests, {r['local']} local "
+      f"({round(100 * r['local'] / r['total'])} %), {r['llm']} to the LLM, ~{r['tokens']:,} tokens.\n")
+print("Recurring LLM requests (candidates for a rule or a routine):")
 for msg, count, tokens in r["repeat"] or []:
-    print(f"  {count:3}×  {tokens:>8,} Tokens  {msg}".replace(",", "."))
+    print(f"  {count:3}×  {tokens:>8,} tokens  {msg}")
 if not r["repeat"]:
-    print("  keine")
-print("\nGelernte Formulierungen:")
+    print("  none")
+print("\nLearned wordings:")
 for k, v in sorted((learning.load().get("aliases") or {}).items()):
-    print(f"  {k:30} → {', '.join(v['entities'])}  (seit {v.get('learned')})")
+    print(f"  {k:30} → {', '.join(v['entities'])}  (since {v.get('learned')})")

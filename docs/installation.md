@@ -1,118 +1,120 @@
-[← Zurück zum README](../README.md)
+[← Back to the README](../README.md)
 
-# Installation und Konfiguration
+# Installation and configuration
 
-Voraussetzungen, Schnellstart, lokale Stimmen, alle Einstellungen aus `.env` und die Werkzeuge für Entwicklung und Diagnose.
+Requirements, quick start, local voices, all settings from `.env` and the tools for development and diagnosis.
 
-## Schnellstart
+## Quick start
 
-**Voraussetzungen:** Windows 11 · Python 3.12 · Node.js · ein Claude-Abo. Optional: NVIDIA-GPU (CUDA 12.8) für Whisper `large-v3-turbo` und die lokale Stimme.
+**Requirements:** Windows 11 · Python 3.12 · Node.js · a Claude subscription. Optional: NVIDIA GPU (CUDA 12.8) for Whisper `large-v3-turbo` and the local voice.
 
 ```powershell
-# 1  Claude Code installieren und anmelden (Abo, kein API-Key)
+# 1  Install Claude Code and sign in (subscription, no API key)
 npm.cmd install -g @anthropic-ai/claude-code
 claude auth login
 
-# 2  Python-Umgebung
+# 2  Python environment
 py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-# mit NVIDIA-GPU zusätzlich: -r requirements-gpu.txt · auf dem Windows-PC: -r requirements-windows.txt
+# with an NVIDIA GPU also: -r requirements-gpu.txt · on the Windows PC: -r requirements-windows.txt
 
-# 3  Konfiguration
-copy .env.example .env                      # Werte eintragen
-copy config\home.example.json config\home.json   # HA-Entity-IDs eintragen (optional)
-mkdir vault\Erinnerungen
+# 3  Configuration
+copy .env.example .env                      # fill in the values
+copy config\home.example.json config\home.json   # fill in the HA entity ids (optional)
+mkdir vault\Memories
 
 # 4  Start
 start-jarvis.bat
 ```
 
-**Mit dem PC starten (optional):** eine Verknüpfung auf `start-jarvis.bat` im Autostart-Ordner (`shell:startup`, Arbeitsordner das Repo, Fenster minimiert) startet Jarvis beim Anmelden. Abschalten im Task-Manager unter „Autostart-Apps“ oder die Verknüpfung löschen.
+**Starting with the PC (optional):** a shortcut to `start-jarvis.bat` in the startup folder (`shell:startup`, working folder the repo, window minimised) starts Jarvis when you sign in. To switch it off use Task Manager under "Startup apps" or delete the shortcut.
 
-**Lokale Stimmen (optional)**
+**Local voices (optional)**
 
 ```powershell
-# Piper (CPU, sofort einsatzbereit)
+# Piper (CPU, ready right away)
 mkdir models\piper
-curl -L -o models\piper\de_DE-thorsten-high.onnx      https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/de_DE-thorsten-high.onnx
-curl -L -o models\piper\de_DE-thorsten-high.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/high/de_DE-thorsten-high.onnx.json
+curl -L -o models\piper\en_GB-alan-medium.onnx      https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alan/medium/en_GB-alan-medium.onnx
+curl -L -o models\piper\en_GB-alan-medium.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json
 
-# Chatterbox Multilingual (GPU, ~5 GB) — Details in requirements-tts.txt
+# Chatterbox Multilingual (GPU, ~5 GB) — details in requirements-tts.txt
 py -3.12 -m venv .venv-tts
 .venv-tts\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 .venv-tts\Scripts\python.exe -m pip install --no-deps chatterbox-tts
 .venv-tts\Scripts\python.exe -m pip install -r requirements-tts.txt
-# Sprachprobe (~10 s, eigene Rechte): models\voice\reference.wav
+# voice sample (~10 s, your own rights): models\voice\reference.wav
 ```
 
-Der Server startet die GPU-Stimme automatisch, sobald `.venv-tts` existiert.
+The server starts the GPU voice automatically as soon as `.venv-tts` exists. Chatterbox speaks English (`language_id` `en`).
 
 ---
 
-## Konfiguration
+## Configuration
 
-Alle Einstellungen stehen kommentiert in [`.env.example`](../.env.example). Persönliche Daten gehören ausschließlich in `.env` und `config/home.json`, beide sind in `.gitignore`.
+All settings are commented in [`.env.example`](../.env.example). Personal data belongs only in `.env` and `config/home.json`; both are in `.gitignore`. Where to enter API keys, passwords and tokens and how to rotate them: README, section [Secrets](../README.md#secrets).
 
-| Bereich | Variablen | Zweck |
+| Area | Variables | Purpose |
 |---|---|---|
-| Profil | `JARVIS_USER_NAME`, `JARVIS_PLACE`, `JARVIS_WEATHER_LAT/LON`, `JARVIS_TIMEZONE`, `JARVIS_BROWSER` | Anrede, Ort, Browser |
-| Gehirn | `JARVIS_LEAN`, `JARVIS_LOCAL_ROUTER`, `JARVIS_MODEL_SIMPLE/SMART`, `JARVIS_EFFORT`, `JARVIS_MAX_OUTPUT_TOKENS`, `JARVIS_HISTORY_TURNS` | Router, Modellwahl, Kontextgröße |
-| Stimme | `TTS_CHAIN`, `TTS_ANNOUNCE_SWITCH`, `FISH_AUDIO_*`, `ELEVENLABS_*`, `AZURE_*`, `GOOGLE_TTS_*`, `EDGE_*`, `LOCAL_TTS_URL` | Anbieter-Reihenfolge und Zugänge |
-| Hören | `JARVIS_STT`, `WHISPER_LOCAL_*` | Spracherkennung |
-| Aktivierungswort | `JARVIS_WAKE` (`off`/`text`/`oww`), `JARVIS_WAKE_*`, `JARVIS_FOLLOWUP_S` | „Jarvis …“ statt Dauer-Mikrofon. Ohne „Jarvis“ wird nichts bearbeitet oder protokolliert; `JARVIS_FOLLOWUP_S` > 0 erlaubt kurz Folgefragen ohne „Jarvis“ (Standard: aus) |
-| Von selbst melden | `JARVIS_PROACTIVE`, `JARVIS_QUIET_HOURS`, `JARVIS_EVENT_LEAD_MIN`, `JARVIS_STORAGE_FULL` | Meldungen und Ruhezeiten (Wecker klingeln immer) |
-| Listen | `JARVIS_SHOPPING_LIST`, `JARVIS_TODO_LIST` | HA-To-do-Entity, leer = Notiz unter `vault/Erinnerungen/Listen/` |
-| Notbetrieb | `JARVIS_FALLBACK` (`groq,gemini,ollama`), `GROQ_API_KEY`, `GROQ_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `OLLAMA_URL`, `OLLAMA_MODEL`, `JARVIS_FALLBACK_PRIVATE` | Ersatz-Kette, wenn Claude ausfällt; siehe [Notbetrieb](sprache.md#notbetrieb-ersatz-kette) |
-| Sparen | `JARVIS_CACHE_S` (Standard 300, 0 = aus) | Gleiche Lese-Fragen so lange aus dem Zwischenspeicher |
-| Pendeln | `JARVIS_HOME_LAT/LON` (sonst Wetter-Koordinaten), `JARVIS_TRAFFIC_FACTOR` (1.25), `JARVIS_COMMUTE_BUFFER_MIN` (5), `JARVIS_LEAVE_WARN_MIN` (5) | Startpunkt, Verkehrszuschlag, Puffer, Vorwarnung |
-| PC und Lautstärke | `JARVIS_DUCK` (0.3, 0 = aus), `JARVIS_DUCK_APPS` (spotify.exe), `JARVIS_NIGHT_VOLUME` (0.5) | Musik leiser beim Sprechen, Stimme in den Ruhezeiten; eigene Apps in `config/apps.json` |
-| Spotify | `JARVIS_SPOTIFY_CLIENT_ID`, `JARVIS_SPOTIFY_HOLD` (1), `JARVIS_SPOTIFY_HOLD_MAX_S` (120), `JARVIS_SPOTIFY_HOLD_MODE` (leise), `JARVIS_SPOTIFY_QUIET_FACTOR` (0.3), `JARVIS_SPOTIFY_QUIET_PCT` (20) | Bei „Jarvis“ und bei jeder Ansage, auch wenn er sich von selbst meldet, geht die Musik auf dem Gerät des Kontos, das gerade spielt (auch Handy an der Anlage), auf ein Drittel ihrer Lautstärke, höchstens 20 %, und kommt danach auf die alte Lautstärke zurück; hat man sie zwischendurch von Hand verstellt, bleibt sie so. Mit `JARVIS_SPOTIFY_HOLD_MODE=pause` hält sie stattdessen an, ebenso auf Geräten, deren Lautstärke Spotify nicht setzen kann; Musikbefehle gehen übers Konto. Einmalig App auf developer.spotify.com (Redirect URI `http://127.0.0.1:8722/callback`), dann `scripts\spotify_login.py` |
-| Aussprache | `config/aussprache.json` | Eigene Einträge, entsteht per Sprache |
-| Dienste | `ICLOUD_*`, `MAIL_*`, `HA_*`, `SYNOLOGY_*`, `JARVIS_PI_*`, `GARMIN_*`, `PAPERLESS_*`, `UNIFI_*`, `JELLYFIN_*` | Integrationen; jede ist optional |
-| Smarter | `JARVIS_USER_HABITS` (1), `JARVIS_WELLBEING` (1), `JARVIS_WB_SLEEP_LOW/STRESS_HIGH/BATTERY_LOW` (60/50/30), `JARVIS_WB_BATTERY_EVENING` (25), `JARVIS_DEPARTURE_PREP_MIN` (30), `JARVIS_POWER_BUDGET_EUR` (0 = aus), `JARVIS_MAINTENANCE` (1), `JARVIS_WHISPER_HOURS` (= Ruhezeiten), `JARVIS_LATE_FROM` (21), `JARVIS_LATE_VOLUME` (0.8), `JARVIS_FOCUS_WARN_MIN` (10), `JARVIS_FOCUS_DISTRACT`, `JARVIS_SELFCHECK_SECONDS` (25), `JARVIS_PHONE_ACTION_ENTITY` | Gewohnheiten, Garmin-Auslöser, Losfahren, Budget, Wartung, Stimme nach Tageszeit, Fokus, Selbstkontrolle, Handy-Rückkanal |
-| Geräte | `config/home.json` | Zuordnung der Dashboard-Felder (Solar, Speicher, Räume, Router, Luft) zu Home-Assistant-Entities, dazu `appliances` (Leistungsmesser für „… ist fertig“) und `device_aliases` (weitere Wörter je Gerät, z. B. „Wohnzimmer“ und „Lampe“ für ein Licht, das in Home Assistant nur „LED“ heißt; greift ohne Neustart nach spätestens 5 Minuten) |
-| Routinen | `config/routines.json` | Entsteht per Sprache; Format in `config/routines.example.json` |
+| Profile | `JARVIS_USER_NAME`, `JARVIS_PLACE`, `JARVIS_WEATHER_LAT/LON`, `JARVIS_TIMEZONE`, `JARVIS_BROWSER` | Form of address, place, browser |
+| Brain | `JARVIS_LEAN`, `JARVIS_LOCAL_ROUTER`, `JARVIS_MODEL_SIMPLE/SMART`, `JARVIS_EFFORT`, `JARVIS_MAX_OUTPUT_TOKENS`, `JARVIS_HISTORY_TURNS` | Router, model choice, context size |
+| Voice | `TTS_CHAIN`, `TTS_ANNOUNCE_SWITCH`, `FISH_AUDIO_*`, `ELEVENLABS_*` (incl. `ELEVENLABS_LANG`, default `en`), `AZURE_*`, `GOOGLE_TTS_*`, `EDGE_*`, `LOCAL_TTS_URL` | Provider order and access |
+| Listening | `JARVIS_STT`, `WHISPER_LOCAL_*` (incl. `WHISPER_LOCAL_LANG`, default `en`), `ELEVENLABS_STT_LANG` (default `eng`) | Speech recognition |
+| Wake word | `JARVIS_WAKE` (`off`/`text`/`oww`), `JARVIS_WAKE_*`, `JARVIS_FOLLOWUP_S` | "Jarvis …" instead of an always-on microphone. Without "Jarvis" nothing is processed or logged; `JARVIS_FOLLOWUP_S` > 0 briefly allows follow-up questions without "Jarvis" (default: off) |
+| Speaking up by himself | `JARVIS_PROACTIVE`, `JARVIS_QUIET_HOURS`, `JARVIS_EVENT_LEAD_MIN`, `JARVIS_STORAGE_FULL` | Notices and quiet hours (alarms always ring) |
+| Lists | `JARVIS_SHOPPING_LIST`, `JARVIS_TODO_LIST` | HA to-do entity, empty = note under `vault/Memories/Lists/` |
+| Fallback mode | `JARVIS_FALLBACK` (`groq,gemini,ollama`), `GROQ_API_KEY`, `GROQ_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `OLLAMA_URL`, `OLLAMA_MODEL`, `JARVIS_FALLBACK_PRIVATE` | Replacement chain when Claude fails; see [Fallback mode](voice.md#fallback-mode-replacement-chain) |
+| Saving | `JARVIS_CACHE_S` (default 300, 0 = off) | The same read questions come from the cache for this long |
+| Commuting | `JARVIS_HOME_LAT/LON` (otherwise the weather coordinates), `JARVIS_TRAFFIC_FACTOR` (1.25), `JARVIS_COMMUTE_BUFFER_MIN` (5), `JARVIS_LEAVE_WARN_MIN` (5) | Starting point, traffic surcharge, buffer, advance warning |
+| PC and volume | `JARVIS_DUCK` (0.3, 0 = off), `JARVIS_DUCK_APPS` (spotify.exe), `JARVIS_NIGHT_VOLUME` (0.5) | Music quieter while speaking, the voice during quiet hours; own apps in `config/apps.json` |
+| Spotify | `JARVIS_SPOTIFY_CLIENT_ID`, `JARVIS_SPOTIFY_HOLD` (1), `JARVIS_SPOTIFY_HOLD_MAX_S` (120), `JARVIS_SPOTIFY_HOLD_MODE` (quiet), `JARVIS_SPOTIFY_QUIET_FACTOR` (0.3), `JARVIS_SPOTIFY_QUIET_PCT` (20) | On "Jarvis" and on every announcement, also when he speaks up by himself, the music on the account's device that is playing (also the phone on the stereo) goes to a third of its volume, at most 20 %, and then comes back to the old volume; if you changed it by hand in between, it stays that way. With `JARVIS_SPOTIFY_HOLD_MODE=pause` it stops instead, as it does on devices whose volume Spotify cannot set; music commands go through the account. Once: an app on developer.spotify.com (redirect URI `http://127.0.0.1:8722/callback`), then `scripts\spotify_login.py` |
+| Pronunciation | `config/pronunciation.json` | Own entries, created by voice |
+| Services | `ICLOUD_*`, `MAIL_*`, `HA_*`, `SYNOLOGY_*`, `JARVIS_PI_*`, `GARMIN_*`, `PAPERLESS_*`, `UNIFI_*`, `JELLYFIN_*` | Integrations; each one is optional |
+| Smarter | `JARVIS_USER_HABITS` (1), `JARVIS_WELLBEING` (1), `JARVIS_WB_SLEEP_LOW/STRESS_HIGH/BATTERY_LOW` (60/50/30), `JARVIS_WB_BATTERY_EVENING` (25), `JARVIS_DEPARTURE_PREP_MIN` (30), `JARVIS_POWER_BUDGET_EUR` (0 = off), `JARVIS_MAINTENANCE` (1), `JARVIS_WHISPER_HOURS` (= quiet hours), `JARVIS_LATE_FROM` (21), `JARVIS_LATE_VOLUME` (0.8), `JARVIS_FOCUS_WARN_MIN` (10), `JARVIS_FOCUS_DISTRACT`, `JARVIS_SELFCHECK_SECONDS` (25), `JARVIS_PHONE_ACTION_ENTITY` | Habits, Garmin triggers, setting off, budget, maintenance, voice by time of day, focus, self-check, phone return channel |
+| Devices | `config/home.json` | Mapping of the dashboard fields (solar, battery, rooms, router, air) to Home Assistant entities, plus `appliances` (power meters for "… is done") and `device_aliases` (more words per device, e.g. "living room" and "lamp" for a light that is only called "LED" in Home Assistant; applies without a restart after 5 minutes at the latest) |
+| Home Assistant entity names | `JARVIS_PLUG_POWER_SUFFIX`, `JARVIS_PLUG_MONTH_SUFFIX`, `JARVIS_HOUSE_MONTH` | The defaults follow English Home Assistant names (`_current_consumption`, `_this_month_s_consumption`); set these for a Home Assistant in another language |
+| Routines | `config/routines.json` | Created by voice; format in `config/routines.example.json` |
 
-> **Wichtig:** `ANTHROPIC_API_KEY` nie setzen. Claude Code würde sonst per API statt über das Abo abrechnen. Der Server entfernt die Variable vorsorglich aus der Umgebung der Kindprozesse.
+> **Important:** never set `ANTHROPIC_API_KEY`. Claude Code would then bill through the API instead of the subscription. As a precaution the server removes the variable from the environment of its child processes.
 
 ---
 
-## Entwicklung und Diagnose
+## Development and diagnosis
 
 ```powershell
-# Tests: Router, Timer, Listen, Routinen (Home Assistant wird simuliert, nichts wird geschaltet)
+# Tests: router, timers, lists, routines (Home Assistant is simulated, nothing is switched)
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 
-# Token-Messung: Bestandteile, Standard-Anfragen, schlanker Weg
+# Token measurement: parts, standard requests, the lean path
 .venv\Scripts\python.exe scripts\measure_tokens.py components
 .venv\Scripts\python.exe scripts\measure_tokens.py new
 
-# Was geht noch ans LLM, was hat der Router gelernt?
+# What still goes to the LLM, what has the router learned?
 .venv\Scripts\python.exe scripts\router_report.py 30
 
-# Autostart bei der Anmeldung (Aufgabenplanung, ohne Adminrechte); -Remove entfernt ihn
+# Autostart at sign-in (Task Scheduler, without admin rights); -Remove removes it
 powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1
 
-# Router + schlanken Aufruf ohne Server testen
-.venv\Scripts\python.exe scripts\lean_probe.py "Wie geht es dem NAS?"
+# Test router + lean call without the server
+.venv\Scripts\python.exe scripts\lean_probe.py "How is the NAS doing?"
 
-# Testinstanz neben der laufenden (eigener Port, eigene Zustandsdatei)
+# Test instance next to the running one (own port, own state file)
 set JARVIS_PORT=8721& set JARVIS_STATE=%TEMP%\state_test.json& .venv\Scripts\python.exe server.py
 ```
 
-| Symptom | Ursache / Lösung |
+| Symptom | Cause / fix |
 |---|---|
-| Live-Button tut nichts | `F5`. Bei „Mikrofon blockiert“ in der Adressleiste das Mikrofon freigeben. |
-| Wird mitten im Satz abgeschnitten | `endpoint.base_ms` / `unfinished_extra_ms` in `config/voice.yaml` erhöhen (siehe Tuning-Protokoll); ohne Engine: `SILENCE_MS` in `ui/app.js` |
-| Stockt beim Sprechen, ohne dass jemand reinredet | `vad.barge_threshold` in `config/voice.yaml` erhöhen; ohne Engine: `BARGE_FACTOR` in `ui/app.js` |
-| HUD meldet keine Engine („Sprach-Engine aus“ im Startbanner) | Port 8724 belegt oder `websockets` fehlt: `pip install websockets pyyaml`; `engine.enabled` in `config/voice.yaml` |
-| Keine Stimme | Feld **STIMME** im Dashboard zeigt gesperrte Anbieter und den Grund |
-| GPU-Stimme startet nicht | `logs/local_tts.log`; der erste Start lädt ~3 GB |
-| Hoher Verbrauch | `logs/usage.jsonl` nach Route, Modell und Gruppen auswerten |
-| Was ist schiefgelaufen? | `logs/jarvis.log` (JSON-Zeilen, Warnungen und Fehler aller Module; `JARVIS_LOG_DEBUG=router` für ein Modul auf DEBUG) und `http://localhost:8720/metrics` (Zähler je Route, Karte, Job, Modul) |
-| Reagiert nicht auf „Jarvis“ | `JARVIS_WAKE` prüfen. Bei `oww` zeigt das Startbanner, ob openWakeWord läuft; sonst gilt die Text-Erkennung. `JARVIS_WAKE_THRESHOLD` senken. |
-| Meldungen nur angezeigt, nicht gesprochen | Ruhezeit (`JARVIS_QUIET_HOURS`) |
-| Notbetrieb meldet sich nicht | Tooltip auf „Brain“ in der Kopfzeile zeigt je Anbieter den Grund (Key fehlt, Limit bis …, Ollama aus). Ollama: `ollama pull qwen2.5:7b-instruct` |
-| Jarvis startet ständig neu | `logs/crash.log`; nach fünf Abstürzen in zehn Minuten hört der Supervisor auf |
-| Falsche Fahrzeit | `JARVIS_HOME_LAT/LON` auf die Wohnadresse setzen (Standard sind die Wetter-Koordinaten) |
-| Gelernte Formulierung falsch | Eintrag in `config/learned.json` löschen |
+| The Live button does nothing | `F5`. On "Microphone blocked" allow the microphone in the address bar. |
+| Gets cut off in the middle of a sentence | Raise `endpoint.base_ms` / `unfinished_extra_ms` in `config/voice.yaml` (see the tuning log); without the engine: `SILENCE_MS` in `ui/app.js` |
+| Stutters while speaking without anyone talking over him | Raise `vad.barge_threshold` in `config/voice.yaml`; without the engine: `BARGE_FACTOR` in `ui/app.js` |
+| The HUD reports no engine ("voice engine off" in the start banner) | Port 8724 in use or `websockets` missing: `pip install websockets pyyaml`; `engine.enabled` in `config/voice.yaml` |
+| No voice | The **VOICE** field in the dashboard shows blocked providers and the reason |
+| The GPU voice does not start | `logs/local_tts.log`; the first start downloads ~3 GB |
+| High usage | Evaluate `logs/usage.jsonl` by route, model and groups |
+| What went wrong? | `logs/jarvis.log` (JSON lines, warnings and errors of all modules; `JARVIS_LOG_DEBUG=router` for one module on DEBUG) and `http://localhost:8720/metrics` (counters per route, card, job, module) |
+| Does not react to "Jarvis" | Check `JARVIS_WAKE`. With `oww` the start banner shows whether openWakeWord runs; otherwise text detection applies. Lower `JARVIS_WAKE_THRESHOLD`. |
+| Notices only shown, not spoken | Quiet hours (`JARVIS_QUIET_HOURS`) |
+| Fallback mode does not answer | The tooltip on "Brain" in the header shows the reason per provider (key missing, limit until …, Ollama off). Ollama: `ollama pull qwen2.5:7b-instruct` |
+| Jarvis keeps restarting | `logs/crash.log`; after five crashes in ten minutes the supervisor stops |
+| Wrong travel time | Set `JARVIS_HOME_LAT/LON` to the home address (the default is the weather coordinates) |
+| A learned wording is wrong | Delete the entry in `config/learned.json` |
+| Speech recognition writes German | `WHISPER_LOCAL_LANG` must be `en` (an `.env` taken over from the German edition still says `de`) |

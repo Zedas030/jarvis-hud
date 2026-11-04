@@ -2,16 +2,16 @@
 Learning loop: Jarvis reviews his own conversations and learns lasting rules.
 
 After a conversation (JARVIS_REFLECT_IDLE_MIN, default 30 minutes of silence) the
-new exchanges from the conversation log (vault/Gespraeche) are evaluated with one
+new exchanges from the conversation log (vault/Conversations) are evaluated with one
 small background call: what went well, what the user corrected, what to do
-differently. The result is appended to the note Erinnerungen/Lernprotokoll.
+differently. The result is appended to the note Memories/Learning log.
 
 Once a week (Sunday from JARVIS_REFLECT_WEEK_HOUR, default 19 h) the week's
 entries are condensed into a few fixed rules. They are NOT written directly:
 they become a proposal (proposals.py) that the user confirms on a card. Accepted
-rules live in the note Vorlieben, in the section "Gelernte Regeln" between two
-markers, and go into the system prompt of every turn (rules_block). "Streich die
-Regel …" removes one again (tool rule_remove, also with a card).
+rules live in the note Preferences, in the section "Learned rules" between two
+markers, and go into the system prompt of every turn (rules_block). "Drop the
+rule …" removes one again (tool rule_remove, also with a card).
 
 Work topics never get in: exchanges that look like work are skipped before the
 model sees them, and anything work-like in its answer is dropped (privacy.py).
@@ -34,20 +34,20 @@ WEEK_HOUR = int(os.environ.get("JARVIS_REFLECT_WEEK_HOUR", "19"))
 MAX_RULES = int(os.environ.get("JARVIS_MAX_RULES", "20"))
 ENABLED = os.environ.get("JARVIS_REFLECT", "1").strip() not in ("0", "false", "no", "off")
 
-LOG_NOTE = "Lernprotokoll"
-RULES_NOTE = "Vorlieben"
-START = "<!-- jarvis:gelernte-regeln -->"
-END = "<!-- /jarvis:gelernte-regeln -->"
+LOG_NOTE = "Learning log"
+RULES_NOTE = "Preferences"
+START = "<!-- jarvis:learned-rules -->"
+END = "<!-- /jarvis:learned-rules -->"
 
 _EXCHANGE = re.compile(r"\*\*(\d{1,2}:\d{2}) · [^*]+:\*\* (.*?)\n\n\*\*Jarvis:\*\* (.*?)(?=\n\*\*\d{1,2}:\d{2} · |\Z)", re.S)
 _CORRECTION = re.compile(
-    r"\b(nein|falsch|stimmt nicht|ich meinte|meinte ich|nicht das|nicht so|lass das|hör auf|stopp|zu lang|"
-    r"zu laut|zu leise|schon wieder|nochmal|noch mal|hab ich doch|eigentlich wollte|du sollst|bitte nicht|"
-    r"das war nicht)\b", re.I)
+    r"\b(no|wrong|not right|thats not right|i meant|not that|not like that|leave it|stop it|stop|too long|"
+    r"too loud|too quiet|again|once more|i already said|actually i wanted|you should|please dont|"
+    r"that was not|that wasnt)\b", re.I)
 
-SYSTEM = ("Du bist JARVIS und wertest deine eigenen Gespräche mit dem User aus, um besser zu werden. "
-          "Ehrlich, konkret, knapp. Arbeitsthemen (Job, Kollegen, Kunden, Projekte der Arbeit) lässt du komplett weg. "
-          "Antworte ausschließlich mit einem JSON-Objekt.")
+SYSTEM = ("You are JARVIS and evaluate your own conversations with the user in order to get better. "
+          "Honest, concrete, brief. You leave out work topics (job, colleagues, customers, work projects) completely. "
+          "Answer with a JSON object only.")
 
 
 # ── conversation log → exchanges ─────────────────────────────
@@ -63,7 +63,7 @@ def _new_exchanges():
     out, pos = [], {}
     for back in (1, 0):
         day = (dt.date.today() - dt.timedelta(days=back)).isoformat()
-        path = memory.DIARY_DIR / f"Gespräch {day}.md"
+        path = memory.DIARY_DIR / f"Conversation {day}.md"
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -79,22 +79,22 @@ def _prompt(items):
     lines, hints = [], []
     for day, t, user, reply in items:
         lines.append(f"[{day} {t}] User: {user[:300]}\nJarvis: {reply[:400]}")
-        if _CORRECTION.search(user):
+        if _CORRECTION.search(re.sub(r"['’]", "", user)):
             hints.append(f"[{day} {t}] {user[:120]}")
     try:
         import selfcheck
         misses = selfcheck.hints()
     except Exception:  # noqa: BLE001
         misses = []
-    return ("Gespräche seit der letzten Auswertung:\n\n" + "\n\n".join(lines) +
-            ("\n\nMögliche Korrekturen des Users:\n" + "\n".join(hints) if hints else "") +
-            ("\n\nMögliche Fehlschläge (der User fragte sofort noch einmal, die erste Antwort passte wohl nicht):\n"
+    return ("Conversations since the last evaluation:\n\n" + "\n\n".join(lines) +
+            ("\n\nPossible corrections by the user:\n" + "\n".join(hints) if hints else "") +
+            ("\n\nPossible misses (the user asked again right away, the first answer probably did not fit):\n"
              + "\n".join(misses) if misses else "") +
-            "\n\nAntworte mit JSON: {\"gut\": [...], \"korrigiert\": [...], \"lehren\": [...]}\n"
-            "- gut: was gut lief (höchstens 3)\n"
-            "- korrigiert: was der User korrigiert hat und was richtig gewesen wäre (höchstens 3)\n"
-            "- lehren: allgemeine Lehre für künftige Gespräche, als Anweisung an dich (höchstens 3)\n"
-            "Jeder Eintrag ein kurzer deutscher Satz (unter 140 Zeichen). Nichts erfinden; nichts Auffälliges = leere Listen.")
+            "\n\nAnswer with JSON: {\"good\": [...], \"corrected\": [...], \"lessons\": [...]}\n"
+            "- good: what went well (3 at most)\n"
+            "- corrected: what the user corrected and what would have been right (3 at most)\n"
+            "- lessons: a general lesson for future conversations, as an instruction to yourself (3 at most)\n"
+            "Each entry one short English sentence (under 140 characters). Invent nothing; nothing notable = empty lists.")
 
 
 def _clean(items, limit=3):
@@ -111,19 +111,19 @@ def _note(name):
 
 
 def append_log(result, when=None):
-    """Writes one evaluation to the Lernprotokoll note. Returns the number of bullets."""
-    rows = ([f"- Gut: {s}" for s in _clean(result.get("gut"))] +
-            [f"- Korrigiert: {s}" for s in _clean(result.get("korrigiert"))] +
-            [f"- Lehre: {s}" for s in _clean(result.get("lehren"))])
+    """Writes one evaluation to the learning log note. Returns the number of bullets."""
+    rows = ([f"- Good: {s}" for s in _clean(result.get("good"))] +
+            [f"- Corrected: {s}" for s in _clean(result.get("corrected"))] +
+            [f"- Lesson: {s}" for s in _clean(result.get("lessons"))])
     if not rows:
         return 0
     path = _note(LOG_NOTE)
     path.parent.mkdir(parents=True, exist_ok=True)
     today = time.strftime("%Y-%m-%d")
     if not path.exists():
-        path.write_text(f"---\ntype: lernen\nwichtigkeit: niedrig\nupdated: {today}\n---\n\n# {LOG_NOTE}\n\n"
-                        "Was Jarvis nach Gesprächen über sich selbst gelernt hat. Daraus entstehen jeden Sonntag "
-                        "Vorschläge für [[Vorlieben]].\n", encoding="utf-8")
+        path.write_text(f"---\ntype: learning\nimportance: low\nupdated: {today}\n---\n\n# {LOG_NOTE}\n\n"
+                        "What Jarvis learned about himself after conversations. Every Sunday this turns into "
+                        "proposals for [[Preferences]].\n", encoding="utf-8")
     body = path.read_text(encoding="utf-8")
     body = re.sub(r"(?m)^updated: .*$", f"updated: {today}", body, count=1)
     stamp = when or time.strftime("%Y-%m-%d %H:%M")
@@ -176,12 +176,12 @@ def rules_list():
     if START not in body or END not in body:
         return []
     section = body.split(START, 1)[1].split(END, 1)[0]
-    return [re.sub(r"\s*\(seit [\d-]+\)$", "", ln[2:].strip()) for ln in section.splitlines() if ln.startswith("- ")]
+    return [re.sub(r"\s*\(since [\d-]+\)$", "", ln[2:].strip()) for ln in section.splitlines() if ln.startswith("- ")]
 
 
 def rules_block():
     rules = rules_list()
-    return ("Vom User bestätigte Regeln, die du aus früheren Gesprächen gelernt hast:\n"
+    return ("Rules confirmed by the user that you learned from earlier conversations:\n"
             + "\n".join(f"- {r}" for r in rules)) if rules else ""
 
 
@@ -196,10 +196,10 @@ def _write_rules(rules_with_dates):
     if path.exists():
         body = path.read_text(encoding="utf-8")
     else:
-        body = (f"---\ntype: vorliebe\nwichtigkeit: mittel\nupdated: {today}\n---\n\n# {RULES_NOTE}\n\n"
-                "Wie der User Dinge mag. Gehört zu [[Profil]].\n")
-    section = (f"{START}\n## Gelernte Regeln\n\nVon Jarvis vorgeschlagen, vom User per Karte bestätigt.\n\n"
-               + "\n".join(f"- {r} (seit {d})" for r, d in rules_with_dates) + f"\n{END}")
+        body = (f"---\ntype: preference\nimportance: medium\nupdated: {today}\n---\n\n# {RULES_NOTE}\n\n"
+                "How the user likes things. Belongs to [[Profile]].\n")
+    section = (f"{START}\n## Learned rules\n\nProposed by Jarvis, confirmed by the user on a card.\n\n"
+               + "\n".join(f"- {r} (since {d})" for r, d in rules_with_dates) + f"\n{END}")
     if START in body and END in body:
         before, rest = body.split(START, 1)
         body = before + section + rest.split(END, 1)[1]
@@ -217,37 +217,37 @@ def _dated_rules():
     out = []
     for ln in section.splitlines():
         if ln.startswith("- "):
-            m = re.match(r"- (.*?)\s*\(seit ([\d-]+)\)$", ln.strip())
+            m = re.match(r"- (.*?)\s*\(since ([\d-]+)\)$", ln.strip())
             out.append((m.group(1), m.group(2)) if m else (ln[2:].strip(), time.strftime("%Y-%m-%d")))
     return out
 
 
 def apply_rules(rules):
-    """Adds confirmed rules to the note Vorlieben (oldest drop out beyond MAX_RULES)."""
+    """Adds confirmed rules to the note Preferences (oldest drop out beyond MAX_RULES)."""
     current = _dated_rules()
     known = {_norm(r) for r, _ in current}
     today = time.strftime("%Y-%m-%d")
     added = 0
     for r in rules:
-        text = " ".join(str(r.get("regel") if isinstance(r, dict) else r).split())[:200]
+        text = " ".join(str(r.get("rule") if isinstance(r, dict) else r).split())[:200]
         if text and _norm(text) not in known and not privacy.is_work(text):
             current.append((text, today))
             known.add(_norm(text))
             added += 1
     _write_rules(current[-MAX_RULES:])
-    return f"{added} Regel(n) in Vorlieben übernommen." if added else "Nichts Neues — die Regeln standen schon drin."
+    return f"{added} rule(s) added to Preferences." if added else "Nothing new — the rules were already in there."
 
 
 def remove_rule(text):
     want = _norm(text or "")
     if not want:
-        return "Welche Regel?"
+        return "Which rule?"
     current = _dated_rules()
     keep = [(r, d) for r, d in current if want not in _norm(r)]
     if len(keep) == len(current):
-        return "Keine gelernte Regel passt dazu."
+        return "No learned rule matches that."
     _write_rules(keep)
-    return f"{len(current) - len(keep)} Regel(n) gestrichen."
+    return f"{len(current) - len(keep)} rule(s) dropped."
 
 
 def consolidate(today=None):
@@ -256,27 +256,27 @@ def consolidate(today=None):
     if not entries:
         return None
     existing = rules_list()
-    prompt = ("Einträge aus deinem Lernprotokoll dieser Woche:\n" + "\n".join(f"- {e}" for e in entries[:60]) +
-              ("\n\nSchon bestehende Regeln (nicht wiederholen):\n" + "\n".join(f"- {r}" for r in existing)
+    prompt = ("Entries from your learning log this week:\n" + "\n".join(f"- {e}" for e in entries[:60]) +
+              ("\n\nRules that already exist (do not repeat):\n" + "\n".join(f"- {r}" for r in existing)
                if existing else "") +
-              "\n\nLeite daraus höchstens 5 feste Regeln für dich ab. Nur, was mehrfach vorkam oder ausdrücklich "
-              "vom User korrigiert wurde. Jede Regel eine kurze Anweisung an dich (unter 140 Zeichen), dazu ein "
-              "Grund. JSON: {\"regeln\": [{\"regel\": \"...\", \"grund\": \"...\"}]}. Nichts Belastbares = leere Liste.")
+              "\n\nDerive at most 5 fixed rules for yourself from them. Only what came up several times or was "
+              "explicitly corrected by the user. Each rule a short instruction to yourself (under 140 characters), plus a "
+              "reason. JSON: {\"rules\": [{\"rule\": \"...\", \"why\": \"...\"}]}. Nothing solid = empty list.")
     result = background.parse_json(background.ask("reflection-week", SYSTEM, prompt)) or {}
-    rules = [{"regel": " ".join(str(r.get("regel", "")).split())[:200],
-              "grund": " ".join(str(r.get("grund", "")).split())[:200]}
-             for r in (result.get("regeln") or []) if isinstance(r, dict)]
+    rules = [{"rule": " ".join(str(r.get("rule", "")).split())[:200],
+              "why": " ".join(str(r.get("why", "")).split())[:200]}
+             for r in (result.get("rules") or []) if isinstance(r, dict)]
     known = {_norm(r) for r in existing}
-    rules = [r for r in rules if r["regel"] and _norm(r["regel"]) not in known
-             and not privacy.is_work(r["regel"], r["grund"])][:5]
+    rules = [r for r in rules if r["rule"] and _norm(r["rule"]) not in known
+             and not privacy.is_work(r["rule"], r["why"])][:5]
     if not rules:
         return None
     week = background.week_key(today)
-    pid = proposals.add("rules", f"{len(rules)} gelernte Regeln aus {week}",
-                        "Aus dem Lernprotokoll der Woche: " + rules[0]["grund"], {"rules": rules}, source="reflection")
-    events.publish("say", f"Sir, aus dieser Woche habe ich {len(rules)} Regeln für mich abgeleitet, zum Beispiel: "
-                          f"{rules[0]['regel']} Wenn Sie mögen, sagen Sie „Regeln übernehmen“, dann zeige ich sie "
-                          "Ihnen zur Bestätigung.", kind="learning")
+    pid = proposals.add("rules", f"{len(rules)} learned rules from {week}",
+                        "From this week's learning log: " + rules[0]["why"], {"rules": rules}, source="reflection")
+    events.publish("say", f"Sir, from this week I have derived {len(rules)} rule{'s' if len(rules) != 1 else ''} for myself, for example: "
+                          f"{rules[0]['rule']} If you like, say “accept the rules” and I will show them to you "
+                          "for confirmation.", kind="learning")
     return pid
 
 

@@ -5,9 +5,9 @@ Homelab figures — what Grafana shows, read at the source; all read-only, 0 tok
   (node), the FRITZ!Box (fritz_exporter), Home Assistant and this PC
   (windows_exporter). Jarvis asks it directly instead of the Grafana UI:
 
-    describe(topic)   internet | pi | pc | wlan | alles — current values plus today's peak
-    query(expr, hours) free PromQL for questions over a time span ("wann war die Last
-                      heute am höchsten?"); hours > 0 = range query, a few points per series
+    describe(topic)   internet | pi | pc | wlan | all — current values plus today's peak
+    query(expr, hours) free PromQL for questions over a time span ("when was the load
+                      highest today?"); hours > 0 = range query, a few points per series
     tile()            the compact values for the HUD tile
 
   Pi-hole 6 (PIHOLE_URL, default http://<pi>:8080, PIHOLE_PASSWORD = an app password
@@ -32,11 +32,11 @@ MAX_SERIES = 12      # a free query may match hundreds of series; the answer is 
 # ── Prometheus ───────────────────────────────────────────────
 def _prom(path, **params):
     if not PROM:
-        raise RuntimeError("Prometheus nicht eingerichtet (PROMETHEUS_URL oder JARVIS_PI_HOST in .env)")
+        raise RuntimeError("Prometheus not set up (PROMETHEUS_URL or JARVIS_PI_HOST in .env)")
     with urllib.request.urlopen(f"{PROM}{path}?{urllib.parse.urlencode(params)}", timeout=15) as r:
         d = json.loads(r.read())
     if d.get("status") != "success":
-        raise RuntimeError(d.get("error") or "Prometheus-Fehler")
+        raise RuntimeError(d.get("error") or "Prometheus error")
     return d["data"]["result"]
 
 
@@ -56,12 +56,12 @@ def _since_midnight():
     return max(60, int((now - now.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()))
 
 
-def _de(x, digits=0):
-    return "—" if x is None else f"{x:,.{digits}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+def _fmt(x, digits=0):
+    return "—" if x is None else f"{x:,.{digits}f}"
 
 
 def _gb(b):
-    return "—" if b is None else (_de(b / 1e12, 1) + " TB" if b >= 1e12 else _de(b / 1e9, 0) + " GB")
+    return "—" if b is None else (_fmt(b / 1e12, 1) + " TB" if b >= 1e12 else _fmt(b / 1e9, 0) + " GB")
 
 
 # PromQL per figure — fixed, so the summaries never depend on what the model writes.
@@ -100,47 +100,47 @@ def internet():
     got = value(f'avg_over_time(max(fritz_wan_datarate_bytes{{direction="rx"}})[{span}s:1m]) * {span}')
     sent = value(f'avg_over_time(max(fritz_wan_datarate_bytes{{direction="tx"}})[{span}s:1m]) * {span}')
     link, uptime = value(Q["link"]), value(Q["fritz_uptime"])
-    rows = [f"internet: {'verbunden' if link == 1 else 'KEINE Leitung'}, gerade {_de(down, 1)} Mbit/s runter, "
-            f"{_de(up, 1)} Mbit/s hoch (Leitung {_de(value(Q['line_down']))}/{_de(value(Q['line_up']))} Mbit/s)",
-            f"heute: {_gb(got)} empfangen, {_gb(sent)} gesendet, Spitze {_de(_today_peak(Q['down']), 0)} Mbit/s runter"]
+    rows = [f"internet: {'connected' if link == 1 else 'NO line'}, right now {_fmt(down, 1)} Mbit/s down, "
+            f"{_fmt(up, 1)} Mbit/s up (line {_fmt(value(Q['line_down']))}/{_fmt(value(Q['line_up']))} Mbit/s)",
+            f"today: {_gb(got)} received, {_gb(sent)} sent, peak {_fmt(_today_peak(Q['down']), 0)} Mbit/s down"]
     if uptime:
-        rows.append(f"fritzbox läuft seit {_de(uptime / 86400, 0)} Tagen ohne Neustart")
+        rows.append(f"fritzbox running for {_fmt(uptime / 86400, 0)} days without a restart")
     return rows
 
 
 def wlan():
     bands = ", ".join(f"{l.get('wifi_name', '?')} {int(v)}" for l, v in values(Q["wifi"]) if v)
-    return [f"wlan: {bands or 'keine Geräte'} verbunden, {_de(value(Q['known']))} Geräte bekannt"]
+    return [f"wlan: {bands or 'no devices'} connected, {_fmt(value(Q['known']))} devices known"]
 
 
 def pi():
     boot = value(Q["pi_boot"])
-    return [f"pi: {_de(value(Q['pi_temp']), 1)} °C (heute max {_de(_today_peak(Q['pi_temp']), 1)} °C), "
-            f"CPU {_de(value(Q['pi_cpu']))} %, Last {_de(value(Q['pi_load']), 2)}, RAM {_de(value(Q['pi_ram']))} %, "
-            f"frei auf der Karte {_gb(value(Q['pi_disk_free']))}"
-            + (f", läuft seit {_de((time.time() - boot) / 86400, 0)} Tagen" if boot else "")]
+    return [f"pi: {_fmt(value(Q['pi_temp']), 1)} °C (today max {_fmt(_today_peak(Q['pi_temp']), 1)} °C), "
+            f"CPU {_fmt(value(Q['pi_cpu']))} %, load {_fmt(value(Q['pi_load']), 2)}, RAM {_fmt(value(Q['pi_ram']))} %, "
+            f"free on the card {_gb(value(Q['pi_disk_free']))}"
+            + (f", running for {_fmt((time.time() - boot) / 86400, 0)} days" if boot else "")]
 
 
 def pc():
-    disks = ", ".join(f"{l.get('volume')} {_gb(v)} frei" for l, v in sorted(values(Q["pc_disks"]), key=lambda x: x[0].get("volume", "")))
-    return [f"pc: CPU {_de(value(Q['pc_cpu']))} % (heute Spitze {_de(_today_peak(Q['pc_cpu']))} %), "
-            f"RAM {_de(value(Q['pc_ram']))} %, {disks}"]
+    disks = ", ".join(f"{l.get('volume')} {_gb(v)} free" for l, v in sorted(values(Q["pc_disks"]), key=lambda x: x[0].get("volume", "")))
+    return [f"pc: CPU {_fmt(value(Q['pc_cpu']))} % (today's peak {_fmt(_today_peak(Q['pc_cpu']))} %), "
+            f"RAM {_fmt(value(Q['pc_ram']))} %, {disks}"]
 
 
 TOPICS = {"internet": internet, "wlan": wlan, "pi": pi, "pc": pc}
 
 
-def describe(topic="alles"):
-    topic = (topic or "alles").strip().lower()
-    parts = TOPICS.values() if topic in ("alles", "all", "") else [TOPICS.get(topic)]
+def describe(topic="all"):
+    topic = (topic or "all").strip().lower()
+    parts = TOPICS.values() if topic in ("all", "alles", "") else [TOPICS.get(topic)]
     if None in parts:
-        return f"Unbekannt: {topic}. Möglich: {', '.join(TOPICS)}, alles."
+        return f"Unknown: {topic}. Possible: {', '.join(TOPICS)}, all."
     rows = []
     for fn in parts:
         try:
             rows += fn()
         except Exception as e:  # noqa: BLE001 — one exporter down must not hide the others
-            rows.append(f"{fn.__name__}: nicht lesbar ({str(e)[:80]})")
+            rows.append(f"{fn.__name__}: not readable ({str(e)[:80]})")
     return "\n".join(rows)
 
 
@@ -148,7 +148,7 @@ def query(expr, hours=0):
     """Free PromQL, read-only by nature. hours > 0: range over the last hours, ~8 points each."""
     expr = (expr or "").strip()
     if not expr:
-        return "Leere Abfrage."
+        return "Empty query."
     try:
         if hours and float(hours) > 0:
             end = time.time()
@@ -157,20 +157,20 @@ def query(expr, hours=0):
             res = _prom("/api/v1/query_range", query=expr, start=int(start), end=int(end), step=step)
             out = []
             for r in res[:MAX_SERIES]:
-                pts = ", ".join(f"{dt.datetime.fromtimestamp(float(t)):%H:%M} {_de(float(v), 2)}" for t, v in r["values"])
+                pts = ", ".join(f"{dt.datetime.fromtimestamp(float(t)):%H:%M} {_fmt(float(v), 2)}" for t, v in r["values"])
                 out.append(f"{_labels(r['metric'])}: {pts}")
         else:
             res = _prom("/api/v1/query", query=expr)
-            out = [f"{_labels(r['metric'])}: {_de(float(r['value'][1]), 2)}" for r in res[:MAX_SERIES]]
-        more = f"\n… {len(res) - MAX_SERIES} weitere Reihen" if len(res) > MAX_SERIES else ""
-        return ("\n".join(out) or "Keine Daten.") + more
+            out = [f"{_labels(r['metric'])}: {_fmt(float(r['value'][1]), 2)}" for r in res[:MAX_SERIES]]
+        more = f"\n… {len(res) - MAX_SERIES} more series" if len(res) > MAX_SERIES else ""
+        return ("\n".join(out) or "No data.") + more
     except Exception as e:  # noqa: BLE001
         return f"Prometheus: {str(e)[:200]}"
 
 
 def _labels(m):
     keep = {k: v for k, v in m.items() if k not in ("instance", "serial", "friendly_name")}
-    return ", ".join(f"{k}={v}" for k, v in keep.items()) or "wert"
+    return ", ".join(f"{k}={v}" for k, v in keep.items()) or "value"
 
 
 # ── Pi-hole 6 ────────────────────────────────────────────────
@@ -186,7 +186,7 @@ def _pihole_session():
     with urllib.request.urlopen(req, timeout=10) as r:
         s = (json.loads(r.read()).get("session") or {})
     if not s.get("valid"):
-        raise RuntimeError("Anmeldung abgelehnt — App-Passwort prüfen")
+        raise RuntimeError("login refused — check the app password")
     return s["sid"]
 
 
@@ -201,7 +201,7 @@ def _pihole_logout(sid):
 def pihole_data():
     """-> dict or raises. One login per call; Pi-hole allows only a few sessions at once."""
     if not PIHOLE_PASSWORD:
-        raise RuntimeError("PIHOLE_PASSWORD fehlt in .env (Pi-hole → Einstellungen → Web-Oberfläche/API → App-Passwort)")
+        raise RuntimeError("PIHOLE_PASSWORD is missing in .env (Pi-hole → Settings → Web interface/API → app password)")
     sid = _pihole_session()
     try:
         s = _pihole(sid, "/api/stats/summary")
@@ -221,14 +221,14 @@ def pihole():
     try:
         d = pihole_data()
     except Exception as e:  # noqa: BLE001
-        return f"Pi-hole nicht lesbar: {str(e)[:160]}"
-    state = {"enabled": "an", "disabled": "AUS", "failed": "fehlerhaft"}.get(d["blocking"], d["blocking"] or "?")
-    rows = [f"pi-hole: Filter {state}, {_de(d['total'])} Anfragen (letzte 24 h), {_de(d['blocked'])} blockiert "
-            f"({_de(d['pct'], 1)} %), {_de(d['clients'])} aktive Geräte, Sperrliste {_de(d['list'])} Domains"]
+        return f"Pi-hole not readable: {str(e)[:160]}"
+    state = {"enabled": "on", "disabled": "OFF", "failed": "faulty"}.get(d["blocking"], d["blocking"] or "?")
+    rows = [f"pi-hole: filter {state}, {_fmt(d['total'])} queries (last 24 h), {_fmt(d['blocked'])} blocked "
+            f"({_fmt(d['pct'], 1)} %), {_fmt(d['clients'])} active devices, block list {_fmt(d['list'])} domains"]
     if d["top_blocked"]:
-        rows.append("am häufigsten blockiert: " + ", ".join(f"{n} ({_de(c)})" for n, c in d["top_blocked"]))
+        rows.append("blocked most often: " + ", ".join(f"{n} ({_fmt(c)})" for n, c in d["top_blocked"]))
     if d["top_clients"]:
-        rows.append("aktivste Geräte: " + ", ".join(f"{n} ({_de(c)})" for n, c in d["top_clients"]))
+        rows.append("most active devices: " + ", ".join(f"{n} ({_fmt(c)})" for n, c in d["top_clients"]))
     return "\n".join(rows)
 
 

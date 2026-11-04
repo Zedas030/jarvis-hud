@@ -1,7 +1,7 @@
 # Jarvis voice engine — every threshold and timeout of listening, turn-taking, barge-in and speaking.
 # Loaded by jarvis/voice/voice_config.py (JARVIS_VOICE_CONFIG points elsewhere). Values here are the
 # defaults the code falls back to when a key is missing, so deleting a line is always safe.
-# Tuning: see docs/sprache.md → "Sprach-Engine" → "Tuning-Protokoll".
+# Tuning: see docs/voice.md → "Voice engine" → "Tuning log".
 
 engine:
   enabled: true            # false: the HUD keeps the old browser-only pipeline (ui/app.js)
@@ -25,8 +25,8 @@ vad:
 endpoint:
   # Adaptive wait after the last speech frame before the utterance counts as finished:
   #   wait = base + (unfinished ? unfinished_extra : 0) + (question ? question_bonus : 0) + learned
-  base_ms: 450             # a finished sentence ("... aus.") ends this soon after the last word
-  unfinished_extra_ms: 900 # "und dann ...", trailing comma, no verb yet: wait longer
+  base_ms: 450             # a finished sentence ("... off.") ends this soon after the last word
+  unfinished_extra_ms: 900 # "and then ...", trailing comma, no verb yet: wait longer
   question_bonus_ms: -100  # a clear question ("...?") may end a little sooner
   no_text_ms: 700          # no partial transcript yet (CPU mode): plain wait
   max_ms: 1800             # never wait longer than this, whatever the rules say
@@ -71,16 +71,16 @@ barge:
   clip_silence_ms: 500     # silence ending the interruption clip
   clip_max_ms: 8000        # an interruption longer than this is checked as it stands
   resume_after_ms: 1500    # interrupted, then nothing said: go on from the start of the sentence
-  backchannel: ["mhm", "mh", "hm", "hmm", "ja", "ja ja", "jo", "genau", "okay", "ok", "aha", "ach so",
-                "alles klar", "verstehe", "gut", "stimmt", "richtig", "klar", "oh", "ah", "äh", "ähm"]
-  stop_words: ["stopp", "stop", "halt", "ruhe", "ruhig", "still", "sei still", "sei ruhig", "schon gut",
-               "danke reicht", "danke das reicht", "reicht", "genug", "danke", "pause", "warte", "moment",
-               "hör auf", "aufhören", "lass gut sein", "abbrechen"]
+  backchannel: ["mhm", "mh", "hm", "hmm", "yes", "yeah", "yep", "right", "okay", "ok", "aha", "i see",
+                "got it", "understood", "good", "true", "exactly", "sure", "oh", "ah", "uh", "um"]
+  stop_words: ["stop", "halt", "quiet", "be quiet", "silence", "shush", "hush", "never mind",
+               "thanks thats enough", "thats enough", "enough", "thanks", "pause", "wait", "hold on",
+               "one moment", "stop it", "stop talking", "leave it", "cancel"]
   echo_text_ratio: 0.6     # share of the clip's words found in his own recent sentences = his echo, not the user
   sonos_duck_via_ha: true  # Sonos: also lower the speaker's volume through Home Assistant while paused
 
 tts:
-  first_chunk_min_chars: 12   # the first piece of an answer may be this short ("Guten Abend, Sir,")...
+  first_chunk_min_chars: 12   # the first piece of an answer may be this short ("Good evening, Sir,")...
   first_chunk_max_chars: 70   # ...and is cut at a comma once the sentence gets this long
   min_chunk_chars: 28         # later pieces: whole sentences at least this long
   gap_ms: 120                 # silence between sentences in the playback stream

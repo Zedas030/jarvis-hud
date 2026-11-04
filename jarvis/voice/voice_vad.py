@@ -102,7 +102,7 @@ class Vad:
             try:
                 self.impl = SileroVad(path)
             except Exception as e:  # noqa: BLE001 — onnxruntime missing or a broken file
-                print(f"  voice: Silero VAD nicht ladbar ({str(e)[:80]}) — Pegel-VAD", flush=True)
+                print(f"  voice: Silero VAD not loadable ({str(e)[:80]}) — energy VAD", flush=True)
         if self.impl is None:
             self.impl = EnergyVad()
         self.kind = self.impl.kind

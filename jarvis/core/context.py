@@ -2,22 +2,22 @@
 Context engine: one place that gathers what Jarvis knows right now — each piece
 with its age, source and how far it can be trusted.
 
-Sources (all optional; a missing integration is reported as "nicht verfügbar"):
-  zeit       clock and date                                   lokal
-  kalender   today's appointments (iCloud), work only counted Dienst (Einladungen: fremd)
-  wetter     open-meteo                                       Dienst
-  timer      timers, alarms, reminders                        lokal
-  plaene     open plan steps due today                        lokal
-  warnungen  active homelab incidents, emergency stop, GPU budget, open proposals   lokal
-  pc         CPU, RAM, VRAM                                    lokal
-  haus       Home Assistant summary (solar, battery)           Dienst
+Sources (all optional; a missing integration is reported as "not available"):
+  time       clock and date                                   local
+  calendar   today's appointments (iCloud), work only counted service (invitations: third-party)
+  weather    open-meteo                                       service
+  timers     timers, alarms, reminders                        local
+  plans      open plan steps due today                        local
+  warnings   active homelab incidents, emergency stop, GPU budget, open proposals   local
+  pc         CPU, RAM, VRAM                                    local
+  house      Home Assistant summary (solar, battery)           service
 
 Every source runs with a time limit (JARVIS_CONTEXT_TIMEOUT, 4 s) in parallel and
 is cached for its own TTL in memory only — nothing is written to disk. When a
-source is slow or down, the last good value is shown as "veraltet (Stand …)".
+source is slow or down, the last good value is shown as "stale (as of …)".
 
-day_overview() answers "Wie sieht mein Tag aus?" without any LLM. block() gives
-the LLM path a short "Lage" (only warnings and stale markers) so it does not ask
+day_overview() answers "What does my day look like?" without any LLM. block() gives
+the LLM path a short "situation" (only warnings and stale markers) so it does not ask
 the same services again.
 """
 import concurrent.futures as cf
@@ -34,42 +34,42 @@ _POOL = cf.ThreadPoolExecutor(max_workers=6, thread_name_prefix="context")
 
 # ── sources: fn() -> data (any), raising on failure ─────────
 
-def _zeit():
+def _time():
     now = dt.datetime.now()
-    day = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")[now.weekday()]
-    return {"now": now, "text": f"{day}, {now:%d.%m.%Y, %H:%M} Uhr"}
+    day = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[now.weekday()]
+    return {"now": now, "text": f"{day}, {now:%Y-%m-%d, %H:%M}"}
 
 
-def _kalender():
+def _calendar():
     import icloud_calendar as cal
     import privacy
     if not cal.configured():
-        raise LookupError("Kalender nicht eingerichtet")
+        raise LookupError("calendar not set up")
     evts = cal.events(dt.date.today(), 1)
     private = [e for e in evts if not privacy.is_work(e.get("title", ""), e.get("location", ""))]
     return {"events": private, "work": len(evts) - len(private)}
 
 
-def _wetter():
+def _weather():
     import dashboard
     w = dashboard._weather()
     if not isinstance(w, dict) or w.get("error"):
-        raise RuntimeError((w or {}).get("error", "kein Wetter"))
+        raise RuntimeError((w or {}).get("error", "no weather"))
     return w
 
 
-def _timer():
+def _timers():
     import scheduler
     now = time.time()
     end = time.mktime((dt.date.today() + dt.timedelta(days=1)).timetuple())
     return [i for i in scheduler.items() if now - 60 <= i["at"] < end]
 
 
-def _plaene():
+def _plans():
     import re
     import memory
     today = dt.date.today().isoformat()
-    folder = memory.MEMORY_DIR / "Projekte"
+    folder = memory.MEMORY_DIR / "Projects"
     due = []
     for path in sorted(folder.glob("*.md")) if folder.exists() else []:
         for d, t in re.findall(r"(?m)^- \[ \] (\d{4}-\d{2}-\d{2}): (.+)$", path.read_text(encoding="utf-8")):
@@ -78,7 +78,7 @@ def _plaene():
     return due
 
 
-def _warnungen():
+def _warnings():
     import commands
     import homelab_watch
     import proposals
@@ -87,25 +87,25 @@ def _warnungen():
     for key, s in (state.get("homelab") or {}).items():
         if s.get("bad", 0) >= homelab_watch.CONFIRM:
             mins = max(1, round((time.time() - (s.get("since") or time.time())) / 60))
-            out.append({"severity": "warn", "text": f"{key} gestört seit {mins} Min.", "key": key})
+            out.append({"severity": "warn", "text": f"{key} disturbed for {mins} min.", "key": key})
     if (state.get("paused_until") or 0) > time.time():
-        out.append({"severity": "info", "text": "Not-Aus aktiv bis "
+        out.append({"severity": "info", "text": "emergency stop active until "
                     + time.strftime("%H:%M", time.localtime(state["paused_until"]))})
     try:
         import resources
         rs = resources.status()
         if rs.get("shed"):
-            out.append({"severity": "info", "text": "Grafikspeicher knapp, abgegeben: " + ", ".join(rs["shed"])})
+            out.append({"severity": "info", "text": "graphics memory tight, given back: " + ", ".join(rs["shed"])})
     except Exception:  # noqa: BLE001
         pass
     n = len(proposals.pending())
     if n:
-        out.append({"severity": "info", "text": f"{n} Vorschlag/Vorschläge warten auf Sie"})
+        out.append({"severity": "info", "text": f"{n} proposal(s) waiting for you"})
     try:
         import focus
         if focus.active():
             until = time.strftime("%H:%M", time.localtime(focus.state()["until"]))
-            out.append({"severity": "info", "text": f"Fokus-Sitzung bis {until}: Meldungen werden zurückgehalten"})
+            out.append({"severity": "info", "text": f"focus session until {until}: notices are held back"})
     except Exception:  # noqa: BLE001
         pass
     return out
@@ -116,24 +116,24 @@ def _pc():
     return infra.pc_metrics()
 
 
-def _haus():
+def _house():
     import dashboard
     h = dashboard._house()
     if not isinstance(h, dict) or h.get("error"):
-        raise RuntimeError((h or {}).get("error", "Home Assistant nicht erreichbar"))
+        raise RuntimeError((h or {}).get("error", "Home Assistant not reachable"))
     return h
 
 
 # name: (fn, ttl seconds, trust)
 SOURCES = {
-    "zeit": (_zeit, 0, "lokal"),
-    "kalender": (_kalender, 300, "fremd"),        # titles of invitations are written by others
-    "wetter": (_wetter, 1800, "Dienst"),
-    "timer": (_timer, 0, "lokal"),
-    "plaene": (_plaene, 300, "lokal"),
-    "warnungen": (_warnungen, 0, "lokal"),
-    "pc": (_pc, 20, "lokal"),
-    "haus": (_haus, 60, "Dienst"),
+    "time": (_time, 0, "local"),
+    "calendar": (_calendar, 300, "third-party"),  # titles of invitations are written by others
+    "weather": (_weather, 1800, "service"),
+    "timers": (_timers, 0, "local"),
+    "plans": (_plans, 300, "local"),
+    "warnings": (_warnings, 0, "local"),
+    "pc": (_pc, 20, "local"),
+    "house": (_house, 60, "service"),
 }
 
 
@@ -160,7 +160,7 @@ def get(names=None, timeout=None):
                 _CACHE[n] = {"data": data, "at": time.time()}
             out[n] = dict(data=data, at=time.time(), ok=True, stale=False, trust=trust, error=None)
         except Exception as e:  # noqa: BLE001 — timeout or source failure
-            err = "Zeitlimit" if isinstance(e, cf.TimeoutError) else str(e)[:120]
+            err = "time limit" if isinstance(e, cf.TimeoutError) else str(e)[:120]
             c = _CACHE.get(n)
             if c and c.get("data") is not None:
                 out[n] = dict(data=c["data"], at=c["at"], ok=True, stale=True, trust=trust, error=err)
@@ -171,62 +171,62 @@ def get(names=None, timeout=None):
     return out
 
 
-def _stand(item):
+def _as_of(item):
     return time.strftime("%H:%M", time.localtime(item["at"])) if item.get("at") else "?"
 
 
-# ── local answer: "Wie sieht mein Tag aus?" ─────────────────
+# ── local answer: "What does my day look like?" ─────────────────
 
 def day_overview(ctx=None):
-    ctx = ctx or get(["zeit", "kalender", "wetter", "timer", "plaene", "warnungen"])
-    now = ctx["zeit"]["data"]["now"]
+    ctx = ctx or get(["time", "calendar", "weather", "timers", "plans", "warnings"])
+    now = ctx["time"]["data"]["now"]
     parts = []
-    w = ctx.get("wetter") or {}
+    w = ctx.get("weather") or {}
     if w.get("ok"):
         d = w["data"]
-        parts.append(f"Wetter: {d.get('sky', '')}, {round(d['tmin'])} bis {round(d['tmax'])} Grad, "
-                     f"Regen {d.get('rain', 0)} Prozent" + (" (veraltet)" if w["stale"] else "") + ".")
-    k = ctx.get("kalender") or {}
+        parts.append(f"Weather: {d.get('sky', '')}, {round(d['tmin'])} to {round(d['tmax'])} degrees, "
+                     f"rain {d.get('rain', 0)} percent" + (" (stale)" if w["stale"] else "") + ".")
+    k = ctx.get("calendar") or {}
     if k.get("ok"):
         evts = [e for e in k["data"]["events"] if (e.get("end") or e["start"]) >= now or e.get("allday")]
         if evts:
             rows = []
             for e in evts[:5]:
-                when = "ganztägig" if e.get("allday") else e["start"].strftime("%H:%M")
-                row = f"{when} {e.get('title', 'Termin')}"
+                when = "all day" if e.get("allday") else e["start"].strftime("%H:%M")
+                row = f"{when} {e.get('title', 'appointment')}"
                 if e.get("location") and not e.get("allday"):
                     try:
                         import commute
                         dest = commute.geocode(e["location"])
                         mins = commute.drive_minutes(dest) if dest else None
                         if mins:
-                            row += f", los um {commute.leave_at(e['start'], mins).strftime('%H:%M')}"
+                            row += f", leave at {commute.leave_at(e['start'], mins).strftime('%H:%M')}"
                     except Exception:  # noqa: BLE001
                         pass
                 rows.append(row)
-            parts.append("Termine: " + "; ".join(rows) + ".")
+            parts.append("Appointments: " + "; ".join(rows) + ".")
         else:
-            parts.append("Heute keine privaten Termine mehr.")
+            parts.append("No more private appointments today.")
         if k["data"]["work"]:
-            parts.append(f"Dazu {k['data']['work']} Arbeitstermin(e).")
+            parts.append(f"Plus {k['data']['work']} work appointment(s).")
     else:
-        parts.append("Kalender: nicht verfügbar.")
-    t = ctx.get("timer") or {}
+        parts.append("Calendar: not available.")
+    t = ctx.get("timers") or {}
     if t.get("ok") and t["data"]:
-        parts.append("Erinnerungen: " + "; ".join(
+        parts.append("Reminders: " + "; ".join(
             f"{time.strftime('%H:%M', time.localtime(i['at']))} {i.get('text') or i['kind']}" for i in t["data"][:4]) + ".")
-    p = ctx.get("plaene") or {}
+    p = ctx.get("plans") or {}
     if p.get("ok") and p["data"]:
-        parts.append("Fällig aus Ihren Plänen: " + "; ".join(
-            f"{t}" + (" (überfällig)" if late else "") for _, t, late in p["data"][:4]) + ".")
-    wa = ctx.get("warnungen") or {}
+        parts.append("Due from your plans: " + "; ".join(
+            f"{t}" + (" (overdue)" if late else "") for _, t, late in p["data"][:4]) + ".")
+    wa = ctx.get("warnings") or {}
     if wa.get("ok") and wa["data"]:
-        parts.append("Hinweise: " + "; ".join(x["text"] for x in wa["data"][:4]) + ".")
-    return " ".join(parts) or "Für heute liegt nichts vor, Sir."
+        parts.append("Notes: " + "; ".join(x["text"] for x in wa["data"][:4]) + ".")
+    return " ".join(parts) or "Nothing on for today, Sir."
 
 
-_DAY = __import__("re").compile(r"\b(wie sieht (mein|der) tag aus|wie sieht('?s| es) heute aus|tagesüberblick|"
-                                r"überblick (für|über) heute|was liegt heute an)\b")
+_DAY = __import__("re").compile(r"\b(what does (my|the) day look like|hows (my|the) day looking|how does today look|"
+                                r"day overview|overview (for|of) today|whats on for today)\b")
 
 
 def handle(n):
@@ -236,13 +236,13 @@ def handle(n):
     return day_overview()
 
 
-# ── LLM path: a short "Lage" ─────────────────────────────────
+# ── LLM path: a short "situation" ─────────────────────────────────
 
 def block(message="", groups=()):
     """Only what the model should not have to look up again: warnings and stale sources. '' if nothing."""
-    ctx = get(["warnungen"], timeout=1.5)
-    lines = [x["text"] for x in (ctx["warnungen"]["data"] or [])] if ctx["warnungen"]["ok"] else []
-    return ("Lage (lokal, aktuell): " + "; ".join(lines)) if lines else ""
+    ctx = get(["warnings"], timeout=1.5)
+    lines = [x["text"] for x in (ctx["warnings"]["data"] or [])] if ctx["warnings"]["ok"] else []
+    return ("Situation (local, current): " + "; ".join(lines)) if lines else ""
 
 
 def describe(names=None):
@@ -250,10 +250,10 @@ def describe(names=None):
     rows = []
     for n, item in get(names).items():
         if not item["ok"]:
-            rows.append(f"- {n}: nicht verfügbar ({item['error']})")
+            rows.append(f"- {n}: not available ({item['error']})")
             continue
         data = item["data"]
         text = data.get("text") if isinstance(data, dict) and "text" in data else str(data)[:300]
-        flag = f"veraltet, Stand {_stand(item)}" if item["stale"] else f"vor {item['age_s']} s"
+        flag = f"stale, as of {_as_of(item)}" if item["stale"] else f"{item['age_s']} s ago"
         rows.append(f"- {n} ({item['trust']}, {flag}): {text}")
     return "\n".join(rows)

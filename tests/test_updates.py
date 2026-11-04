@@ -18,21 +18,21 @@ class Updates(unittest.TestCase):
         self.assertEqual(policy.action_class("mcp__jarvis__updates_check"), policy.READ)
 
     def test_router_brings_update_tools(self):
-        for text in ("Gibt es Updates für das NAS?", "Aktualisiere bitte die FRITZ!Box", "Ist die Firmware aktuell?"):
+        for text in ("Are there updates for the NAS?", "Please update the FRITZ!Box", "Is the firmware up to date?"):
             self.assertIn("updates", router.llm_route(text)["groups"], text)
 
     def test_update_questions_skip_the_status_line(self):
-        # Heard like this: each got "Das NAS: alles in Ordnung …" from the local status handler.
-        for text in ("kannst du meinen NAS updaten, das Knowledgey NAS?", "mach ein Software Update von dem NAS.",
-                     "Ja, prüfe, ob irgendwelche Apps oder irgendwelche Updates auf dem NAS verfügbar sind.",
-                     "Wie läuft das Update auf dem Pi?"):
+        # Heard like this: each got "The NAS: all fine …" from the local status handler.
+        for text in ("can you update my NAS, the Synology NAS?", "do a software update of the NAS.",
+                     "Yes, check whether any apps or any updates are available on the NAS.",
+                     "How is the update on the Pi going?"):
             r = router.route(text)
             self.assertEqual(r["kind"], "llm", text)
             self.assertIn("updates", r["groups"], text)
         # a fixed NAS reading: the status question must still reach the local handler, without the real NAS
         nas = {"ok": True, "temp": 40, "used_pct": 50, "used_tb": 2.0, "total_tb": 4.0}
         with mock.patch.object(router, "_dash", return_value=nas):
-            self.assertEqual(router.route("Wie geht es dem NAS?").get("handler"), "nas")
+            self.assertEqual(router.route("How is the NAS doing?").get("handler"), "nas")
 
     def test_ha_only_entities_with_update(self):
         states = [
@@ -80,23 +80,23 @@ class Updates(unittest.TestCase):
         self.assertNotIn("upgrade", step.values(), "method upgrade got DSM error 4501")
 
     def test_unknown_target_runs_nothing(self):
-        self.assertIn("Unbekanntes Ziel", updates.install("rm -rf /"))
+        self.assertIn("Unknown target", updates.install("rm -rf /"))
 
     def test_report_only_targets_run_nothing(self):
         with mock.patch.object(updates, "_pi") as pi, mock.patch.object(updates, "_ha") as ha:
             for target in ("pi:docker:homeassistant", "fritz:10.0.0.2", "fw:tp-link-p110"):
-                self.assertIn("nicht", updates.install(target), target)
+                self.assertIn("not", updates.install(target), target)
         pi.assert_not_called()
         ha.assert_not_called()
 
     def test_firmware_drift_names_only_the_older_ones(self):
         devices = [
             ["TP-Link", "P110", "TV", "1.4.8 Build 260804 Rel.045837"],
-            ["TP-Link", "P110", "Kühlschrank", "1.4.0 Build 251020 Rel.161559"],
+            ["TP-Link", "P110", "Fridge", "1.4.0 Build 251020 Rel.161559"],
             ["TP-Link", "P110", "PC", "1.4.6 Build 260309 Rel.093810"],
-            ["TP-Link", "P110", "Zelt", "1.4.8 Build 260804 Rel.045837"],
-            ["TP-Link", "KE100", "Links", "2.15.0"], ["TP-Link", "KE100", "Rechts", "2.15.0"],
-            ["VeSync", "Core300S", "Luft", "2.0.00"],
+            ["TP-Link", "P110", "Tent", "1.4.8 Build 260804 Rel.045837"],
+            ["TP-Link", "KE100", "Left", "2.15.0"], ["TP-Link", "KE100", "Right", "2.15.0"],
+            ["VeSync", "Core300S", "Air", "2.0.00"],
             # FRITZ's tracker copies the client's version; it must not count as a second plug
             ["FRITZ!", "FRITZ!Box Tracked device", "TV", "1.4.6"], ["FRITZ!", "FRITZ!Box Tracked device", "x", "1.0"],
             [None, None, "Sun", None],
@@ -105,7 +105,7 @@ class Updates(unittest.TestCase):
         self.assertEqual(len(got), 1)
         maker, model, newest, behind = got[0]
         self.assertEqual((maker, model, updates._short(newest)), ("TP-Link", "P110", "1.4.8"))
-        self.assertEqual([n for n, _sw in behind], ["Kühlschrank", "PC"])
+        self.assertEqual([n for n, _sw in behind], ["Fridge", "PC"])
 
     def test_fritz_versions(self):
         xml = ("<j:BoxInfo><j:Name>FRITZ!Repeater 1200 AX</j:Name><j:HW>268</j:HW>"
@@ -142,7 +142,7 @@ class Updates(unittest.TestCase):
         rows, notes = updates.docker_rows(containers, digest=remote.get)
         self.assertEqual(len(rows), 1)
         self.assertTrue(rows[0].startswith("pi:docker:a: "))
-        self.assertIn("nur Anzeige", rows[0])
+        self.assertIn("display only", rows[0])
         self.assertEqual(notes, [])
 
     def test_docker_rows_name_the_ha_version(self):

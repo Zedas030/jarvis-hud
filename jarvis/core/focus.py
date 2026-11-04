@@ -1,5 +1,5 @@
 """
-Focus sessions: "Fokus 45 Minuten" — Jarvis holds his notices, starts the focus playlist if one
+Focus sessions: "focus 45 minutes" — Jarvis holds his notices, starts the focus playlist if one
 is set, mentions a distraction once, and sums the session up at the end. 0 tokens.
 
   while a session runs
@@ -8,7 +8,7 @@ is set, mentions a distraction once, and sums the session up at the end. 0 token
     distraction  the active window's title is checked every EVERY seconds (desktop.py); time in
                a window matching DISTRACT (YouTube, Netflix, Reddit …) adds up — at WARN_MIN
                minutes one spoken hint, no more
-  at the end   "45 Minuten Fokus, 8 Minuten davon auf YouTube. Inzwischen: …" with up to three
+  at the end   "45 minutes of focus, 8 of them on YouTube. Meanwhile: …" with up to three
                held notices (the rest stays in the bell)
 
 state.json → focus: {since, until, held: [text], distract_s, warned, app}
@@ -52,7 +52,7 @@ def _music():
         return ""
     try:
         import spotify
-        return "Die Fokus-Playlist läuft." if spotify.play_context(uri) else ""
+        return "The focus playlist is playing." if spotify.play_context(uri) else ""
     except Exception:  # noqa: BLE001 — music is a bonus
         return ""
 
@@ -64,28 +64,28 @@ def start(minutes=None, now=None):
                                                                  distract_s=0, warned=False, app="")))
     music = _music()
     until = time.strftime("%H:%M", time.localtime(now + minutes * 60))
-    return f"Fokus bis {until} Uhr, Sir. Ich halte alles zurück, was nicht klingeln muss. {music}".strip()
+    return f"Focus until {until}, Sir. I will hold back everything that does not have to ring. {music}".strip()
 
 
 def summary(st, now=None):
     now = now or time.time()
     mins = max(1, round((min(now, st.get("until", now)) - st.get("since", now)) / 60))
     lost = round(st.get("distract_s", 0) / 60)
-    text = f"{mins} Minuten Fokus" + (f", {lost} davon in {st.get('app') or 'Ablenkungen'}" if lost else ", ohne Ablenkung") + "."
+    text = f"{mins} minutes of focus" + (f", {lost} of them in {st.get('app') or 'distractions'}" if lost else ", without distraction") + "."
     held = st.get("held") or []
     if held:
-        text += " Inzwischen: " + " ".join(h.removeprefix("Sir, ").rstrip(".") + "." for h in held[:3])
+        text += " Meanwhile: " + " ".join(h.removeprefix("Sir, ").rstrip(".") + "." for h in held[:3])
         if len(held) > 3:
-            text += f" Und {len(held) - 3} weitere Meldungen in der Glocke."
+            text += f" And {len(held) - 3} more notices in the bell."
     return text
 
 
 def end(now=None):
     st = state()
     if not st.get("until"):
-        return "Es läuft keine Fokus-Sitzung, Sir."
+        return "No focus session is running, Sir."
     commands.update_state(lambda d: d.__setitem__("focus", {}))
-    return "Fokus beendet. " + summary(st, now)
+    return "Focus ended. " + summary(st, now)
 
 
 def _foreground():
@@ -103,7 +103,7 @@ def step(now=None):
         return
     if now >= st["until"]:
         commands.update_state(lambda d: d.__setitem__("focus", {}))
-        events.publish("say", "Sir, die Fokus-Zeit ist um. " + summary(st, now), kind="focus", priority="critical")
+        events.publish("say", "Sir, the focus time is up. " + summary(st, now), kind="focus", priority="critical")
         return
     title = _foreground()
     m = DISTRACT.search(title)
@@ -120,13 +120,13 @@ def step(now=None):
             return True
         return False
     if commands.update_state(mut):
-        events.publish("say", f"Sir, {WARN_MIN} Minuten {app}. Nur zur Erinnerung — Sie wollten fokussiert bleiben.",
+        events.publish("say", f"Sir, {WARN_MIN} minutes of {app}. Just a reminder — you wanted to stay focused.",
                        kind="focus", priority="critical")
 
 
-_START = re.compile(r"\b(fokus(-| )?(sitzung|modus|zeit|phase)?|konzentrationsphase|deep ?work)\b")
-_END = re.compile(r"\b(beend\w*|aus|stopp\w*|vorbei|fertig|abbrechen)\b")
-_HOWLONG = re.compile(r"\bwie lange (noch|läuft)\b")
+_START = re.compile(r"\b(focus( session| mode| time| phase)?|deep ?work)\b")
+_END = re.compile(r"\b(end\w*|off|stop\w*|over|done|finish\w*|cancel)\b")
+_HOWLONG = re.compile(r"\bhow (long|much longer|much time)\b")
 
 
 def handle(n):
@@ -135,8 +135,8 @@ def handle(n):
     if _HOWLONG.search(n):
         st = state()
         if not active():
-            return "Es läuft keine Fokus-Sitzung, Sir."
-        return f"Noch {max(1, round((st['until'] - time.time()) / 60))} Minuten Fokus, Sir."
+            return "No focus session is running, Sir."
+        return f"{max(1, round((st['until'] - time.time()) / 60))} more minutes of focus, Sir."
     if _END.search(n):
         return end()
     import scheduler

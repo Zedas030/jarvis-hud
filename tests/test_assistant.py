@@ -38,8 +38,8 @@ class FakeIMAP:
         return "OK", []
 
     def list(self):
-        return "OK", [b'(\\HasNoChildren) "/" "INBOX"', b'(\\HasNoChildren \\Drafts) "/" "Entw&APw-rfe"',
-                      b'(\\HasNoChildren \\Sent) "/" "Gesendet"']
+        return "OK", [b'(\\HasNoChildren) "/" "INBOX"', b'(\\HasNoChildren \\Drafts) "/" "Drafts"',
+                      b'(\\HasNoChildren \\Sent) "/" "Sent"']
 
     def append(self, folder, flags, when, data):
         self.appended.append((folder, flags, data))
@@ -68,7 +68,7 @@ class Draft(unittest.TestCase):
         FakeIMAP.instances.clear()
 
     def run_draft(self, **kw):
-        args = dict(to="anna@example.org", subject="Samstag", body="Hallo Anna,\nbleibt es bei Samstag?")
+        args = dict(to="anna@example.org", subject="Saturday", body="Hello Anna,\nare we still on for Saturday?")
         args.update(kw)
         # mailboxes.py reads the accounts from the environment; one fake account here
         fake = {"MAIL_IMAP_HOST": "imap.example.org", "MAIL_USER": "me@example.org", "MAIL_PASSWORD": "x"}
@@ -77,15 +77,15 @@ class Draft(unittest.TestCase):
 
     def test_draft_goes_to_drafts_only(self):
         out = self.run_draft()
-        self.assertIn("Gesendet habe ich nichts", out)
+        self.assertIn("I have not sent anything", out)
         folder, flags, data = FakeIMAP.instances[0].appended[0]
-        self.assertEqual(folder, '"Entw&APw-rfe"')
+        self.assertEqual(folder, '"Drafts"')
         self.assertIn("\\Draft", flags)
-        self.assertIn(b"Subject: Samstag", data)
+        self.assertIn(b"Subject: Saturday", data)
         self.assertIn(b"To: anna@example.org", data)
 
     def test_bad_address(self):
-        self.assertIn("keine gültige Mail-Adresse", self.run_draft(to="anna"))
+        self.assertIn("is not a valid mail address", self.run_draft(to="anna"))
         self.assertEqual(FakeIMAP.instances, [])
 
     def test_needs_card(self):
@@ -95,19 +95,19 @@ class Draft(unittest.TestCase):
 
 class DayPrep(unittest.TestCase):
     def test_private_detailed_work_counted(self):
-        (memory.MEMORY_DIR / "Personen").mkdir(parents=True, exist_ok=True)
-        (memory.MEMORY_DIR / "Personen" / "Zahnarzt Müller.md").write_text(
-            "---\ntype: person\n---\n\n# Zahnarzt Müller\n\n- Praxis in Bonn\n", encoding="utf-8")
+        (memory.MEMORY_DIR / "People").mkdir(parents=True, exist_ok=True)
+        (memory.MEMORY_DIR / "People" / "Dentist Miller.md").write_text(
+            "---\ntype: person\n---\n\n# Dentist Miller\n\n- Practice in Bonn\n", encoding="utf-8")
         day = dt.date(2026, 10, 23)
-        evts = [{"title": "Zahnarzt Müller", "start": dt.datetime(2026, 10, 23, 10), "allday": False,
+        evts = [{"title": "Dentist Miller", "start": dt.datetime(2026, 10, 23, 10), "allday": False,
                  "location": "Bonn"},
-                {"title": "Meeting mit Kunde Contoso", "start": dt.datetime(2026, 10, 23, 14), "allday": False}]
+                {"title": "Meeting with customer Contoso", "start": dt.datetime(2026, 10, 23, 14), "allday": False}]
         import commute
         with Patch(commute, geocode=lambda p: (50.7, 7.1), drive_minutes=lambda d: 25):
             out = a.day_prep(day, events=evts)
-        self.assertIn("1 private Termin(e), dazu 1 Arbeitstermin(e)", out)
-        self.assertIn("10:00 Zahnarzt Müller in Bonn — 25 Min. Fahrt, los um 09:30", out)
-        self.assertIn("Notizen: Zahnarzt Müller", out)
+        self.assertIn("1 private appointment(s), plus 1 work appointment(s)", out)
+        self.assertIn("10:00 Dentist Miller in Bonn — 25 min drive, leave at 09:30", out)
+        self.assertIn("notes: Dentist Miller", out)
         self.assertNotIn("Contoso", out)
 
     def test_untrusted(self):
@@ -116,13 +116,13 @@ class DayPrep(unittest.TestCase):
 
 class Research(unittest.TestCase):
     def test_save(self):
-        out = a.research_save("Golfschläger für Anfänger", "Ein Halbsatz reicht für den Anfang (Annahme: Budget 500 €).",
+        out = a.research_save("Golf clubs for beginners", "A half set is enough to start with (assumption: budget 500 €).",
                               ["Golf Post – https://example.org/a (10.10.2026)"])
-        self.assertIn("Recherchen/Golfschläger für Anfänger", out)
-        note = next((memory.MEMORY_DIR / "Recherchen").glob("Golfschläger*.md")).read_text(encoding="utf-8")
-        self.assertIn("## Quellen", note)
-        self.assertIn("ablauf:", note)
-        self.assertIn("Arbeitsthemen", a.research_save("Angebot für Kunde", "x"))
+        self.assertIn("Research/Golf clubs for beginners", out)
+        note = next((memory.MEMORY_DIR / "Research").glob("Golf clubs*.md")).read_text(encoding="utf-8")
+        self.assertIn("## Sources", note)
+        self.assertIn("expires:", note)
+        self.assertIn("work topics", a.research_save("Offer for the customer", "x"))
 
 
 class Watch(unittest.TestCase):
@@ -135,22 +135,22 @@ class Watch(unittest.TestCase):
         background.ask = self._ask
 
     def test_add_list_remove(self):
-        self.assertIn("im Auge", a.watch_add("RTX 5080 Treiber", 3))
-        self.assertIn("schon", a.watch_add("rtx 5080 treiber"))
-        self.assertIn("Arbeitsthemen", a.watch_add("Projektplan beim Kunden"))
-        self.assertIn("RTX 5080 Treiber (alle 3 Tage)", a.watch_list())
-        self.assertIn("Nicht mehr beobachtet", a.watch_remove("rtx"))
+        self.assertIn("keep an eye on", a.watch_add("RTX 5080 driver", 3))
+        self.assertIn("already", a.watch_add("rtx 5080 driver"))
+        self.assertIn("work topics", a.watch_add("Project plan at the customer"))
+        self.assertIn("RTX 5080 driver (every 3 days)", a.watch_list())
+        self.assertIn("No longer watched", a.watch_remove("rtx"))
         for i in range(a.WATCH_MAX):
-            a.watch_add(f"Thema {i}")
-        self.assertIn("schon", a.watch_add("eins zu viel"))
+            a.watch_add(f"Topic {i}")
+        self.assertIn("already", a.watch_add("one too many"))
 
     def test_step_announces_only_news(self):
-        a.watch_add("Golfplatz Öffnungszeiten")
+        a.watch_add("Golf course opening hours")
         a.watch_add("Pi-hole Version")
         a.watch_add("Hyper Backup")
-        answers = iter([{"neu": True, "zusammenfassung": "Ab November schließt der Platz um 16 Uhr.",
-                         "quellen": ["Club – https://example.org (20.10.2026)"]},
-                        {"neu": False, "zusammenfassung": "Nichts Neues."}])
+        answers = iter([{"new": True, "summary": "From November the course closes at 4 pm.",
+                         "sources": ["Club – https://example.org (2026-10-20)"]},
+                        {"new": False, "summary": "Nothing new."}])
         calls = []
 
         def ask(job, system, prompt, tools=""):
@@ -163,12 +163,12 @@ class Watch(unittest.TestCase):
             self.assertEqual(len(checked), a.WATCH_PER_DAY)          # capped per day
             self.assertEqual(calls, ["WebSearch"] * a.WATCH_PER_DAY)
             self.assertEqual(len(events._LOG) - before, 1)           # only the news is spoken
-            self.assertIn("schließt der Platz", events._LOG[-1]["text"])
+            self.assertIn("the course closes", events._LOG[-1]["text"])
             self.assertEqual(a.watch_step(now=time.time()), [])       # nothing more today
-        self.assertTrue(list((memory.MEMORY_DIR / "Recherchen").glob("Beobachtung Golfplatz*.md")))
+        self.assertTrue(list((memory.MEMORY_DIR / "Research").glob("Watch Golf course*.md")))
 
     def test_no_claude_no_check(self):
-        a.watch_add("Irgendwas")
+        a.watch_add("Anything")
         with Patch(runtime, runtime_kind=lambda: "mock"):
             self.assertEqual(a.watch_step(), [])
 
@@ -176,19 +176,19 @@ class Watch(unittest.TestCase):
 class Plans(unittest.TestCase):
     def test_create_list_check(self):
         reminders = []
-        steps = [{"text": "Kartons besorgen", "date": "2099-11-01"}, {"text": "Küche packen", "date": "2099-11-03"},
-                 {"text": "kaputt", "date": "irgendwann"}]
-        out = a.plan_create("Umzug", steps, internal=lambda op, args: reminders.append(args) or "Erinnerung gesetzt.")
-        self.assertIn("2 Schritten", out)
-        self.assertIn("2 Erinnerungen", out)
-        self.assertEqual(reminders[0], {"kind": "reminder", "at": "2099-11-01 09:00", "text": "Umzug: Kartons besorgen"})
-        self.assertIn("Umzug: 01.11. Kartons besorgen; 03.11. Küche packen", a.plan_list())
-        self.assertIn("Noch 1 Schritt", a.plan_check("Umzug", "kartons"))
-        self.assertIn("komplett erledigt", a.plan_check("Umzug", "küche"))
-        self.assertEqual(a.plan_list(), "Keine offenen Pläne.")
+        steps = [{"text": "Get boxes", "date": "2099-11-01"}, {"text": "Pack the kitchen", "date": "2099-11-03"},
+                 {"text": "broken", "date": "some time"}]
+        out = a.plan_create("Move", steps, internal=lambda op, args: reminders.append(args) or "Reminder set.")
+        self.assertIn("2 steps", out)
+        self.assertIn("2 reminders", out)
+        self.assertEqual(reminders[0], {"kind": "reminder", "at": "2099-11-01 09:00", "text": "Move: Get boxes"})
+        self.assertIn("Move: Nov 01 Get boxes; Nov 03 Pack the kitchen", a.plan_list())
+        self.assertIn("1 step(s) still open", a.plan_check("Move", "boxes"))
+        self.assertIn("completely done", a.plan_check("Move", "kitchen"))
+        self.assertEqual(a.plan_list(), "No open plans.")
 
     def test_no_work_plans(self):
-        self.assertIn("Arbeitsvorhaben", a.plan_create("Präsentation für den Chef", [{"text": "x", "date": "2099-01-01"}]))
+        self.assertIn("work projects", a.plan_create("Presentation for the boss", [{"text": "x", "date": "2099-01-01"}]))
 
 
 if __name__ == "__main__":

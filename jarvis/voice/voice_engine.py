@@ -53,7 +53,7 @@ WORD = re.compile(r"(?:[^\W\d_]|\d){2,}", re.U)
 
 # Two microphones hear the same words (the PC through the wall, the iPad on the bedside table): the one in the
 # room the presence sensors see the user in wins. config/home.json → mic_rooms maps a room to a paired
-# device's name ({"Schlafzimmer": "iPad"}). Another session then waits MIC_HOLD_S after its own speech end
+# device's name ({"Bedroom": "iPad"}). Another session then waits MIC_HOLD_S after its own speech end
 # for that device to end an utterance too (within MIC_SAME_S of its own) and drops the words if it did.
 # Without a preferred device in the room, or with it not connected, everything stays as before.
 MIC_HOLD_S = float(os.environ.get("JARVIS_MIC_HOLD_S", "1.5"))
@@ -257,7 +257,7 @@ class Session:
 
     def _listen_frame(self, frame, p):
         if self.machine.state == st.IDLE:
-            self.machine.go(st.LISTENING, "Mikrofon")
+            self.machine.go(st.LISTENING, "microphone")
         ev = self.tracker.feed(p)
         if ev == "start":
             self._begin_utterance()
@@ -269,7 +269,7 @@ class Session:
         elif self.speech_end_at is None:
             self.speech_end_at = self.clock() - self.tracker.silence_ms / 1000.0
         if self.tracker.speech_ms > self.cfg.vad.max_speech_ms:
-            self.log("Dauergeräusch verworfen (Musik?)")
+            self.log("constant noise dropped (music?)")
             self._drop_utterance()
             return
         if self.partials_on and self.tracker.speech_ms >= 600 and self.tracker.speech_ms % 200 == 0:
@@ -349,7 +349,7 @@ class Session:
         try:
             text = self.sh.rec.final(pcm) if self.sh.rec.available else ""
         except Exception as e:  # noqa: BLE001
-            self.log(f"Spracherkennung fehlgeschlagen: {str(e)[:80]}")
+            self.log(f"speech recognition failed: {str(e)[:80]}")
             text = ""
         turn.mark("stt_done")
         other = self._other_mic(turn.t.get("speech_end")) if text else ""
@@ -357,16 +357,16 @@ class Session:
             if not self.alive or self.machine.state != st.THINKING or gen != self.utt_gen:
                 return                          # the user went on talking, or a newer turn exists
             if not text:
-                self._back_to_listening("nichts verstanden")
+                self._back_to_listening("nothing understood")
                 return
             if other:
-                self.log(f"das {other} hört zu: „{text[:60]}“")
-                self._back_to_listening(f"{other} im Raum")
+                self.log(f"the {other} is listening: “{text[:60]}”")
+                self._back_to_listening(f"{other} in the room")
                 return
             self._emit("final", text=text)
             if self.pending_confirm:
                 self._voice_confirm(text)
-                self._back_to_listening("Freigabe per Stimme")
+                self._back_to_listening("approval by voice")
                 return
             awake = ptt or self.awake() or bool(self.glue)
             strict = self.ambience in ("music", "tv", "sport") and self.wake_mode() != "off"
@@ -375,14 +375,14 @@ class Session:
                 text = rest if ok and rest else text          # "Jarvis, ..." is stripped even without a wake word
             else:
                 if not ok:
-                    self.log(f"nicht für mich: „{text[:60]}“")
-                    self._back_to_listening("ohne „Jarvis“")
+                    self.log(f"not for me: “{text[:60]}”")
+                    self._back_to_listening("without “Jarvis”")
                     return
                 if voice_wake.is_bare(text):
                     self.open_window(self.cfg.wake.window_s)
                     self._emit("chime")
-                    self.log("ich höre")
-                    self._back_to_listening("nur „Jarvis“")
+                    self.log("listening")
+                    self._back_to_listening("only “Jarvis”")
                     return
                 text = rest or text
             if self.glue:
@@ -420,17 +420,17 @@ class Session:
 
     def _voice_confirm(self, text):
         allow = None
-        if re.search(r"best(ä|ae)tig", text, re.I) and not re.search(r"nicht|kein", text, re.I):
+        if re.search(r"\bconfirm(ed)?\b", text, re.I) and not re.search(r"\b(not|dont|don't|no)\b", text, re.I):
             allow = True
-        elif re.search(r"\b(nein|stopp?|abbrechen|ablehnen|nicht)\b", text, re.I):
+        elif re.search(r"\b(no|nope|stop|cancel|decline|deny|not)\b", text, re.I):
             allow = False
         if allow is None:
-            self.log("sag „bestätigt“ oder „nein“")
+            self.log("say “confirmed” or “no”")
             return
         try:
             self._post("/api/permission/answer", {"id": self.pending_confirm, "allow": allow})
         except Exception as e:  # noqa: BLE001
-            self.log(f"Freigabe nicht gesendet: {str(e)[:60]}")
+            self.log(f"approval not sent: {str(e)[:60]}")
 
     # ── push-to-talk, typed text, notices ──────────────────────
     def ptt_on(self):
@@ -460,15 +460,15 @@ class Session:
         """A typed question from the HUD: answered like a spoken one, spoken unless speak=False."""
         with self.lock:
             if self.machine.state in (st.SPEAKING, st.INTERRUPTED, st.RESUMING):
-                self._stop_speaking("neue Frage")
+                self._stop_speaking("new question")
             if self.machine.state == st.THINKING:
-                self._cancel_run("neue Frage")
+                self._cancel_run("new question")
             turn = voice_metrics.Turn("typed", clock=self.clock)
             turn.mark("speech_end")
             turn.mark("endpoint")
             turn.mark("stt_done")
             if self.machine.state != st.THINKING:
-                self.machine.go(st.THINKING, "getippt")
+                self.machine.go(st.THINKING, "typed")
             self._start_run(message, turn, typed=typed, speak=speak)
 
     def say(self, text):
@@ -481,7 +481,7 @@ class Session:
         if not self.say_queue or self.machine.state not in (st.IDLE, st.LISTENING) or self.run:
             return
         text = self.say_queue.pop(0)
-        self._new_answer("(Meldung)")
+        self._new_answer("(notice)")
         self.answer_done = True
         self.turn = voice_metrics.Turn("notice", clock=self.clock)
         self.turn.mark("speech_end")
@@ -489,7 +489,7 @@ class Session:
         self.turn.mark("llm_done")
         for chunk in self.splitter.feed(text, final=True):
             self._queue_sentence(chunk)
-        self.machine.go(st.SPEAKING, "Meldung")
+        self.machine.go(st.SPEAKING, "notice")
         self.player_cond.notify_all()
 
     def stop(self, why="Stopp-Knopf"):
@@ -595,7 +595,7 @@ class Session:
                 for chunk in self.splitter.feed(self.answer_text, final=True):
                     self._queue_sentence(chunk)
             if not self.sentences or not run["speak"]:
-                self._finish_turn(interrupted=False, why="Antwort ohne Ton" if text else "keine Antwort")
+                self._finish_turn(interrupted=False, why="answer without sound" if text else "no answer")
             else:
                 self.player_cond.notify_all()
 
@@ -634,13 +634,13 @@ class Session:
                 return
             self.run = None
             self.log(f"Anfrage fehlgeschlagen: {msg}")
-            self._emit("run", ev={"t": "error", "message": f"Keine Verbindung zum Gehirn: {msg}"})
+            self._emit("run", ev={"t": "error", "message": f"No connection to the brain: {msg}"})
             self._new_answer(run["message"])
             self.answer_done = True
-            for chunk in self.splitter.feed("Entschuldigung, Sir, ich komme gerade nicht an mein Gehirn.", final=True):
+            for chunk in self.splitter.feed("Apologies, Sir, I cannot reach my brain right now.", final=True):
                 self._queue_sentence(chunk)
             if self.machine.state == st.THINKING:
-                self.machine.go(st.SPEAKING, "Fehlermeldung")
+                self.machine.go(st.SPEAKING, "error message")
             self.player_cond.notify_all()
 
     def _cancel_run(self, why):
@@ -673,10 +673,10 @@ class Session:
         ev = self.tracker.feed(p)
         if ev == "start":
             self.glue = ls["text"]
-            self._cancel_run("Sie reden weiter")
-            self.log("Sie reden weiter — warte auf den Rest")
+            self._cancel_run("user keeps talking")
+            self.log("you keep talking — waiting for the rest")
             voice_metrics.event("user_continued")
-            self.machine.go(st.LISTENING, "Nutzer spricht weiter")
+            self.machine.go(st.LISTENING, "user keeps talking")
             self._begin_utterance()
             self.utt += frame
 
@@ -690,7 +690,7 @@ class Session:
         self.synth.submit(s)
         self.guard.remember(voice_tts.plain(text))
         if self.machine.state == st.THINKING:
-            self.machine.go(st.SPEAKING, "erster Satz")
+            self.machine.go(st.SPEAKING, "first sentence")
         self.player_cond.notify_all()
 
     def _on_audio(self, s, pcm):
@@ -711,12 +711,12 @@ class Session:
                                       or self.play_index >= len(self.sentences)):
                     if (self.machine.state == st.SPEAKING and self.answer_done and not self.paused
                             and self.play_index >= len(self.sentences) and self._all_played()):
-                        self._finish_turn(interrupted=False, why="fertig gesprochen")
+                        self._finish_turn(interrupted=False, why="done speaking")
                     self.player_cond.wait(0.1)
                 if not self.alive:
                     return
                 if self.machine.state == st.RESUMING:
-                    self.machine.go(st.SPEAKING, "weiter am Satzanfang")
+                    self.machine.go(st.SPEAKING, "resuming at the start of the sentence")
                 s = self.sentences[self.play_index]
                 self.play_index += 1
                 output = self.output
@@ -753,7 +753,7 @@ class Session:
             if done:
                 break
             if not chunk and self.clock() > deadline:
-                self.log(f"Stimme antwortet nicht: „{voice_tts.plain(s.text)[:40]}“")
+                self.log(f"voice does not answer: “{voice_tts.plain(s.text)[:40]}”")
                 break
             with self.lock:
                 self.player_cond.wait(0.05)
@@ -786,7 +786,7 @@ class Session:
                 secs = sonos.say(eid, chunks, s.mime or "audio/mpeg", voice_tts.plain(s.text), quiet=events.quiet_now())
                 threading.Thread(target=self._feed_reference, args=(s,), daemon=True).start()
         except Exception as e:  # noqa: BLE001 — the speaker failed: the device plays it itself
-            self.log(f"Lautsprecher: {str(e)[:80]} — spreche selbst")
+            self.log(f"speaker: {str(e)[:80]} — speaking myself")
             with self.lock:
                 self.output = ""
                 self.room_speaker = False
@@ -893,14 +893,14 @@ class Session:
         self.turn.mark("output_paused")
         if self.output:
             threading.Thread(target=self._room_pause, daemon=True).start()
-        self.machine.go(st.INTERRUPTED, "Sie sprechen")
+        self.machine.go(st.INTERRUPTED, "user speaks")
         self.clip = bytearray(self.preroll)
         self.clip_tracker.reset()
         self.clip_tracker.speaking = True
         self.clip_tracker.speech_ms = self.cfg.barge.confirm_ms
         self.clip_started_at = self.clock()
         voice_metrics.observe("barge_react_ms", (self.clock() - (self.barge_first_at or self.clock())) * 1000)
-        self.log("Pause — ich höre")
+        self.log("pause — listening")
 
     def _room_pause(self):
         import alexa_voice
@@ -940,7 +940,7 @@ class Session:
             speech_ms = self.clip_tracker.speech_ms
             self.clip_tracker.reset()
             if speech_ms < self.cfg.barge.confirm_ms + self.frame_ms * 2:
-                self._resume("kurzer Laut")
+                self._resume("short sound")
                 voice_metrics.event("barge_ins", outcome="noise")
                 return
             spoke_until = self.clock() - (self.cfg.barge.clip_silence_ms / 1000.0 if not since >= self.cfg.barge.clip_max_ms else 0)
@@ -948,7 +948,7 @@ class Session:
                              name="voice-barge").start()
         elif self.clip_tracker.speech_ms <= self.cfg.barge.confirm_ms + self.frame_ms and \
                 self.clock() - self.paused_at > self.cfg.barge.resume_after_ms / 1000.0:
-            self._resume("nichts gesagt")
+            self._resume("nothing said")
             voice_metrics.event("barge_ins", outcome="resume")
 
     def _classify_interruption(self, clip, paused_at, spoke_until=None):
@@ -970,47 +970,47 @@ class Session:
             if self.output and alexa_voice.is_alexa(self.output):
                 strict = True
             if not norm:
-                self._resume("Geräusch")
+                self._resume("noise")
                 voice_metrics.event("barge_ins", outcome="noise")
             elif self.room_speaker and self.guard.text_match(text) >= self.cfg.barge.echo_text_ratio and not named:
-                self._resume("eigenes Echo")
+                self._resume("own echo")
                 voice_metrics.event("echo_false_alarms")
                 voice_metrics.event("barge_ins", outcome="echo")
-            elif norm in {_norm(w) for w in self.cfg.barge.backchannel} or re.fullmatch(r"(m+h*m*|h+m+|ä+h*m*)", norm):
-                self._resume(f"Rückmeldung „{text}“")
+            elif norm in {_norm(w) for w in self.cfg.barge.backchannel} or re.fullmatch(r"(m+h*m*|h+m+|u+h*m*|e+r*m*)", norm):
+                self._resume(f"backchannel “{text}”")
                 voice_metrics.event("barge_ins", outcome="backchannel")
             elif _norm(rest) in {_norm(w) for w in self.cfg.barge.stop_words} or \
                     re.match(r"^(stopp?|halt)\b", _norm(rest)):
-                self.log(f"„{text}“ — ich höre auf")
+                self.log(f"“{text}” — I stop")
                 self._stop_speaking("Stopp-Wort")
                 self._finish_turn(interrupted=True, why="Stopp-Wort")
                 voice_metrics.event("barge_ins", outcome="stop")
             elif strict and not named:
-                self._resume("ohne „Jarvis“ bei Fernsehen/Musik")
+                self._resume("without “Jarvis” during TV/music")
                 voice_metrics.event("barge_ins", outcome="ignored_ambience")
             elif _words(rest) < 2:
                 if named:                        # a bare "Jarvis": stop and listen
-                    self._stop_speaking("„Jarvis“")
-                    self._finish_turn(interrupted=True, why="„Jarvis“")
+                    self._stop_speaking("“Jarvis”")
+                    self._finish_turn(interrupted=True, why="“Jarvis”")
                     self.open_window(self.cfg.wake.window_s)
                     self._emit("chime")
                     voice_metrics.event("barge_ins", outcome="name")
                 else:
-                    self._resume("zu kurz")
+                    self._resume("too short")
                     voice_metrics.event("barge_ins", outcome="noise")
             else:
-                self.log(f"gehört: „{text}“")
+                self.log(f"heard: “{text}”")
                 self._emit("final", text=text)
                 spoken_hint = self._spoken_hint()
-                self._stop_speaking("echte Unterbrechung")
-                self._finish_turn(interrupted=True, why="Unterbrechung mit Frage")
+                self._stop_speaking("real interruption")
+                self._finish_turn(interrupted=True, why="interruption with a question")
                 voice_metrics.event("barge_ins", outcome="utterance")
                 turn = voice_metrics.Turn("voice", clock=self.clock)
                 turn.mark("speech_end", spoke_until or self.clock())
                 turn.mark("endpoint")
                 turn.mark("stt_done")
                 self.last_sent = {"text": rest, "at": self.clock()}
-                self.machine.go(st.THINKING, "Unterbrechung")
+                self.machine.go(st.THINKING, "interruption")
                 self._start_run(rest, turn, typed=False, hint=spoken_hint)
 
     def _spoken_hint(self):
@@ -1018,7 +1018,7 @@ class Session:
         n = self.resume_from
         total = len(self.sentences)
         if total and n < total:
-            return f"Hinweis: Du wurdest nach Satz {n} von {total} deiner letzten Antwort unterbrochen; antworte auf das Neue."
+            return f"Note: you were interrupted after sentence {n} of {total} of your last answer; answer the new thing."
         return ""
 
     def _resume(self, why):
@@ -1029,7 +1029,7 @@ class Session:
         self.play_index = self.resume_from
         self.playing_id = None
         self._emit("gain", value=1.0, ms=self.cfg.barge.fade_ms)
-        self.log(f"weiter ({why})")
+        self.log(f"carrying on ({why})")
         if self.output:
             threading.Thread(target=self._room_resume, daemon=True).start()
         self.player_cond.notify_all()
@@ -1041,7 +1041,7 @@ class Session:
                 sonos.stop(self.output)                 # lifts the hold
                 sonos.release(self.output)
         except Exception as e:  # noqa: BLE001
-            self.log(f"Lautsprecher weiter: {str(e)[:60]}")
+            self.log(f"speaker carrying on: {str(e)[:60]}")
 
     def _stop_speaking(self, why):
         self.paused = True
@@ -1081,7 +1081,7 @@ class Session:
         self.ducked = False
         self.resume_from = 0
         self.playing_id = None
-        if self.answer_text and self.answer_message not in ("(Meldung)", "") and not interrupted:
+        if self.answer_text and self.answer_message not in ("(notice)", "") and not interrupted:
             self.open_window(self.cfg.wake.conversation_s * (1.6 if self.answer_text.rstrip().endswith("?") else 1.0))
         if self.machine.state != st.LISTENING:
             self.machine.go(st.LISTENING, why)
@@ -1098,7 +1098,7 @@ class Session:
         """The conversation window must hold what he said, not what he had planned to say."""
         spoken = self._spoken_text().strip()
         msg = self.answer_message
-        if msg in ("", "(Meldung)"):
+        if msg in ("", "(notice)"):
             return
         try:
             import commands
@@ -1107,12 +1107,12 @@ class Session:
                 win = d.get("window") or []
                 for w in reversed(win):
                     if w.get("u", "")[:240] == " ".join(msg.split())[:240]:
-                        w["a"] = (spoken[:300] + " [unterbrochen]") if spoken else "[unterbrochen, bevor etwas gesagt wurde]"
+                        w["a"] = (spoken[:300] + " [interrupted]") if spoken else "[interrupted before anything was said]"
                         break
                 d["window"] = win
             commands.update_state(patch)
         except Exception as e:  # noqa: BLE001
-            self.log(f"Gedächtnis nicht angepasst: {str(e)[:60]}")
+            self.log(f"memory not adjusted: {str(e)[:60]}")
 
     # ── timers ─────────────────────────────────────────────────
     def _ticker(self):
@@ -1129,7 +1129,7 @@ class Session:
                     if state == st.INTERRUPTED and self.clip is not None and \
                             self.clip_tracker.speech_ms <= self.cfg.barge.confirm_ms + self.frame_ms and \
                             self.clock() - self.paused_at > self.cfg.barge.resume_after_ms / 1000.0:
-                        self._resume("nichts gesagt")
+                        self._resume("nothing said")
                         voice_metrics.event("barge_ins", outcome="resume")
                     cue_ms = self.cfg.llm.thinking_cue_after_ms
                     if state == st.THINKING and self.run and cue_ms and cue_sent != self.run["at"] \

@@ -153,27 +153,27 @@ def act(action, snap):
         for name, mb in snap["ollama"]:
             try:
                 _ollama("/api/generate", {"model": name, "keep_alive": 0}, timeout=10)
-                _note(f"Ollama-Modell {name} entladen ({mb} MB VRAM frei)")
+                _note(f"Ollama model {name} unloaded ({mb} MB VRAM free)")
             except Exception as e:  # noqa: BLE001
-                _note(f"Ollama entladen fehlgeschlagen: {e}")
+                _note(f"unloading Ollama failed: {e}")
     elif action == "stop_tts_gpu":
         import tts_chain
         if tts_chain.gpu_pause():
             STATE["shed"].append(action)
-            _note("GPU-Stimme pausiert, Piper spricht (Grafikspeicher knapp)")
+            _note("GPU voice paused, Piper speaks (graphics memory tight)")
     elif action == "start_tts_gpu":
         import tts_chain
         tts_chain.gpu_resume()
         STATE["shed"].remove("stop_tts_gpu")
-        _note("GPU-Stimme wieder gestartet")
+        _note("GPU voice started again")
     elif action == "whisper_to_cpu":
         import voice
         if voice.unload_stt():
             STATE["shed"].append(action)
-            _note("Whisper von der Grafikkarte genommen, hört jetzt auf der CPU")
+            _note("Whisper taken off the graphics card, now listens on the CPU")
     elif action == "whisper_back":
         STATE["shed"].remove("whisper_to_cpu")
-        _note("Whisper darf wieder auf die Grafikkarte (beim nächsten Laden)")
+        _note("Whisper may use the graphics card again (at the next load)")
 
 
 def gpu_allowed(kind):
@@ -201,35 +201,35 @@ def choose_ollama_model(configured):
     if free is None or need is None or free - RESERVE >= need * 1.15:
         return configured, ""
     if SMALL_MODEL and SMALL_MODEL in sizes and free - RESERVE >= sizes[SMALL_MODEL] * 1.15:
-        return SMALL_MODEL, f"zu wenig Grafikspeicher für {configured}, nehme {SMALL_MODEL}"
-    return configured, f"zu wenig Grafikspeicher — {configured} läuft teilweise auf der CPU (langsamer)"
+        return SMALL_MODEL, f"not enough graphics memory for {configured}, taking {SMALL_MODEL}"
+    return configured, f"not enough graphics memory — {configured} runs partly on the CPU (slower)"
 
 
 def status():
     s = STATE.get("last") or {}
     if not s:
-        return {"ok": None, "text": "noch keine Messung"}
+        return {"ok": None, "text": "no measurement yet"}
     parts = []
     if "vram_total_mb" in s:
-        parts.append(f"VRAM {s['vram_used_mb'] / 1024:.1f}/{s['vram_total_mb'] / 1024:.0f} GB frei {s['vram_free_mb'] / 1024:.1f}")
-    parts.append("Stimme " + ("GPU" if s["tts_gpu"]["running"] else "pausiert" if s["tts_gpu"]["paused"] else "CPU"))
+        parts.append(f"VRAM {s['vram_used_mb'] / 1024:.1f}/{s['vram_total_mb'] / 1024:.0f} GB free {s['vram_free_mb'] / 1024:.1f}")
+    parts.append("voice " + ("GPU" if s["tts_gpu"]["running"] else "paused" if s["tts_gpu"]["paused"] else "CPU"))
     parts.append("Whisper " + ("GPU" if s["whisper"]["gpu"] else "CPU" if s["whisper"]["name"] else "–"))
-    parts.append("Ollama " + (", ".join(n for n, _ in s["ollama"]) or "leer"))
+    parts.append("Ollama " + (", ".join(n for n, _ in s["ollama"]) or "empty"))
     return {"ok": s.get("vram_free_mb", RESERVE) >= RESERVE, "text": " · ".join(parts), "shed": list(STATE["shed"]),
             "log": STATE["log"][-8:], "snapshot": s}
 
 
 def describe():
-    """German text for the resource_status tool."""
+    """Text for the resource_status tool."""
     st = status()
     if st["ok"] is None:
         snapshot()
         st = status()
-    lines = [st["text"], f"Reserve {RESERVE} MB, frei gehalten für Windows, Browser und Spiele."]
+    lines = [st["text"], f"Reserve {RESERVE} MB, kept free for Windows, browsers and games."]
     if st["shed"]:
-        lines.append("Gerade abgegeben: " + ", ".join(st["shed"]))
+        lines.append("Given back right now: " + ", ".join(st["shed"]))
     if st["log"]:
-        lines.append("Zuletzt: " + "; ".join(st["log"][-4:]))
+        lines.append("Recently: " + "; ".join(st["log"][-4:]))
     return "\n".join(lines)
 
 

@@ -1,6 +1,6 @@
 {
-  "_comment": "Kopieren nach config/home.json und die Entity-IDs aus Home Assistant eintragen (Entwicklerwerkzeuge → Zustände). Felder ohne passendes Gerät leer lassen.",
-  "storage_name": "Batteriespeicher",
+  "_comment": "Copy to config/home.json and fill in the entity ids from Home Assistant (Developer tools → States). Leave fields without a matching device empty.",
+  "storage_name": "Home battery",
   "solar_power": [
     "sensor.solar_power"
   ],
@@ -14,11 +14,11 @@
   "rooms": [
     [
       "climate.living_room",
-      "Wohnzimmer"
+      "Living room"
     ],
     [
       "climate.bedroom",
-      "Schlafzimmer"
+      "Bedroom"
     ]
   ],
   "air_pm25": "sensor.air_purifier_pm25",
@@ -35,25 +35,25 @@
   ],
   "appliances": [
     {
-      "name": "Waschmaschine",
-      "power": "sensor.waschmaschine_power",
+      "name": "washing machine",
+      "power": "sensor.washing_machine_power",
       "on_w": 10,
       "run_min": 3,
       "off_w": 4,
       "off_min": 3
     },
     {
-      "name": "Trockner",
-      "article": "der ",
-      "power": "sensor.trockner_power"
+      "name": "dryer",
+      "article": "the ",
+      "power": "sensor.dryer_power"
     }
   ],
   "device_aliases": {
-    "light.wohnzimmer_led": [
-      "Wohnzimmer",
-      "Licht",
-      "Lampe",
-      "Stehlampe"
+    "light.living_room_led": [
+      "living room",
+      "light",
+      "lamp",
+      "floor lamp"
     ]
   },
   "climate_groups": {
@@ -65,18 +65,18 @@
     ]
   },
   "departure": {
-    "_comment": "Vor dem Losfahren zu einem Termin: diese Thermostate (aus climate_groups) auf climate_away Grad, als Vorschlag mit Karte; 0 = ausschalten",
+    "_comment": "Before leaving for an appointment: set these thermostats (from climate_groups) to climate_away degrees, as a suggestion with a card; 0 = switch off",
     "climate": [
       "climate.living_room"
     ],
     "climate_away": 17
   },
   "focus": {
-    "_comment": "Fokus-Sitzung: diese Spotify-Playlist startet beim „Fokus 45 Minuten“ (leer = keine Musik)",
+    "_comment": "Focus session: this Spotify playlist starts with “focus 45 minutes” (empty = no music)",
     "playlist": "spotify:playlist:37i9dQZF1DX8NTLI2TtZa6"
   },
   "presence_room": "input_select.room",
   "mic_rooms": {
-    "Schlafzimmer": "iPad"
+    "Bedroom": "iPad"
   }
 }

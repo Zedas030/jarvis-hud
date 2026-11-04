@@ -1,14 +1,14 @@
 """
 The router learns from the LLM — fewer tokens every week.
 
-1. Aliases: when a switching request had to go to Claude ("Mach die Leselampe
-   im Büro aus") and Claude switched exactly the device(s) with home_control,
+1. Aliases: when a switching request had to go to Claude ("Turn off the reading
+   lamp in the study") and Claude switched exactly the device(s) with home_control,
    the wording is stored as a draft (config/learned.json → "drafts"). Only after
    it recurred and the user accepted it on a card (skill_factory.py) does the
    router do it alone, in milliseconds, for 0 tokens.
 
 2. Report: logs/usage.jsonl tells which requests went to the LLM how often and
-   at what cost. "Verbrauchsbericht" / "Was hast du gelernt?" answers locally;
+   at what cost. "Usage report" / "What have you learned?" answers locally;
    scripts/router_report.py prints the full list for tuning the rules.
 """
 import collections
@@ -22,14 +22,15 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]      # the repository (this f
 PATH = pathlib.Path(os.environ.get("JARVIS_LEARNED", ROOT / "config" / "learned.json"))
 USAGE = ROOT / "logs" / "usage.jsonl"
 _CACHE = {"mtime": None, "data": {}}
-_SWITCH_WORDS = {"an", "aus", "ein", "einschalten", "ausschalten", "anmachen", "ausmachen", "anschalten",
-                 "abschalten", "schalte", "schalt", "mach", "mache", "bitte", "mal", "jarvis", "sir", "der", "die",
-                 "das", "den", "dem", "im", "in", "am", "kannst", "du", "und", "noch", "jetzt", "doch", "auch"}
+_SWITCH_WORDS = {"on", "off", "turn", "switch", "power", "shut", "set", "make", "please", "jarvis", "sir", "the",
+                 "a", "an", "in", "at", "of", "can", "could", "you", "and", "now", "also", "too", "again", "my",
+                 "activate", "deactivate", "enable", "disable"}
 
 
 def key(n):
-    """The device part of a command: 'mach bitte die Leselampe im Büro aus' -> 'büro leselampe'."""
-    words = [w for w in re.sub(r"[^\wäöüß]+", " ", (n or "").lower()).split() if w not in _SWITCH_WORDS]
+    """The device part of a command: 'please turn off the reading lamp in the study' -> 'lamp reading study'."""
+    text = re.sub(r"['’]", "", (n or "").lower())
+    words = [w for w in re.sub(r"[^\w]+", " ", text).split() if w not in _SWITCH_WORDS]
     return " ".join(sorted(set(words)))
 
 
@@ -73,7 +74,7 @@ def observe(message, tool_calls):
     if any(a.get("data") for a in switches):
         return None                       # brightness etc.: the wording does not carry the value reliably
     n = (message or "").lower()
-    if re.search(r"\?|\b(wenn|falls|später|um \d|in \d|warum|ob)\b", n) or len(n) > 90:
+    if re.search(r"\?|\b(if|when|later|at \d|in \d|why|whether)\b", n) or len(n) > 90:
         return None
     k = key(n)
     if not k or len(k.split()) > 5:
@@ -102,13 +103,13 @@ def observe(message, tool_calls):
 
 
 def choice(n):
-    """Entities the user picked once when this wording was ambiguous ("die Lampe"), or []."""
+    """Entities the user picked once when this wording was ambiguous ("the lamp"), or []."""
     k = key(n)
     return list((load().get("choices") or {}).get(k, {}).get("entities", [])) if k else []
 
 
 def remember_choice(n, entities):
-    """The user's answer to "Meinen Sie A oder B?" — kept for the wording, no card needed: he said it."""
+    """The user's answer to "Do you mean A or B?" — kept for the wording, no card needed: he said it."""
     k = key(n)
     if not k or not entities:
         return False
@@ -156,7 +157,7 @@ def report(days=7):
     llm = [r for r in rs if r not in local]
     by_msg = collections.defaultdict(lambda: [0, 0])
     for r in llm:
-        m = " ".join(re.sub(r"[^\wäöüß ]+", " ", (r.get("message") or "").lower()).split())[:60]
+        m = " ".join(re.sub(r"[^\w ]+", " ", (r.get("message") or "").lower()).split())[:60]
         by_msg[m][0] += 1
         by_msg[m][1] += r.get("total_in", 0) + r.get("output", 0)
     repeat = sorted(((m, c, t) for m, (c, t) in by_msg.items() if c >= 2), key=lambda x: -x[2])[:10]
@@ -168,20 +169,20 @@ def report(days=7):
 def spoken_report(days=7):
     r = report(days)
     if not r.get("total"):
-        return "Dazu habe ich noch keine Zahlen, Sir."
+        return "I have no numbers on that yet, Sir."
     share = round(100 * r["local"] / r["total"])
-    text = (f"In den letzten {days} Tagen {r['total']} Anfragen, {share} Prozent davon habe ich selbst erledigt. "
-            f"Ans Sprachmodell gingen {r['llm']}, zusammen etwa {round(r['tokens'] / 1000)} tausend Tokens. "
-            f"Ich kenne {r['aliases']} gelernte Formulierungen"
-            + (f", {r['drafts']} weitere warten als Entwurf auf Ihre Freigabe." if r.get("drafts") else "."))
+    text = (f"In the last {days} days {r['total']} requests, {share} percent of them I handled myself. "
+            f"{r['llm']} went to the language model, together about {round(r['tokens'] / 1000)} thousand tokens. "
+            f"I know {r['aliases']} learned wordings"
+            + (f", {r['drafts']} more are waiting as drafts for your approval." if r.get("drafts") else "."))
     if r["repeat"]:
         m, c, _ = r["repeat"][0]
-        text += f" Am teuersten wiederholt: „{m}“, {c} mal."
+        text += f" Most expensive repeat: “{m}”, {c} times."
     try:
         import selfcheck
         n = len(selfcheck.misses(days))
         if n:
-            text += f" {n} Mal mussten Sie gleich nochmal fragen — Details mit „Wie gut warst du?“."
+            text += f" {n} times you had to ask again right away — details with “How well did you do?”."
     except Exception:  # noqa: BLE001
         pass
     return text

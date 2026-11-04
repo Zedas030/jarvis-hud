@@ -34,7 +34,7 @@
     var elongation = wrap(lunarLongitude - solarLongitude, 2 * Math.PI);
     var fraction = clamp((1 - Math.cos(lunarLatitude) * Math.cos(elongation)) / 2, 0, 1);
     var waxing = elongation < Math.PI;
-    var label = fraction < .015 ? 'Neumond' : fraction > .985 ? 'Vollmond' : Math.abs(fraction - .5) < .025 ? (waxing ? 'Erstes Viertel' : 'Letztes Viertel') : (waxing ? 'Zunehmender Mond' : 'Abnehmender Mond');
+    var label = fraction < .015 ? 'New moon' : fraction > .985 ? 'Full moon' : Math.abs(fraction - .5) < .025 ? (waxing ? 'First quarter' : 'Last quarter') : (waxing ? 'Waxing moon' : 'Waning moon');
     return { fraction: fraction, waxing: waxing, phase: elongation / (2 * Math.PI), label: label };
   }
   function moonPath(fraction, waxing) {

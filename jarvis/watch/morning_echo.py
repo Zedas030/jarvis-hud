@@ -7,8 +7,8 @@ the TV, or someone talks to the Echo), the Echo says once what matters today. Fi
 
 The briefing counts as the day's briefing (state.json → briefing_day), so the first conversation
 does not repeat it. config/home.json → "morning_briefing":
-  {"room": "Wohnzimmer", "triggers": ["binary_sensor.bad_aufenthaltserkennung_bad", "light.licht", "switch.tv",
-                                      "media_player.nutzer_echo_dot"]}
+  {"room": "Living Room", "triggers": ["binary_sensor.bathroom_presence", "light.light", "switch.tv",
+                                       "media_player.user_echo_dot"]}
   The briefing is spoken in the room the presence sensors see the user in (whereabouts.py); "room" is the
   fallback when nobody is seen. A presence sensor as trigger: the first visit to the bathroom in the morning.
 A media_player counts when it was talked to (Alexa Media Player's last_called_timestamp).
@@ -21,7 +21,7 @@ import time
 
 import commands
 
-ENABLED = os.environ.get("JARVIS_MORNING_ECHO", "1").strip().lower() not in ("0", "false", "no", "off", "aus")
+ENABLED = os.environ.get("JARVIS_MORNING_ECHO", "1").strip().lower() not in ("0", "false", "no", "off")
 FROM_HOUR = int(os.environ.get("JARVIS_MORNING_FROM", "5"))
 UNTIL_HOUR = int(os.environ.get("JARVIS_BRIEFING_UNTIL", "13"))
 ECHO_WAIT_S = 8              # after "Alexa, ..." Alexa answers first
@@ -31,7 +31,7 @@ _LAST = {}                   # entity -> what it was in the previous round ("on"
 def config():
     import jarvis_profile as profile
     cfg = profile.ha("morning_briefing", {}) or {}
-    return {"room": cfg.get("room", "Wohnzimmer"), "triggers": list(cfg.get("triggers") or [])}
+    return {"room": cfg.get("room", "Living Room"), "triggers": list(cfg.get("triggers") or [])}
 
 
 def _mark(s):
@@ -64,14 +64,14 @@ def triggered(states, triggers, last):
 def _weather():
     import briefing
     text = briefing._weather().split(": ", 1)[-1]
-    text = re.sub(r"\s*\([^)]*\)", "", text).replace("°C", "Grad")
-    return "Heute " + text
+    text = re.sub(r"\s*\([^)]*\)", "", text).replace("°C", "degrees")
+    return "Today " + text
 
 
 def _alerts():
     import weather_alerts
     alerts = weather_alerts.fetch()
-    return ("Achtung: " + " ".join(weather_alerts.say(a) for a in alerts[:2])) if alerts else ""
+    return ("Note: " + " ".join(weather_alerts.say(a) for a in alerts[:2])) if alerts else ""
 
 
 def _agenda():
@@ -85,19 +85,19 @@ def _agenda():
     out = []
     if parcels:
         senders = [e["title"].lstrip("📦 ").split(":", 1)[0].strip() for e in parcels]
-        out.append(f"Heute kommt {'ein Paket' if len(parcels) == 1 else f'{len(parcels)} Pakete'} "
-                   f"von {' und '.join(dict.fromkeys(senders))}.")
+        out.append(f"Today {'a parcel arrives' if len(parcels) == 1 else f'{len(parcels)} parcels arrive'} "
+                   f"from {' and '.join(dict.fromkeys(senders))}.")
     if not evts:
-        return " ".join(out) or "Heute stehen keine Termine an."
-    parts = [("ganztägig " if e.get("allday") else f"um {e['start'].hour}:{e['start'].minute:02d} ")
-             + e.get("title", "ein Termin") for e in evts[:3]]
-    more = f", und {len(evts) - 3} weitere" if len(evts) > 3 else ""
-    return " ".join(out + ["Termine: " + ", ".join(parts) + more + "."])
+        return " ".join(out) or "There are no appointments today."
+    parts = [("all day " if e.get("allday") else f"at {e['start'].hour}:{e['start'].minute:02d} ")
+             + e.get("title", "an appointment") for e in evts[:3]]
+    more = f", and {len(evts) - 3} more" if len(evts) > 3 else ""
+    return " ".join(out + ["Appointments: " + ", ".join(parts) + more + "."])
 
 
 def _coach():
     import energy_coach
-    return energy_coach.morning_line().replace("Energie-Coach: heute", "Die Sonne bringt heute")
+    return energy_coach.morning_line().replace("Energy coach: today", "The sun brings today")
 
 
 def _night(now):
@@ -107,21 +107,21 @@ def _night(now):
     if not rows:
         return ""
     first = rows[-1]["text"].removeprefix("Sir, ")
-    return (f"In der Nacht gab es {len(rows)} Meldungen, zuletzt: {first}" if len(rows) > 1
-            else f"In der Nacht: {first}")
+    return (f"There were {len(rows)} notices during the night, the last: {first}" if len(rows) > 1
+            else f"During the night: {first}")
 
 
 def _mail():
     import briefing
-    m = re.search(r"(\d+) ungelesene", briefing._mail_count() or "")
-    return f"Sie haben {m.group(1)} ungelesene Mails." if m and m.group(1) != "0" else ""
+    m = re.search(r"(\d+) unread", briefing._mail_count() or "")
+    return f"You have {m.group(1)} unread mails." if m and m.group(1) != "0" else ""
 
 
 def text(now=None):
     now = now or dt.datetime.now()
     import jarvis_profile as profile
     name = getattr(profile, "USER_NAME", "") or ""
-    out = [f"Guten Morgen, {name or 'Sir'}."]
+    out = [f"Good morning, {name or 'Sir'}."]
     parts = (_weather, _alerts, _agenda, _coach, lambda: _night(now), _mail)
     try:
         import wellbeing
@@ -169,7 +169,7 @@ def check(states, now=None):
 
     def run():
         words = text(now)
-        print(f"  Morgen-Briefing ({fired}): {words[:120]}", flush=True)
+        print(f"  morning briefing ({fired}): {words[:120]}", flush=True)
         _speak(cfg["room"], words)
     wait = ECHO_WAIT_S if fired.startswith("media_player.") else 0
     t = threading.Timer(wait, run)

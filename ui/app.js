@@ -84,22 +84,22 @@ var micProblem = null;   // 'blocked' | 'needs-click' | null
 function updateMicButton() {
   var btn = $('#btnMic'), label = $('#micLabel');
   if (!btn || !label || typeof Live === 'undefined') return;
-  var st = 'off', text = 'Live starten';
-  if (micProblem === 'blocked') { st = 'blocked'; text = 'Mikrofon blockiert'; }
-  else if (Live.ptt) { st = 'hearing'; text = 'Loslassen = senden'; }
-  else if (!Live.on) { st = 'off'; text = 'Live starten'; }
+  var st = 'off', text = 'Start live';
+  if (micProblem === 'blocked') { st = 'blocked'; text = 'Microphone blocked'; }
+  else if (Live.ptt) { st = 'hearing'; text = 'Release = send'; }
+  else if (!Live.on) { st = 'off'; text = 'Start live'; }
   else if (micProblem === 'needs-click' || (Live.ctx && Live.ctx.state === 'suspended')) {
-    st = 'needs-click'; text = 'Klick = Mikro an';
+    st = 'needs-click'; text = 'Click = mic on';
   }
   // picking the iPad up, music, talk: recorded on the device, but nothing for him until "Jarvis"
   else if (Live.armed && typeof OnDevice !== 'undefined' && OnDevice.gate() && !Wake.awake()) { st = 'sleeping'; text = Ambience.hint(); }
-  else if (Live.armed) { st = 'hearing'; text = 'Höre dich …'; }
-  else if (Live.sending) { st = 'busy'; text = 'Verstehe …'; }
-  else if (Live.speaking) { st = 'speaking'; text = (typeof VoiceClient !== 'undefined' && VoiceClient.on) ? 'Spricht · reinreden unterbricht' : 'Spricht · „Jarvis“ unterbricht'; }
-  else if (running) { st = 'busy'; text = briefingActive ? 'Briefing · reden bricht ab' : 'Denkt …'; }
-  else if (Ringing.on) { st = 'speaking'; text = 'Klingelt · reden = aus'; }
+  else if (Live.armed) { st = 'hearing'; text = 'Hearing you …'; }
+  else if (Live.sending) { st = 'busy'; text = 'Understanding …'; }
+  else if (Live.speaking) { st = 'speaking'; text = (typeof VoiceClient !== 'undefined' && VoiceClient.on) ? 'Speaking · talking over him interrupts' : 'Speaking · “Jarvis” interrupts'; }
+  else if (running) { st = 'busy'; text = briefingActive ? 'Briefing · talking cancels it' : 'Thinking …'; }
+  else if (Ringing.on) { st = 'speaking'; text = 'Ringing · talk = off'; }
   else if (!Wake.awake()) { st = 'sleeping'; text = Ambience.hint(); }
-  else { st = 'listening'; text = Wake.mode() === 'off' ? 'Hört zu' : 'Ich höre …'; }
+  else { st = 'listening'; text = Wake.mode() === 'off' ? 'Listening' : 'I am listening …'; }
   btn.dataset.state = st;
   btn.classList.toggle('live', Live.on && st !== 'blocked');
   document.body.classList.toggle('mic-tap', st === 'needs-click');   // the station shows a full-screen "tap"
@@ -122,8 +122,8 @@ function gauge(el, frac, colour, value, unit, label) {
     + '<div class="gtext"><b>' + esc(value) + '<small>' + esc(unit) + '</small></b></div>'
     + '<span class="glabel">' + esc(label) + '</span>';
 }
-function de(n, digits) {
-  return n == null ? '—' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: digits || 0 });
+function fmt(n, digits) {
+  return n == null ? '—' : Number(n).toLocaleString('en-GB', { maximumFractionDigits: digits || 0 });
 }
 function tone(v, okAt, warnAt, higherIsBetter) {
   if (v == null) return 'var(--ink-dim)';
@@ -132,35 +132,35 @@ function tone(v, okAt, warnAt, higherIsBetter) {
 }
 
 function renderHouse(h) {
-  if (!h || h.error) { $('#houseLine').textContent = h ? 'Home Assistant: ' + h.error : 'lädt …'; return; }
-  gauge($('#gSolar'), h.solar_w / 2000, 'var(--amber)', de(h.solar_w), 'W', 'Solar');
-  gauge($('#gSoc'), (h.soc || 0) / 100, tone(h.soc, 50, 20, true), de(h.soc), '%', 'Speicher');
-  $('#houseLine').innerHTML = '<span>heute <b>' + de(h.gen_kwh, 1) + ' kWh</b></span>'
-    + '<span>Batterien <b>' + h.bats.map(function (b) { return de(b); }).join(' / ') + ' %</b></span>';
+  if (!h || h.error) { $('#houseLine').textContent = h ? 'Home Assistant: ' + h.error : 'loading …'; return; }
+  gauge($('#gSolar'), h.solar_w / 2000, 'var(--amber)', fmt(h.solar_w), 'W', 'Solar');
+  gauge($('#gSoc'), (h.soc || 0) / 100, tone(h.soc, 50, 20, true), fmt(h.soc), '%', 'Battery');
+  $('#houseLine').innerHTML = '<span>today <b>' + fmt(h.gen_kwh, 1) + ' kWh</b></span>'
+    + '<span>batteries <b>' + h.bats.map(function (b) { return fmt(b); }).join(' / ') + ' %</b></span>';
   $('#rooms').innerHTML = h.rooms.map(function (r) {
     return '<li><span class="nm">' + esc(r.name) + '</span>'
-      + (r.heating ? '<i class="flame" title="heizt auf ' + de(r.target, 1) + ' °C">▲</i>' : '')
-      + '<b>' + de(r.temp, 1) + ' °C</b></li>';
+      + (r.heating ? '<i class="flame" title="heating to ' + fmt(r.target, 1) + ' °C">▲</i>' : '')
+      + '<b>' + fmt(r.temp, 1) + ' °C</b></li>';
   }).join('');
   var pm = h.pm25, col = tone(pm, 12, 35, false);
   $('#airFill').style.width = Math.min(100, (pm || 0) / 75 * 100) + '%';
   $('#airFill').style.background = col;
-  $('#airVal').innerHTML = pm == null ? '—' : de(pm) + ' <small>µg</small>';
+  $('#airVal').innerHTML = pm == null ? '—' : fmt(pm) + ' <small>µg</small>';
   $('#airVal').style.color = col;
 }
 
 function renderMe(m) {
   if (!m || m.error) {
-    $('#meTiles').innerHTML = '<p class="hint">' + esc(m ? 'Garmin: ' + m.error : 'Uhr wird gelesen …') + '</p>';
+    $('#meTiles').innerHTML = '<p class="hint">' + esc(m ? 'Garmin: ' + m.error : 'reading the watch …') + '</p>';
     return;
   }
   gauge($('#gSleep'), (m.sleep_score || 0) / 100, tone(m.sleep_score, 75, 60, true),
-    m.sleep_score == null ? '—' : m.sleep_score, '', 'Schlaf');
+    m.sleep_score == null ? '—' : m.sleep_score, '', 'Sleep');
   gauge($('#gBattery'), (m.battery || 0) / 100, tone(m.battery, 50, 25, true),
     m.battery == null ? '—' : m.battery, '', 'Body Battery');
   var tile = function (k, v, u) { return '<div><span>' + k + '</span><b>' + v + '<small>' + u + '</small></b></div>'; };
-  $('#meTiles').innerHTML = tile('SCHLAF', de(m.sleep_h, 1), ' h') + tile('SCHRITTE', de(m.steps), '')
-    + tile('RUHEPULS', de(m.rhr), ' bpm') + tile('STRESS', de(m.stress), '');
+  $('#meTiles').innerHTML = tile('SLEEP', fmt(m.sleep_h, 1), ' h') + tile('STEPS', fmt(m.steps), '')
+    + tile('RUHEPULS', fmt(m.rhr), ' bpm') + tile('STRESS', fmt(m.stress), '');
   $('#meAge').textContent = 'garmin · ' + m.at;
 }
 
@@ -168,7 +168,7 @@ function renderMe(m) {
 function renderMail(m) {
   if (!m || m.error) {
     $('#mailUnread').textContent = '—';
-    $('#mailList').innerHTML = '<p class="hint">' + esc(m ? 'Postfach: ' + m.error : 'Postfach wird gelesen …') + '</p>';
+    $('#mailList').innerHTML = '<p class="hint">' + esc(m ? 'Mailbox: ' + m.error : 'reading the mailbox …') + '</p>';
     return;
   }
   $('#mailUnread').textContent = m.unread;
@@ -176,38 +176,38 @@ function renderMail(m) {
   var many = (m.accounts || 1) > 1;
   // an account that does not answer (wrong password, IMAP off) says so here instead of vanishing
   var broken = (m.errors || []).map(function (e) {
-    return '<li class="warn"><i class="dot"></i><span class="nm">' + esc(e.split(':')[0]) + ' nicht erreichbar</span><em>'
+    return '<li class="warn"><i class="dot"></i><span class="nm">' + esc(e.split(':')[0]) + ' not reachable</span><em>'
       + esc(e.split(':').slice(1).join(':').trim()) + '</em></li>';
   }).join('');
   $('#mailList').innerHTML = broken + (m.latest.map(function (x) {
     return '<li class="ok"><i class="dot"></i><span class="nm">' + (many ? '<small>' + esc(x.account) + ' · </small>' : '')
       + esc(x.sender) + ' <small>' + esc(x.when) + '</small></span><em>' + esc(x.subject) + '</em></li>';
-  }).join('') || (broken ? '' : '<p class="hint">Alles gelesen.</p>'));
-  $('#mailAge').textContent = 'Mail · ' + (many ? m.accounts + ' Konten · ' : '') + m.at;
+  }).join('') || (broken ? '' : '<p class="hint">All read.</p>'));
+  $('#mailAge').textContent = 'Mail · ' + (many ? m.accounts + ' accounts · ' : '') + m.at;
 }
 
 function renderSystems(d) {
   var rows = [], h = d.house, p = d.pi, n = d.nas;
   var row = function (state, name, detail) { rows.push([state, name, detail]); };
   if (p) row(p.error ? 'bad' : (p.up < p.containers || p.temp > 70 ? 'warn' : 'ok'), 'Raspberry Pi',
-    p.error ? p.error : de(p.temp, 1) + ' °C · ' + p.up + '/' + p.containers + ' Container');
+    p.error ? p.error : fmt(p.temp, 1) + ' °C · ' + p.up + '/' + p.containers + ' Container');
   if (n) row(n.error ? 'bad' : (!n.ok || n.used_pct > 85 ? 'warn' : 'ok'), 'NAS',
-    n.error ? n.error : de(n.used_pct) + ' % belegt · ' + n.disks + ' Platten ' + (n.ok ? 'gesund' : 'prüfen'));
+    n.error ? n.error : fmt(n.used_pct) + ' % used · ' + n.disks + ' disks ' + (n.ok ? 'healthy' : 'check'));
   if (h && !h.error) row(h.router.online ? 'ok' : 'bad', 'Router',
-    h.router.online ? '↓ ' + de(h.router.down * 8 / 1000, 1) + ' · ↑ ' + de(h.router.up * 8 / 1000, 1) + ' Mbit/s' : 'offline');
-  if (h) row(h.error ? 'bad' : 'ok', 'Home Assistant', h.error ? 'nicht erreichbar' : 'verbunden');
+    h.router.online ? '↓ ' + fmt(h.router.down * 8 / 1000, 1) + ' · ↑ ' + fmt(h.router.up * 8 / 1000, 1) + ' Mbit/s' : 'offline');
+  if (h) row(h.error ? 'bad' : 'ok', 'Home Assistant', h.error ? 'not reachable' : 'connected');
   var rs = d.resources;
   if (rs && rs.ok !== null) row(rs.ok ? (rs.shed && rs.shed.length ? 'warn' : 'ok') : 'warn', 'GPU-Budget',
-    rs.text + (rs.shed && rs.shed.length ? ' · abgegeben: ' + rs.shed.join(', ') : ''));
+    rs.text + (rs.shed && rs.shed.length ? ' · given back: ' + rs.shed.join(', ') : ''));
   var c = d.pc;
-  if (c && !c.error) row((c.pc_gpu_temp > 85 || c.pc_disk > 92) ? 'warn' : 'ok', 'Dieser PC',
-    'CPU ' + de(c.pc_cpu) + ' % · RAM ' + de(c.pc_ram) + ' %' + (c.pc_vram != null ? ' · VRAM ' + de(c.pc_vram) + ' %' : '')
-    + (c.pc_gpu_temp != null ? ' · GPU ' + de(c.pc_gpu_temp) + ' °C' : ''));
+  if (c && !c.error) row((c.pc_gpu_temp > 85 || c.pc_disk > 92) ? 'warn' : 'ok', 'This PC',
+    'CPU ' + fmt(c.pc_cpu) + ' % · RAM ' + fmt(c.pc_ram) + ' %' + (c.pc_vram != null ? ' · VRAM ' + fmt(c.pc_vram) + ' %' : '')
+    + (c.pc_gpu_temp != null ? ' · GPU ' + fmt(c.pc_gpu_temp) + ' °C' : ''));
   $('#sysList').innerHTML = rows.map(function (r) {
     return '<li class="' + r[0] + '"><i class="dot"></i><span class="nm">' + esc(r[1]) + '</span><em>' + esc(r[2]) + '</em></li>';
-  }).join('') || '<p class="hint">lädt …</p>';
+  }).join('') || '<p class="hint">loading …</p>';
   var bad = rows.filter(function (r) { return r[0] !== 'ok'; }).length;
-  $('#sysAge').textContent = bad ? bad + ' Hinweis' + (bad > 1 ? 'e' : '') : 'alles grün';
+  $('#sysAge').textContent = bad ? bad + ' notice' + (bad > 1 ? 's' : '') : 'all green';
   $('#sysAge').className = bad ? 'warn' : '';
 }
 
@@ -216,19 +216,19 @@ function renderSystems(d) {
 function renderHomelab(h) {
   var box = $('#labGrid');
   if (!box) return;
-  if (!h || h.error) { box.innerHTML = '<p class="hint">' + esc(h ? h.error : 'lädt …') + '</p>'; return; }
+  if (!h || h.error) { box.innerHTML = '<p class="hint">' + esc(h ? h.error : 'loading …') + '</p>'; return; }
   var use = h.line_down ? Math.min(100, (h.down || 0) / h.line_down * 100) : 0;
   var cell = function (cls, value, label, extra) {
     return '<div class="mcell ' + cls + '"><b>' + value + '</b><span>' + esc(label) + '</span>' + (extra || '') + '</div>';
   };
-  var net = h.link === 0 ? 'offline' : '↓ ' + de(h.down, 1) + ' · ↑ ' + de(h.up, 1);
+  var net = h.link === 0 ? 'offline' : '↓ ' + fmt(h.down, 1) + ' · ↑ ' + fmt(h.up, 1);
   box.innerHTML =
     cell(h.link === 0 ? 'bad' : '', esc(net), 'Internet Mbit/s', '<i class="labbar"><i style="width:' + use.toFixed(1) + '%"></i></i>')
     + cell(h.ph_pct == null ? 'dim' : (h.ph_on === false ? 'bad' : ''),
-           h.ph_pct == null ? '—' : de(h.ph_pct, 1) + ' %', h.ph_on === false ? 'Pi-hole AUS' : 'Pi-hole blockiert')
-    + cell(h.pi_temp > 70 ? 'warn' : '', de(h.pi_temp, 1) + ' °C', 'Pi Temperatur')
-    + cell(h.pi_cpu > 90 ? 'warn' : '', de(h.pi_cpu) + ' %', 'Pi CPU');
-  $('#labAge').textContent = h.ph_error ? 'Pi-hole: Passwort fehlt' : 'Prometheus · Pi-hole';
+           h.ph_pct == null ? '—' : fmt(h.ph_pct, 1) + ' %', h.ph_on === false ? 'Pi-hole AUS' : 'Pi-hole blockiert')
+    + cell(h.pi_temp > 70 ? 'warn' : '', fmt(h.pi_temp, 1) + ' °C', 'Pi temperature')
+    + cell(h.pi_cpu > 90 ? 'warn' : '', fmt(h.pi_cpu) + ' %', 'Pi CPU');
+  $('#labAge').textContent = h.ph_error ? 'Pi-hole: password missing' : 'Prometheus · Pi-hole';
   $('#labAge').className = h.ph_error ? 'warn' : '';
   if (h.ph_error) box.children[1].title = h.ph_error;
 }
@@ -254,7 +254,7 @@ var LiveBar = {
     var bar = $('#liveBar');
     if (!bar) return false;
     bar.innerHTML = LiveBar.card('cpu', 'CPU', true) + LiveBar.card('gpu', 'GPU', true)
-      + LiveBar.card('ram', 'RAM', true) + LiveBar.card('net', 'Netz · dieser PC', false);
+      + LiveBar.card('ram', 'RAM', true) + LiveBar.card('net', 'Network · this PC', false);
     return true;
   },
   setRing: function (key, v) {
@@ -324,14 +324,14 @@ var LiveBar = {
     try {
       var d = await (await fetch('/api/sysmon', { headers: headers() })).json();
       if (d.error) return;
-      var L = LiveBar, pct = function (v) { return v == null ? '—' : de(v) + '<small>%</small>'; };
+      var L = LiveBar, pct = function (v) { return v == null ? '—' : fmt(v) + '<small>%</small>'; };
       L.push('cpu', d.cpu); L.push('gpu', d.gpu); L.push('ram', d.ram); L.push('down', d.net_down); L.push('up', d.net_up);
       L.setRing('cpu', d.cpu); L.setRing('gpu', d.gpu); L.setRing('ram', d.ram);
-      L.text('cpu', pct(d.cpu), d.cores ? d.cores + ' Threads' : '');
+      L.text('cpu', pct(d.cpu), d.cores ? d.cores + ' threads' : '');
       L.text('gpu', pct(d.gpu), d.vram_used != null
-        ? 'VRAM ' + de(d.vram_used, 1) + ' / ' + de(d.vram_total, 0) + ' GB · ' + de(d.gpu_temp) + ' °C' : '');
-      L.text('ram', pct(d.ram), de(d.ram_used, 1) + ' / ' + de(d.ram_total, 0) + ' GB');
-      L.text('net', '<i class="dn">↓</i>' + de(d.net_down, 1) + ' <i class="up">↑</i>' + de(d.net_up, 1), 'Mbit/s');
+        ? 'VRAM ' + fmt(d.vram_used, 1) + ' / ' + fmt(d.vram_total, 0) + ' GB · ' + fmt(d.gpu_temp) + ' °C' : '');
+      L.text('ram', pct(d.ram), fmt(d.ram_used, 1) + ' / ' + fmt(d.ram_total, 0) + ' GB');
+      L.text('net', '<i class="dn">↓</i>' + fmt(d.net_down, 1) + ' <i class="up">↑</i>' + fmt(d.net_up, 1), 'Mbit/s');
       var cy = 'rgba(95,228,255,.9)', cyf = 'rgba(95,228,255,.28)';
       L.trace('cpu', [{ data: L.hist.cpu, scale: 100, line: cy, fill: cyf }]);
       L.trace('gpu', [{ data: L.hist.gpu, scale: 100, line: 'rgba(185,140,255,.95)', fill: 'rgba(185,140,255,.28)' }]);
@@ -352,14 +352,14 @@ var LiveBar = {
 function renderTop(d) {
   var w = d.weather, e = d.event;
   if (w && !w.error) {
-    $('#wNow').textContent = de(w.now) + '° · ' + w.sky;
-    $('#wSub').textContent = de(w.tmin) + '–' + de(w.tmax) + '° · Regen ' + w.rain + ' % · Wind ' + w.wind;
+    $('#wNow').textContent = fmt(w.now) + '° · ' + w.sky;
+    $('#wSub').textContent = fmt(w.tmin) + '–' + fmt(w.tmax) + '° · rain ' + w.rain + ' % · wind ' + w.wind;
     $('#gVerdict').textContent = w.golf;
-    $('#chipGolf em').textContent = 'Golf ' + (w.golf_day || 'heute');
+    $('#chipGolf em').textContent = 'Golf ' + (w.golf_day || 'today');
     $('#chipGolf').className = 'chip-lg ' + w.golf_cls;
   }
   if (e && !e.error) {
-    $('#eTitle').textContent = e.title || 'frei';
+    $('#eTitle').textContent = e.title || 'free';
     $('#eWhen').textContent = e.when;
   }
 }
@@ -376,8 +376,8 @@ async function loadDashboard() {
 
 function tickClock() {
   var now = new Date();
-  $('#clockTime').textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  $('#clockDate').textContent = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#clockTime').textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  $('#clockDate').textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   setText('#nightClock', $('#clockTime').textContent);
 }
 
@@ -526,8 +526,8 @@ async function loadStatus() {
   safely(function () { if (s.timers) Timers.set(s.timers); });
   safely(function () {
     var f = s.fallback, el = $('#pBrain');
-    if (el && f && f.mode !== 'off') el.title = 'Ersatz bei Claude-Ausfall: ' + (f.chain || []).map(function (r) {
-      return r.name + ' ' + r.model + (r.ok ? ' (bereit)' : ' — ' + r.why);
+    if (el && f && f.mode !== 'off') el.title = 'Fallback when Claude is down: ' + (f.chain || []).map(function (r) {
+      return r.name + ' ' + r.model + (r.ok ? ' (ready)' : ' — ' + r.why);
     }).join(' → ');
   });
   updateMicButton();
@@ -561,12 +561,12 @@ function renderUsage(u) {
   setBar('u5', u.five_hour);
   setBar('u7', u.seven_day);
   var extra = $('#uExtra');
-  if (u.using_overage) { extra.textContent = 'wird genutzt'; extra.className = ''; }
-  else if (u.overage_reason === 'out_of_credits') { extra.textContent = 'leer'; extra.className = 'empty'; }
-  else if (u.overage === 'allowed') { extra.textContent = 'verfügbar'; extra.className = ''; }
-  else { extra.textContent = u.overage_reason ? u.overage_reason.replace(/_/g, ' ') : 'aus'; extra.className = ''; }
+  if (u.using_overage) { extra.textContent = 'in use'; extra.className = ''; }
+  else if (u.overage_reason === 'out_of_credits') { extra.textContent = 'empty'; extra.className = 'empty'; }
+  else if (u.overage === 'allowed') { extra.textContent = 'available'; extra.className = ''; }
+  else { extra.textContent = u.overage_reason ? u.overage_reason.replace(/_/g, ' ') : 'off'; extra.className = ''; }
   var mins = Math.round((Date.now() / 1000 - (u.at || 0)) / 60);
-  $('#usageAge').textContent = mins < 1 ? 'gerade' : 'vor ' + mins + ' min';
+  $('#usageAge').textContent = mins < 1 ? 'just now' : mins + ' min ago';
 }
 
 /* Voice provider chain: who speaks now, what is left, who is paused until when. */
@@ -577,12 +577,12 @@ function renderTts(t) {
   el.textContent = (t.active_label || '—') + (active && active.balance ? ' · ' + active.balance : '');
   var paused = (t.chain || []).filter(function (c) { return c.blocked_until; }).map(function (c) {
     var d = new Date(c.blocked_until * 1000);
-    return c.label + ' leer bis ' + d.getDate() + '.' + (d.getMonth() + 1) + '.';
+    return c.label + ' empty until ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   });
   sub.textContent = paused.join(' · ');
-  row.title = 'Stimmen-Kette:\n' + (t.chain || []).map(function (c, i) {
-    return (i + 1) + '. ' + c.label + ': ' + (!c.configured ? 'kein Key' : c.blocked_until ? 'gesperrt (' + c.reason + ')'
-      : 'bereit') + (c.balance ? ' — ' + c.balance : '');
+  row.title = 'Voice chain:\n' + (t.chain || []).map(function (c, i) {
+    return (i + 1) + '. ' + c.label + ': ' + (!c.configured ? 'no key' : c.blocked_until ? 'blocked (' + c.reason + ')'
+      : 'ready') + (c.balance ? ' — ' + c.balance : '');
   }).join('\n');
 }
 
@@ -593,15 +593,15 @@ function renderBilling(b) {
   if (!el || !b) return;
   el.className = '';
   if (!b.balance_set) {
-    el.textContent = 'eintragen ✎';
-    sub.textContent = b.configured ? '' : 'Für automatische Abzüge JARVIS_COST_KEY in .env setzen';
+    el.textContent = 'enter ✎';
+    sub.textContent = b.configured ? '' : 'For automatic deductions set JARVIS_COST_KEY in .env';
   } else if (typeof b.remaining === 'number') {
     el.textContent = usd(b.remaining);
     if (b.remaining < 2) el.className = 'crit';
     else if (b.remaining < 5) el.className = 'warn';
     var parts = [];
-    if (typeof b.today === 'number') parts.push('heute ' + usd(b.today));
-    if (typeof b.month === 'number') parts.push('Monat ' + usd(b.month));
+    if (typeof b.today === 'number') parts.push('today ' + usd(b.today));
+    if (typeof b.month === 'number') parts.push('month ' + usd(b.month));
     if (b.note) parts.push(b.note);
     sub.textContent = parts.join(' · ');
   } else {
@@ -624,10 +624,10 @@ function renderBilling(b) {
       body: JSON.stringify({ usd: input.value })
     });
     var data = await res.json();
-    if (!res.ok) { log('error', 'GUTHABEN', data.error || 'Fehler'); return; }
+    if (!res.ok) { log('error', 'CREDIT', data.error || 'error'); return; }
     input.value = ''; form.hidden = true;
     renderBilling(data);
-    log('ok', 'GUTHABEN', 'Kontostand gesetzt: ' + usd(data.entered));
+    log('ok', 'CREDIT', 'balance set: ' + usd(data.entered));
   };
 })();
 
@@ -712,7 +712,7 @@ async function transmit(message, opts) {
 /* Stop talking and drop the rest of the answer (Escape, or talking over him).
    running is cleared right away so live mode can record the interruption. */
 function cancelRun() {
-  if (typeof VoiceClient !== 'undefined' && VoiceClient.on) { VoiceClient.stopAll('Abbruch'); running = false; return; }
+  if (typeof VoiceClient !== 'undefined' && VoiceClient.on) { VoiceClient.stopAll('cancel'); running = false; return; }
   interruptSpeech();
   streamSpeak = false;
   if (activeCtl) activeCtl.abort();
@@ -780,7 +780,7 @@ function handleEvent(ev) {
 
 /* ── confirmation gate ─────────────────────
    Shell commands and writes outside the Jarvis folder only run after the user
-   confirms here: a click, or saying "bestätigt" / "nein". No answer = denied. */
+   confirms here: a click, or saying "confirmed" / "no". No answer = denied. */
 var pendingConfirm = null;
 
 function answerConfirm(allow) {
@@ -796,24 +796,24 @@ function answerConfirm(allow) {
 function showConfirm(ev) {
   var card = document.createElement('div');
   card.className = 'bubble confirm';
-  card.innerHTML = '<div class="ctitle">Bestätigung erforderlich · ' + esc(ev.tool) + '</div>'
+  card.innerHTML = '<div class="ctitle">Confirmation required · ' + esc(ev.tool) + '</div>'
     + '<pre class="cdetail">' + esc(ev.detail || '') + '</pre>'
-    + '<div class="cbtns"><button class="cyes">Bestätigen</button>'
+    + '<div class="cbtns"><button class="cyes">Confirm</button>'
     + '<button class="cno">Ablehnen</button><span class="ctimer"></span></div>';
   $('#transcript').appendChild(card);
   $('#transcript').scrollTop = $('#transcript').scrollHeight;
   var left = ev.timeout || 75;
   var timer = setInterval(function () {
     left -= 1;
-    card.querySelector('.ctimer').textContent = 'automatisch abgelehnt in ' + left + ' s';
+    card.querySelector('.ctimer').textContent = 'declined automatically in ' + left + ' s';
     if (left <= 0) clearInterval(timer);
   }, 1000);
   pendingConfirm = { id: ev.id, card: card, timer: timer };
   card.querySelector('.cyes').onclick = function () { answerConfirm(true); };
   card.querySelector('.cno').onclick = function () { answerConfirm(false); };
-  log('note', 'FREIGABE', ev.tool + ': ' + String(ev.detail || '').slice(0, 80));
-  setVoiceState('BESTÄTIGEN?', 'hot');
-  speak('[serious] Bestätigung erforderlich, Sir.');
+  log('note', 'APPROVAL', ev.tool + ': ' + String(ev.detail || '').slice(0, 80));
+  setVoiceState('CONFIRM?', 'hot');
+  speak('[serious] Confirmation required, Sir.');
 }
 
 function closeConfirm(id, allow) {
@@ -821,9 +821,9 @@ function closeConfirm(id, allow) {
   clearInterval(pendingConfirm.timer);
   var card = pendingConfirm.card;
   card.classList.add(allow ? 'approved' : 'denied');
-  card.querySelector('.cbtns').innerHTML = allow ? '✓ bestätigt' : '✕ abgelehnt';
+  card.querySelector('.cbtns').innerHTML = allow ? '✓ confirmed' : '✕ declined';
   pendingConfirm = null;
-  log(allow ? 'ok' : 'note', 'FREIGABE', allow ? 'bestätigt' : 'abgelehnt');
+  log(allow ? 'ok' : 'note', 'APPROVAL', allow ? 'confirmed' : 'declined');
   if (allow) approvalBeep();
   if (running) setVoiceState('THINKING', 'hot');
 }
@@ -863,7 +863,7 @@ var stopSpeaking = null;
 function interruptSpeech() {
   if (typeof VoiceClient !== 'undefined' && VoiceClient.on) {
     if (!Live.speaking && !running) return false;
-    VoiceClient.stopAll('unterbrochen');
+    VoiceClient.stopAll('interrupted');
     return true;
   }
   if (!stopSpeaking && !Speech.active) return false;
@@ -878,7 +878,7 @@ function interruptSpeech() {
   var stop = stopSpeaking;
   stopSpeaking = null;
   stop();
-  log('note', 'VOICE', 'unterbrochen');
+  log('note', 'VOICE', 'interrupted');
   return true;
 }
 
@@ -946,23 +946,23 @@ var Notes = {
     $('#noteBox').hidden = false;
     try {
       var n = await (await fetch('/api/notifications', { headers: headers() })).json();
-      var t = function (s) { return new Date(s * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); };
+      var t = function (s) { return new Date(s * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); };
       var html = '';
-      if (n.paused_until) html += '<h3>NOT-AUS</h3><ul><li class="bad">Pausiert bis ' + t(n.paused_until) + ' — „weitermachen“ hebt es auf.</li></ul>';
-      if (n.proposals.length) html += '<h3>OFFENE VORSCHLÄGE</h3><ul>' + n.proposals.map(function (p) {
+      if (n.paused_until) html += '<h3>EMERGENCY STOP</h3><ul><li class="bad">Paused until ' + t(n.paused_until) + ' — “carry on” lifts it.</li></ul>';
+      if (n.proposals.length) html += '<h3>OPEN SUGGESTIONS</h3><ul>' + n.proposals.map(function (p) {
         return '<li class="prop"><b>' + esc(p.title) + '</b><br>' + esc(p.why) + '</li>'; }).join('') + '</ul>';
-      if (n.tasks && n.tasks.length) html += '<h3>AUFGABEN</h3><ul>' + n.tasks.map(function (t) {
+      if (n.tasks && n.tasks.length) html += '<h3>TASKS</h3><ul>' + n.tasks.map(function (t) {
         var cls = t.status === 'COMPLETED' ? 'ok' : (/FAIL|TIMED|CANCEL/.test(t.status) ? 'bad' : 'prop');
         return '<li class="' + cls + '"><small>' + esc(t.status) + ' · ' + t.done + '/' + t.total + '</small><b>'
           + esc(t.title) + '</b>' + (t.report ? '<br>' + esc(t.report) : '') + '</li>'; }).join('') + '</ul>';
-      html += '<h3>MELDUNGEN</h3><ul>' + (n.items.map(function (e) {
+      html += '<h3>NOTICES</h3><ul>' + (n.items.map(function (e) {
         return '<li><small>' + t(e.at) + ' · ' + esc(e.kind) + '</small>' + esc(e.text) + '</li>'; }).join('')
-        || '<li>Noch keine Meldungen seit dem Start.</li>') + '</ul>';
+        || '<li>No notices since the start yet.</li>') + '</ul>';
       if (n.incidents.length) html += '<h3>HOMELAB</h3><ul>' + n.incidents.map(function (i) {
         return '<li class="' + (i.state === 'ok' ? 'ok' : 'bad') + '"><small>' + esc(i.at) + '</small>' + esc(i.text) + '</li>'; }).join('') + '</ul>';
       $('#noteBody').innerHTML = html;
-      $('#noteAge').textContent = 'Profil ' + (n.persona || '—');
-    } catch (e) { $('#noteBody').innerHTML = '<p class="hint">Nicht erreichbar.</p>'; }
+      $('#noteAge').textContent = 'Profile ' + (n.persona || '—');
+    } catch (e) { $('#noteBody').innerHTML = '<p class="hint">Not reachable.</p>'; }
   }
 };
 (function initNotes() {
@@ -1062,8 +1062,8 @@ MusicHold.hold = function () {
   MusicHold.timer = setInterval(MusicHold.check, 1000);
 };
 MusicHold.check = function () {
-  var busy = { Fenster: Wake.mode() !== 'off' && Wake.awake(), denkt: running, Aufnahme: Live.armed,
-    versteht: Live.sending, spricht: Live.speaking || Speech.active, Freigabe: !!pendingConfirm };
+  var busy = { window: Wake.mode() !== 'off' && Wake.awake(), thinking: running, recording: Live.armed,
+    understanding: Live.sending, speaking: Live.speaking || Speech.active, approval: !!pendingConfirm };
   var any = false;
   Object.keys(busy).forEach(function (k) { if (busy[k]) { MusicHold.waited[k] = 1; any = true; } });
   if (any) { MusicHold.quiet = 0; return; }
@@ -1208,7 +1208,7 @@ function playUrl(url, setup, onFinish, rescue) {
       rescue().then(function (blob) {
         if (finished) return;
         return playOnCtx(blob, ctx, function (stop) { stopSpeaking = function () { stop(); done(); }; });
-      }).catch(function (e) { log('note', 'VOICE', 'Wiedergabe fehlgeschlagen: ' + String(e && e.message || e).slice(0, 60)); })
+      }).catch(function (e) { log('note', 'VOICE', 'playback failed: ' + String(e && e.message || e).slice(0, 60)); })
         .then(done);
       return true;
     };
@@ -1228,13 +1228,13 @@ function playUrl(url, setup, onFinish, rescue) {
         if (e && e.name === 'NotAllowedError') {
           audio.onended = audio.onerror = null;
           if (!finished && liveOutCtx() && rescue) {
-            if (!Sound.blocked) log('note', 'VOICE', 'Ton über das Mikrofon-Audio — kein Tippen nötig');
+            if (!Sound.blocked) log('note', 'VOICE', 'Sound through the microphone audio — no tap needed');
             Sound.blocked = true;
             audio.removeAttribute('src');
             if (viaCtx()) return;
           }
           audio.onended = audio.onerror = done;
-          log('note', 'VOICE', 'Ton blockiert — einmal klicken, dann spricht er');
+          log('note', 'VOICE', 'Sound blocked — click once, then he speaks');
           afterGesture(function () { if (!finished) audio.play().catch(done); });
         } else done();
       });
@@ -1295,7 +1295,7 @@ function speakBrowser(text) {
   if (!window.speechSynthesis) return Promise.resolve();
   return new Promise(function (resolve) {
     var u = new SpeechSynthesisUtterance(stripTones(text));
-    u.rate = 1.02; u.pitch = 0.92; u.volume = outVolume(); u.lang = 'de-DE';
+    u.rate = 1.02; u.pitch = 0.92; u.volume = outVolume(); u.lang = 'en-GB';
     u.onend = resolve; u.onerror = resolve;
     stopSpeaking = function () { speechSynthesis.cancel(); resolve(); };
     speechSynthesis.speak(u);
@@ -1353,7 +1353,7 @@ function pauseSpeech() {
   Speech.pausedAt = performance.now();
   sonosHalt(true);
   if (stopSpeaking) { var stop = stopSpeaking; stopSpeaking = null; stop(); }
-  log('note', 'VOICE', 'Pause — ich höre');
+  log('note', 'VOICE', 'Pause — I am listening');
   var at = Speech.pausedAt;   // a clip that never comes back (recorder broke) must not keep him silent
   setTimeout(function () {
     if (Speech.paused && Speech.pausedAt === at && !Barge.rec && !Barge.busy) resumeSpeech();
@@ -1369,7 +1369,7 @@ function resumeSpeech() {
   Speech.queue.forEach(function (it) {
     if (Output.target || it.again) { it.blob = askVoice(it.text); it.again = false; }
   });
-  log('note', 'VOICE', 'weiter');
+  log('note', 'VOICE', 'carrying on');
   var go = Speech.onResume; Speech.onResume = null;
   if (go) go();
 }
@@ -1403,7 +1403,7 @@ async function playSpeechQueue() {
     Live.speaking = false;
     Live.spokeAt = performance.now();
     duckMusic(false);
-    if (!Speech.cancelled) Wake.followUp(answerText);   // "Und morgen?" needs no wake word
+    if (!Speech.cancelled) Wake.followUp(answerText);   // "And tomorrow?" needs no wake word
     if (!Live.armed && !running) setVoiceState(Live.on ? 'LISTENING' : 'IDLE', Live.on ? 'hot' : '');
     var w = Speech.waiters; Speech.waiters = [];
     w.forEach(function (f) { f(); });
@@ -1434,7 +1434,7 @@ async function speak(text) {
       var u = new SpeechSynthesisUtterance(stripTones(text));
       u.rate = 1.02; u.pitch = 0.92;
       u.volume = outVolume();
-      u.lang = 'de-DE';
+      u.lang = 'en-GB';
       u.onend = resolve; u.onerror = resolve;
       stopSpeaking = function () { speechSynthesis.cancel(); resolve(); };
       speechSynthesis.cancel();
@@ -1466,7 +1466,7 @@ var Output = {
     var btn = $('#btnOutput');
     if (!btn) return;
     btn.hidden = !Output.speakers.length;
-    btn.textContent = Output.target ? '🔊 ' + Output.label : '🔈 Ton hier';
+    btn.textContent = Output.target ? '🔊 ' + Output.label : '🔈 Sound here';
     btn.classList.toggle('on', !!Output.target);
   },
   next: function () {
@@ -1476,11 +1476,11 @@ var Output = {
       method: 'POST', headers: headers({ 'content-type': 'application/json' }),
       body: JSON.stringify({ target: target })
     }).then(function (res) { return res.ok ? res.json() : null; }).then(function (j) {
-      if (!j) return log('note', 'VOICE', 'Ausgabe nicht umgestellt');
+      if (!j) return log('note', 'VOICE', 'output not switched');
       Output.target = j.output || ''; Output.label = j.output_label || '';
       Output.render();
-      log('note', 'VOICE', Output.target ? 'Antworten dieses Geräts kommen aus ' + Output.label : 'Antworten kommen wieder aus diesem Gerät');
-    }).catch(function () { log('note', 'VOICE', 'Ausgabe nicht umgestellt'); });
+      log('note', 'VOICE', Output.target ? 'answers of this device come from ' + Output.label : 'answers come from this device again');
+    }).catch(function () { log('note', 'VOICE', 'output not switched'); });
   },
   init: function () {
     var btn = $('#btnOutput');
@@ -1497,14 +1497,14 @@ var Output = {
    (OnDevice.need, Wake.check) and the screen says that "Hey Jarvis" is the safe way. */
 var AMB_RATE = 0.0015;     // per mic frame (~16 ms): ~10 s to fill
 var AMB_ON = 0.85, AMB_OFF = 0.5;   // share of loud frames — with a gap so the hint does not flicker
-var AMB_LABEL = { sport: 'Sport läuft', tv: 'Fernseher läuft', music: 'Musik läuft', noise: 'Laut im Raum' };
+var AMB_LABEL = { sport: 'sport on', tv: 'TV on', music: 'music playing', noise: 'loud in the room' };
 var Ambience = {
   fromHouse: '', busy: 0, ear: false,
   house: function (a) {
     var k = (a && a.kind) || '';
     if (k === Ambience.fromHouse) return;
     Ambience.fromHouse = k;
-    if (k) log('note', 'WAKE', AMB_LABEL[k] + ' (' + ((a.players || []).join(', ') || 'Home Assistant') + ') — „Jarvis“ zählt nur am Satzanfang oder -ende');
+    if (k) log('note', 'WAKE', AMB_LABEL[k] + ' (' + ((a.players || []).join(', ') || 'Home Assistant') + ') — “Jarvis” only counts at the start or end of a sentence');
     updateMicButton();
   },
   hear: function (loud) {
@@ -1513,28 +1513,27 @@ var Ambience = {
     if (!was && Ambience.busy > AMB_ON) Ambience.ear = true;
     else if (was && Ambience.busy < AMB_OFF) Ambience.ear = false;
     if (Ambience.ear !== was) {
-      if (Ambience.ear && !Ambience.fromHouse) log('note', 'WAKE', 'Dauergeräusch im Raum — strengere Erkennung');
-      WakeLog.send(Ambience.ear ? 'Dauergeräusch erkannt' : 'Raum wieder ruhig');
+      if (Ambience.ear && !Ambience.fromHouse) log('note', 'WAKE', 'steady noise in the room — stricter detection');
+      WakeLog.send(Ambience.ear ? 'steady noise detected' : 'room quiet again');
       updateMicButton();
     }
   },
   kind: function () { return Ambience.fromHouse || (Ambience.ear ? 'noise' : ''); },
   strict: function () { return Wake.mode() !== 'off' && !!Ambience.kind(); },
-  hint: function () { var k = Ambience.kind(); return k ? AMB_LABEL[k] + ' · sag „Hey Jarvis“' : 'Sag „Jarvis“'; }
+  hint: function () { var k = Ambience.kind(); return k ? AMB_LABEL[k] + ' · say “Hey Jarvis”' : 'Say “Jarvis”'; }
 };
 
 /* ── wake word ─────────────────────────────────
    JARVIS_WAKE on the server: off = every utterance counts (as before);
-   text = only utterances addressed to "Jarvis" — at the start ("Jarvis, mach
-   das Licht an") or at the end ("Mach das Licht an, Jarvis"); oww = the
+   text = only utterances addressed to "Jarvis" — at the start ("Jarvis, turn
+   the light on") or at the end ("Turn the light on, Jarvis"); oww = the
    server also hears "Hey Jarvis" (openWakeWord) and opens the mic for a few
    seconds. After every answer there is a follow-up window without the wake word. */
 // Spellings Whisper produces for "Jarvis"; "arvis" is one whose first sound got lost.
-var WAKE_NAME = '(?:jarvis|jarviz|jarves|javis|jarwis|jervis|yarvis|garvis|tscharvis|tschawis|dschawis|dschavis|'
-  + 'charvis|chavis|arvis|jarvi)';
-var WAKE_RE = new RegExp('^\\W*(?:(?:hey|hi|hallo|ok|okay|he|ey|du)\\W+)?' + WAKE_NAME + '\\b[\\s,.!?:;-]*', 'i');
-var WAKE_END_RE = new RegExp('[\\s,;-]+(?:bitte\\W+)?' + WAKE_NAME + '\\W*$', 'i');
-// "Kannst du, Jarvis, mal ..." — the name in the middle counts too
+var WAKE_NAME = '(?:jarvis|jarviz|jarves|javis|jarwis|jervis|yarvis|garvis|charvis|chavis|arvis|jarvi)';
+var WAKE_RE = new RegExp('^\\W*(?:(?:hey|hi|hello|ok|okay|oi|yo)\\W+)?' + WAKE_NAME + '\\b[\\s,.!?:;-]*', 'i');
+var WAKE_END_RE = new RegExp('[\\s,;-]+(?:please\\W+)?' + WAKE_NAME + '\\W*$', 'i');
+// "Could you, Jarvis, ..." — the name in the middle counts too
 var WAKE_MID_RE = new RegExp('(^|[\\s,.!?;:-]+)' + WAKE_NAME + '(?![\\p{L}])[\\s,.!?:;-]*', 'iu');
 var Wake = {
   cfg: { mode: 'off', window_s: 7, followup_s: 0 },
@@ -1567,7 +1566,7 @@ var Wake = {
     MusicHold.hold();
     Wake.open(Wake.cfg.window_s || 7);
     wakeChime();
-    log('note', 'WAKE', 'Aktivierungswort gehört');
+    log('note', 'WAKE', 'wake word heard');
   },
   /* text mode: strip the wake word, or say the utterance was not meant for us */
   /* strict (music, sport, TV in the room): only "Jarvis" at the start or end of the sentence
@@ -1651,7 +1650,7 @@ var Ringing = {
 };
 
 /* ── push from the server (/api/events) ────────
-   Timers ringing, "Die Waschmaschine ist fertig", appointments, new devices,
+   Timers ringing, "The washing machine is done", appointments, new devices,
    the wake word. Spoken only when nothing else is going on; during the quiet
    hours notices are only shown (alarms still ring). */
 var Push = { queue: [], busy: false, es: null };
@@ -1694,10 +1693,10 @@ async function drainPush() {
       var ev = Push.queue.shift();
       var b = bubble('jarvis', ev.text || '');
       b.classList.add('push');
-      log(ev.t === 'alarm' ? 'run' : 'note', ev.t === 'alarm' ? 'WECKER' : 'MELDUNG', ev.text || '');
+      log(ev.t === 'alarm' ? 'run' : 'note', ev.t === 'alarm' ? 'ALARM' : 'NOTICE', ev.text || '');
       if (ev.t === 'alarm') {
         await Ringing.start(ev.kind === 'alarm' ? 45 : 8);
-        // Talked over the ringing ("Stopp", "Schlummern"): he listens instead of reading it out.
+        // Talked over the ringing ("Stop", "Snooze"): he listens instead of reading it out.
         if (ev.text && !Ringing.interrupted) await speak(ev.text);
         else Wake.followUp('?');
       } else if (ev.silent) {
@@ -1726,16 +1725,16 @@ var Timers = {
       txt = (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
     } else {
       var d = new Date(next.at * 1000);
-      txt = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      txt = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       if (d.toDateString() !== new Date().toDateString()) txt = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d.getDay()] + ' ' + txt;
     }
-    var label = { timer: 'Timer', alarm: 'Wecker', reminder: 'Erinnerung', action: 'Geplant' }[next.kind] || '';
+    var label = { timer: 'Timer', alarm: 'Alarm', reminder: 'Reminder', action: 'Planned' }[next.kind] || '';
     $('#tNext').textContent = txt;
     $('#tSub').textContent = label + (next.text ? ' · ' + next.text : '') + (list.length > 1 ? ' · +' + (list.length - 1) : '');
     $('#chipTimer .ico').textContent = next.kind === 'alarm' ? '⏰' : next.kind === 'reminder' ? '🔔' : '⏱';
     chip.title = list.map(function (i) {
-      return ({ timer: 'Timer', alarm: 'Wecker', reminder: 'Erinnerung', action: 'Geplant' }[i.kind] || i.kind) + ' '
-        + new Date(i.at * 1000).toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+      return ({ timer: 'Timer', alarm: 'Alarm', reminder: 'Reminder', action: 'Planned' }[i.kind] || i.kind) + ' '
+        + new Date(i.at * 1000).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
         + (i.text ? ' — ' + i.text : '');
     }).join('\n');
   }
@@ -1755,9 +1754,9 @@ var CONTINUE_MS = 7000;        // talk again this soon after sending = same sent
 var CONTINUE_SUSTAIN_MS = 250; // ...for at least this long (a cough does not count)
 var SILENCE_MS = 2000;    // quiet this long ends the utterance (people pause to think — shorter cuts them off)
 // After that pause the clip is transcribed; if the text sounds unfinished (ends on
-// "ähm", "und", "dass", a comma, or without a full stop) it is held this long for the rest.
+// "um", "and", "that", a comma, or without a full stop) it is held this long for the rest.
 var UNFINISHED_HOLD_MS = 3000;
-var UNFINISHED_END = /(?:^|\s)(ähm|äh|ehm|öhm|hm+|mhm|und|oder|aber|also|dass|weil|wenn|ob|der|die|den|dem|des|ein|eine|einen|einem|mit|für|von|vom|zum|zur|im|halt|quasi|sozusagen|irgendwie|nämlich|bitte\s*,)\s*[,.…-]*\s*$/i;
+var UNFINISHED_END = /(?:^|\s)(um+|uh+|erm|er|hm+|mhm|and|or|but|so|that|because|if|whether|the|a|an|my|your|with|for|from|to|of|in|on|at|into|like|kind of|sort of|basically|actually|please\s*,)\s*[,.…-]*\s*$/i;
 
 function looksUnfinished(text) {
   var t = String(text || '').trim();
@@ -1777,11 +1776,11 @@ var BARGE_MIN = 0.02;      // ...and at least this loud
 var BARGE_AMBIENT = 2.2;   // ...and this much louder than steady background (TV, music)
 var BARGE_SILENCE_MS = 550;   // a pause this long ends the clip — "Jarvis" alone is short
 var BARGE_MAX_MS = 6000;      // longer than this without a pause: check what is there
-var BARGE_STOP_ONLY = /^\W*(stopp?|halt|ruhe|still|sei (mal )?still|schon gut|danke|genug|warte|moment|pause)\W*$/i;
+var BARGE_STOP_ONLY = /^\W*(stop|halt|quiet|silence|be quiet|shush|hush|never mind|thanks|enough|thats enough|wait|hold on|one moment|pause)\W*$/i;
 var PAUSE_MS = 400;              // talking over him this long pauses him (shorter: a cough, an "mhm")
 var BARGE_SILENCE_PAUSED_MS = 1000;   // paused, he waits a little longer for the first word
 var BARGE_MAX_PAUSED_MS = 15000;      // ...and lets a whole request through
-var BARGE_FILLER = /^\W*(m+h*m+|h+m+|ä+h*m*|aha|okay|ok|genau|ach so|alles klar)\W*$/i;
+var BARGE_FILLER = /^\W*(m+h*m+|h+m+|u+h*m*|aha|okay|ok|yes|yeah|right|exactly|i see|got it|sure)\W*$/i;
 // On a Sonos the mic hears him as well (echo cancellation only knows the device's own speaker):
 var ECHO_FACTOR = 1.8;           // a voice must be this much louder than his loudest recent moment
 var ECHO_DECAY = 0.996;          // per frame (~16 ms): that moment fades over a few seconds
@@ -1792,7 +1791,7 @@ var PTT_HOLD_MS = 350;     // hold the Live button this long = push-to-talk
 // steady sound (music, TV, fan) lifts it while short speech bursts barely do.
 var AMBIENT_RATE = 0.002;  // per frame — ~8 s to settle at 60 fps
 var AMBIENT_FACTOR = 1.8;  // speak this much louder than the background
-var NOISE_TEXT = /^\W*[\[(*♪]?\s*(musik|music|applaus|lachen|gelächter|untertitel|copyright|♪)/i;
+var NOISE_TEXT = /^\W*[\[(*♪]?\s*(music|applause|laughter|laughing|subtitles|copyright|♪)/i;
 
 // Posts every 6 render quanta (768 samples, ~16 ms) — about the old frame rate,
 // which AMBIENT_RATE is tuned for.
@@ -1934,14 +1933,14 @@ var OnDevice = {
       var d = ev.data;
       if (d.t === 'ready') {
         OnDevice.ready = true;
-        log('ok', 'WAKE', 'Aktivierungswort hört jetzt auf diesem Gerät — ohne „Jarvis“ geht nichts an den PC');
+        log('ok', 'WAKE', 'the wake word now listens on this device — without “Jarvis” nothing goes to the PC');
         var ms = d.models || OnDevice.models();
-        WakeLog.send('Erkennung auf dem Gerät bereit · Modell ' + ms[0]
-          + (ms.length > 1 ? ' (zum Vergleich: ' + ms.slice(1).join(', ') + ')' : '') + ' · Schwelle ' + OnDevice.threshold());
+        WakeLog.send('detection on the device ready · model ' + ms[0]
+          + (ms.length > 1 ? ' (for comparison: ' + ms.slice(1).join(', ') + ')' : '') + ' · threshold ' + OnDevice.threshold());
       } else if (d.t === 'error') {
         OnDevice.failed = true; OnDevice.ready = false; OnDevice.on = false;
-        log('note', 'WAKE', 'Erkennung auf dem Gerät nicht verfügbar (' + d.msg + ') — der PC prüft wie bisher');
-        WakeLog.send('Erkennung auf dem Gerät fehlgeschlagen: ' + d.msg);
+        log('note', 'WAKE', 'detection on the device not available (' + d.msg + ') — the PC checks as before');
+        WakeLog.send('detection on the device failed: ' + d.msg);
       } else if (d.t === 'score') {
         var top = d.s;
         for (var k in d.by || {}) top = Math.max(top, d.by[k]);
@@ -2015,8 +2014,8 @@ var Live = {
     }
     if (!window.__serverSTT) {
       micProblem = 'blocked';
-      $('#btnMic').title = 'Der Server meldet keine Spracherkennung — Jarvis-Fenster prüfen bzw. neu starten.';
-      log('error', 'VOICE', 'Spracherkennung auf dem Server nicht verfügbar');
+      $('#btnMic').title = 'The server reports no speech recognition — check or restart the Jarvis window.';
+      log('error', 'VOICE', 'speech recognition on the server not available');
       updateMicButton();
       return;
     }
@@ -2028,15 +2027,15 @@ var Live = {
       var denied = /NotAllowed|Permission|denied/i.test(String(e && (e.name + e.message)));
       micProblem = 'blocked';
       $('#btnMic').title = denied
-        ? 'Der Browser blockiert das Mikrofon: links in der Adressleiste aufs Schloss-Symbol klicken → Mikrofon „Zulassen“, dann F5.'
-        : 'Kein Mikrofon gefunden: ' + String(e).slice(0, 80);
-      log('error', 'VOICE', denied ? 'Mikrofon im Browser blockiert — Schloss-Symbol links in der Adressleiste → Mikrofon zulassen, dann F5'
-                                   : 'Mikrofon nicht verfügbar: ' + String(e).slice(0, 70));
+        ? 'The browser blocks the microphone: click the lock icon on the left of the address bar → microphone “Allow”, then F5.'
+        : 'No microphone found: ' + String(e).slice(0, 80);
+      log('error', 'VOICE', denied ? 'microphone blocked in the browser — lock icon left of the address bar → allow microphone, then F5'
+                                   : 'microphone not available: ' + String(e).slice(0, 70));
       updateMicButton();
       return;
     }
     micProblem = null;
-    $('#btnMic').title = 'Klicken: Live an/aus · Gedrückt halten: sprechen (Push-to-Talk)';
+    $('#btnMic').title = 'Click: live on/off · Hold: speak (push-to-talk)';
     Live.ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (Live.ctx.state === 'suspended') {
       // Started from boot without a click: the browser may deliver silence until the
@@ -2101,7 +2100,7 @@ var Live = {
     if (micProblem === 'needs-click') {
       micProblem = null;
       await Live.calibrate();
-      log('ok', 'VOICE', 'Mikrofon aktiv — einfach sprechen');
+      log('ok', 'VOICE', 'microphone active — just speak');
     }
     updateMicButton();
   },
@@ -2176,7 +2175,7 @@ var Live = {
         // Record from the first loud frame — waiting first would cut "Jar" off "Jarvis".
         if (!Ringing.on) { Barge.start(t); return; }
         if (!Live.bargeSince) Live.bargeSince = t;
-        else if (t - Live.bargeSince > BARGE_MS && interruptSpeech()) {   // the alarm stops on any voice — "reden = aus"
+        else if (t - Live.bargeSince > BARGE_MS && interruptSpeech()) {   // the alarm stops on any voice — "talk = off"
           Live.bargeSince = 0;
           Live.start(t - BARGE_MS);   // what follows still needs "Jarvis" to count
         }
@@ -2204,7 +2203,7 @@ var Live = {
           else if (bt - Live.bargeSince > BARGE_MS) {
             Live.bargeSince = 0;
             briefingActive = false;
-            log('note', 'VOICE', 'Briefing abgebrochen — ich höre');
+            log('note', 'VOICE', 'briefing cancelled — I am listening');
             cancelRun();
             Live.start(bt - BARGE_MS);
           }
@@ -2220,7 +2219,7 @@ var Live = {
             Live.contSince = 0;
             Live.continuing = true;
             cancelRun();
-            log('note', 'VOICE', 'Sie reden weiter — warte auf den Rest');
+            log('note', 'VOICE', 'you keep talking — waiting for the rest');
             if (!Live.armed) Live.start(tn - CONTINUE_SUSTAIN_MS);
             else setVoiceState('HEARING', 'hot');
           }
@@ -2245,7 +2244,7 @@ var Live = {
     }
     // Nobody talks 20 s without a breath — that is music or TV, so drop it.
     if (now - Live.voiceStart > MAX_SPEECH_MS) {
-      log('note', 'VOICE', 'Dauergeräusch verworfen (Musik?)');
+      log('note', 'VOICE', 'steady noise dropped (music?)');
       return Live.discard();
     }
     if (now - Live.lastVoice > SILENCE_MS) {
@@ -2315,15 +2314,15 @@ var Live = {
         && !(rec && (rec.awake || Wake.lastHeard >= rec.at - 2500))) {
       var peak = OnDevice.peak(rec ? rec.at - 2500 : 0), need = OnDevice.need(rec && rec.dur || 0);
       var all = OnDevice.peaks(rec ? rec.at - 2500 : 0);
-      var info = 'Wert ' + peak.toFixed(3) + ', Schwelle ' + need.toFixed(3) + ', ' + Math.round((rec && rec.dur || 0) / 100) / 10 + ' s'
+      var info = 'score ' + peak.toFixed(3) + ', threshold ' + need.toFixed(3) + ', ' + Math.round((rec && rec.dur || 0) / 100) / 10 + ' s'
         + (Ambience.kind() ? ', ' + Ambience.kind() : '') + (all ? ' · ' + all : '');
       if (peak < need) {
-        if (peak >= 0.01) log('note', 'WAKE', 'kein „Jarvis“ erkannt (' + info + ')');
-        WakeLog.send('verworfen · ' + info);
+        if (peak >= 0.01) log('note', 'WAKE', 'no “Jarvis” detected (' + info + ')');
+        WakeLog.send('dropped · ' + info);
         setVoiceState('LISTENING', 'hot');
         return;
       }
-      WakeLog.send('an den PC · ' + info);
+      WakeLog.send('to the PC · ' + info);
       // The model was sure (a German "Jarvis" in a sentence reached 0.34) but Whisper may still
       // spell it as something else — then the device's ear counts, not the transcript's spelling.
       if (rec && OnDevice.trusted(peak, rec.dur || 0)) rec.deviceHeard = true;
@@ -2339,16 +2338,16 @@ var Live = {
       // Nothing is logged before it is clear the words were meant for him: room talk,
       // TV and phone calls are transcribed locally to look for "Jarvis", then dropped.
       if (!res.ok || !text || text.replace(/[^\p{L}\p{N}]/gu, '').length < 2 || NOISE_TEXT.test(text)) {
-        if (OnDevice.gate()) WakeLog.send('PC: nichts verstanden');
+        if (OnDevice.gate()) WakeLog.send('PC: nothing understood');
         setVoiceState('LISTENING', 'hot');
         return;
       }
       if (pendingConfirm) {
         log('note', 'VOICE', 'heard: "' + text + '"');
-        // Deliberate words only, so a stray "ja" from the room cannot approve.
-        if (/best(ä|ae)tig/i.test(text) && !/nicht|kein/i.test(text)) answerConfirm(true);
-        else if (/\b(nein|stopp?|abbrechen|ablehnen|nicht)\b/i.test(text)) answerConfirm(false);
-        else log('note', 'FREIGABE', 'sag "bestätigt" oder "nein"');
+        // Deliberate words only, so a stray "yes" from the room cannot approve.
+        if (/\bconfirm(ed)?\b/i.test(text) && !/\b(not|no|dont|don't)\b/i.test(text)) answerConfirm(true);
+        else if (/\b(no|nope|stop|cancel|decline|deny|not)\b/i.test(text)) answerConfirm(false);
+        else log('note', 'APPROVAL', 'say "confirmed" or "no"');
         setVoiceState('LISTENING', 'hot');
         return;
       }
@@ -2357,7 +2356,7 @@ var Live = {
         var heardWake = !!(rec && (rec.awake || rec.deviceHeard || Wake.lastHeard >= rec.at - 2500));
         var w = Wake.check(text, heardWake, Ambience.strict());
         if (!w.ok) {
-          if (OnDevice.gate()) WakeLog.send('PC: kein „Jarvis“ im Text (' + text.split(/\s+/).length + ' Wörter)');
+          if (OnDevice.gate()) WakeLog.send('PC: no “Jarvis” in the text (' + text.split(/\s+/).length + ' words)');
           setVoiceState('LISTENING', 'hot');
           return;
         }
@@ -2367,14 +2366,14 @@ var Live = {
         if (text.replace(/[^\p{L}\p{N}]/gu, '').length < 2) {   // just "Jarvis?" — he is listening now
           Wake.open(Wake.cfg.window_s || 7);
           wakeChime();
-          log('note', 'WAKE', 'ich höre');
+          log('note', 'WAKE', 'I am listening');
           setVoiceState('LISTENING', 'hot');
           return;
         }
       } else {
         log('note', 'VOICE', 'heard: "' + text + '"');   // no wake word set, or the rest of a sentence he is already on
       }
-      // A held-back unfinished start ("Als Allererstes mal bitte, ähm,") gets the rest glued on.
+      // A held-back unfinished start ("First of all, please, um,") gets the rest glued on.
       if (Live.partial) {
         text = Live.partial + ' ' + text;
         Live.partial = null;
@@ -2384,7 +2383,7 @@ var Live = {
       // Push-to-talk always sends: there the button said the sentence is over.
       if (!Live.pttSend && looksUnfinished(text)) {
         Live.partial = text;
-        log('note', 'VOICE', 'klingt unfertig — warte auf den Rest: "' + text.slice(-40) + '"');
+        log('note', 'VOICE', 'sounds unfinished — waiting for the rest: "' + text.slice(-40) + '"');
         setVoiceState('LISTENING', 'hot');
         var holdUntil = performance.now() + UNFINISHED_HOLD_MS;
         (function waitForRest() {
@@ -2469,13 +2468,13 @@ var BargeLog = {
     var s = BargeLog.st;
     BargeLog.st = null;
     if (!s || !(s.clips || s.drops || s.peak > s.bar * 0.5)) return;
-    BargeLog.send('Antwort ' + ((performance.now() - s.since) / 1000).toFixed(1) + ' s · lautester Moment '
-      + s.peak.toFixed(3) + ', Hürde ' + s.bar.toFixed(3) + ' (Raum ' + Live.base.toFixed(3) + ', Hintergrund '
+    BargeLog.send('answer ' + ((performance.now() - s.since) / 1000).toFixed(1) + ' s · loudest moment '
+      + s.peak.toFixed(3) + ', bar ' + s.bar.toFixed(3) + ' (room ' + Live.base.toFixed(3) + ', background '
       + Live.ambient.toFixed(3) + (Output.target ? ', Echo ' + (Live.echo || 0).toFixed(3) : '') + ') · '
-      + s.clips + ' Clips geprüft, ' + s.drops + ' kurze Laute');
+      + s.clips + ' clips checked, ' + s.drops + ' short sounds');
   },
   send: function (text) {
-    WakeLog.send('Unterbrechen: ' + text + (Output.target ? ' [' + Output.label + ']' : ''), true);
+    WakeLog.send('interrupt: ' + text + (Output.target ? ' [' + Output.label + ']' : ''), true);
   }
 };
 
@@ -2543,7 +2542,7 @@ var Barge = {
     // talking over him without "Jarvis" heard on the device: nothing to check on the PC
     if (!paused && OnDevice.gate() && Math.max(Wake.lastHeard, OnDevice.faintAt) < performance.now() - 4000
         && OnDevice.peak(Barge.since - PREROLL_MS) < OnDevice.SHORT_FLOOR) {
-      BargeLog.send('nicht geprüft, das Gerät hörte kein „Jarvis“ (Wert ' + OnDevice.peak(Barge.since - PREROLL_MS).toFixed(3) + ')');
+      BargeLog.send('not checked, the device heard no “Jarvis” (score ' + OnDevice.peak(Barge.since - PREROLL_MS).toFixed(3) + ')');
       Barge.busy = false;
       return;
     }
@@ -2556,7 +2555,7 @@ var Barge = {
     } catch (e) { /* unreadable clip: he simply keeps talking */ }
     Barge.busy = false;
     var named = WAKE_ANY_RE.test(text);
-    BargeLog.send('gehört „' + text.slice(0, 80) + '“ → ' + (named ? 'Name erkannt, unterbrochen' : paused ? 'ohne Namen, in der Pause' : 'ohne Namen, weiter'));
+    BargeLog.send('heard “' + text.slice(0, 80) + '” → ' + (named ? 'name recognised, interrupted' : paused ? 'without the name, in the pause' : 'without the name, carrying on'));
     var rest = named ? Wake.check(text, true).text : text.trim();
     var words = rest.replace(/[^\p{L}\p{N}]/gu, '').length >= 2 && !BARGE_FILLER.test(rest);
     // Without his name it counts only when he paused for it, with real words, no TV talking and not his own voice.
@@ -2567,8 +2566,8 @@ var Barge = {
     log('note', 'VOICE', 'heard: "' + text + '"');
     interruptSpeech();
     if (running) cancelRun();
-    // "Jarvis, wie wird das Wetter?" in one breath is the next request; a clip cut
-    // off mid-sentence or a bare "Jarvis" / "Jarvis, stopp" just opens the mic.
+    // "Jarvis, what will the weather be like?" in one breath is the next request; a clip cut
+    // off mid-sentence or a bare "Jarvis" / "Jarvis, stop" just opens the mic.
     if (!cut && !BARGE_STOP_ONLY.test(rest) && rest.replace(/[^\p{L}\p{N}]/gu, '').length >= 2) {
       Live.lastSent = { text: rest, at: performance.now() };
       await transmit(rest);
@@ -2577,7 +2576,7 @@ var Barge = {
     }
     Wake.open(Wake.cfg.window_s || 7);
     wakeChime();
-    log('note', 'WAKE', 'ich höre');
+    log('note', 'WAKE', 'I am listening');
     setVoiceState('LISTENING', 'hot');
   }
 };
@@ -2606,7 +2605,7 @@ async function startPTT() {
   if (!Live.on) { await Live.enable(); if (!Live.on) return; }
   if (typeof VoiceClient !== 'undefined' && VoiceClient.on) {
     Live.ptt = true; VoiceClient.ptt(true); setVoiceState('HEARING', 'hot'); updateMicButton();
-    log('note', 'VOICE', 'Push-to-Talk — loslassen zum Senden');
+    log('note', 'VOICE', 'push-to-talk — release to send');
     return;
   }
   await Live.unlock();
@@ -2616,7 +2615,7 @@ async function startPTT() {
   Live.ptt = true;
   if (!Live.armed) Live.start(performance.now());
   setVoiceState('HEARING', 'hot');
-  log('note', 'VOICE', 'Push-to-Talk — loslassen zum Senden');
+  log('note', 'VOICE', 'push-to-talk — release to send');
 }
 
 function stopPTT() {
@@ -2689,7 +2688,7 @@ var Station = {
     Station.apply();
     // Called from a tap: the mic and audio unlock right here, no second tap needed.
     if (on && !Live.on) toggleLive();
-    log('note', 'STATION', on ? 'Station an — Bildschirm bleibt an, sag „Jarvis …“' : 'Station aus');
+    log('note', 'STATION', on ? 'station on — the screen stays on, say “Jarvis …”' : 'station off');
   },
 
   apply: function () {
@@ -2703,17 +2702,17 @@ var Station = {
   night: function (on) {
     var was = document.body.classList.contains('night');
     document.body.classList.toggle('night', on);
-    if (on !== was && Station.on) log('note', 'STATION', on ? 'Nachtbild an' : 'Nachtbild aus — guten Morgen');
+    if (on !== was && Station.on) log('note', 'STATION', on ? 'night screen on' : 'night screen off — good morning');
   },
 
   /* Screen Wake Lock: Safari 16.4+, in a home-screen app from iPadOS 18.4. Older
-     ones fall back to the iPad setting "Automatische Sperre: Nie". */
+     ones fall back to the iPad setting "Auto-Lock: Never". */
   keepAwake: async function () {
     if (!('wakeLock' in navigator) || (Station.lock && !Station.lock.released)) return;
     try {
       Station.lock = await navigator.wakeLock.request('screen');
     } catch (e) {
-      log('note', 'STATION', 'Bildschirm-Sperre nicht abschaltbar — Einstellungen → Anzeige → Automatische Sperre: Nie');
+      log('note', 'STATION', 'screen lock cannot be switched off — Settings → Display → Auto-Lock: Never');
     }
   }
 };
@@ -2726,7 +2725,7 @@ var BRIEFING_RESET = '7';
 var briefingActive = false;
 // The server assembles the facts itself (weather/golf, appointments, solar,
 // mail — no stock news) and has them phrased in one small call.
-var BRIEFING = 'Tagesbriefing zum Start';
+var BRIEFING = 'daily briefing at start';
 
 /* iPad, not iPhone — iPadOS Safari calls itself a Mac, a touch screen there is the giveaway (as pair.html) */
 function isTablet() {
@@ -2754,7 +2753,7 @@ async function bootSequence() {
     localStorage.removeItem('jarvis.briefingDay');
   }
   if (localStorage.getItem('jarvis.briefingDay') === today) {
-    log('note', 'BRIEFING', 'übersprungen — heute schon gehabt');
+    log('note', 'BRIEFING', 'skipped — already had it today');
     return;
   }
   localStorage.setItem('jarvis.briefingDay', today);
@@ -2786,23 +2785,23 @@ var Devices = {
     clearInterval(Devices.timer);
     var tick = function () {
       var left = Math.max(0, Math.round((until - Date.now()) / 1000));
-      $('#pairHint').textContent = left ? 'Auf dem Gerät eingeben · noch ' + Math.floor(left / 60) + ':'
-        + String(left % 60).padStart(2, '0') : 'Abgelaufen — neuen Code holen.';
+      $('#pairHint').textContent = left ? 'Enter it on the device · ' + Math.floor(left / 60) + ':'
+        + String(left % 60).padStart(2, '0') + ' left' : 'Expired — get a new code.';
       if (!left) { $('#pairCode').textContent = '······'; clearInterval(Devices.timer); Devices.list(); }
     };
     tick();
     Devices.timer = setInterval(function () { tick(); }, 1000);
-    if (!d.remote) $('#pairHint').textContent = 'Fernzugriff ist aus: JARVIS_REMOTE=1 in .env setzen.';
+    if (!d.remote) $('#pairHint').textContent = 'Remote access is off: set JARVIS_REMOTE=1 in .env.';
   },
   list: async function () {
     var d = await Devices.api('/api/devices'), ul = $('#pairList');
-    ul.innerHTML = d.devices.length ? '' : '<li class="empty">Noch kein Gerät gekoppelt.</li>';
+    ul.innerHTML = d.devices.length ? '' : '<li class="empty">No device paired yet.</li>';
     d.devices.forEach(function (dev) {
       var li = document.createElement('li');
-      li.innerHTML = '<b>' + esc(dev.name) + '</b><em>' + esc(dev.seen ? 'zuletzt ' + dev.seen : 'gekoppelt ' + dev.created)
-        + '</em><button title="Gerät entfernen">✕</button>';
+      li.innerHTML = '<b>' + esc(dev.name) + '</b><em>' + esc(dev.seen ? 'last seen ' + dev.seen : 'paired ' + dev.created)
+        + '</em><button title="Remove device">✕</button>';
       li.querySelector('button').onclick = async function () {
-        if (!confirm(dev.name + ' entfernen? Es muss danach neu gekoppelt werden.')) return;
+        if (!confirm('Remove ' + dev.name + '? It has to be paired again afterwards.')) return;
         await Devices.api('/api/devices/revoke', { id: dev.id });
         Devices.list();
       };
@@ -2861,14 +2860,14 @@ window.addEventListener('DOMContentLoaded', function () {
   // again; the page reloads itself once the new boot id shows up (Reconnect).
   var rb = $('#btnRestart');
   if (rb) rb.onclick = async function () {
-    if (!confirm('Jarvis-Server neu starten? Ein laufendes Gespräch wird abgebrochen.')) return;
+    if (!confirm('Restart the Jarvis server? A conversation in progress is cancelled.')) return;
     rb.disabled = true;
     try {
       var r = await (await fetch('/api/restart', { method: 'POST', headers: headers({ 'content-type': 'application/json' }),
                                                     body: '{}' })).json();
-      log(r.ok ? 'note' : 'error', 'SERVER', r.ok ? 'Neustart — gleich wieder da' : r.error);
+      log(r.ok ? 'note' : 'error', 'SERVER', r.ok ? 'restart — back in a moment' : r.error);
       if (!r.ok) { rb.disabled = false; return; }
-    } catch (e) { log('note', 'SERVER', 'Neustart läuft'); }
+    } catch (e) { log('note', 'SERVER', 'restarting'); }
     Reconnect.lost();
   };
 
@@ -2879,7 +2878,7 @@ window.addEventListener('DOMContentLoaded', function () {
     cancelRun();
     briefingActive = false;
     setVoiceState(Live.on ? 'LISTENING' : 'IDLE', Live.on ? 'hot' : '');
-    log('note', 'VOICE', 'per Knopf abgebrochen');
+    log('note', 'VOICE', 'cancelled by button');
   };
   setInterval(function () {
     $('#btnStop').disabled = !(running || stopSpeaking || Speech.active);

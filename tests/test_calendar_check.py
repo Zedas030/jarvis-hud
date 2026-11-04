@@ -19,51 +19,51 @@ import shipments
 
 DAY = dt.date(2026, 10, 27)
 DENTIST = {"start": dt.datetime(2026, 10, 27, 10, 0), "end": dt.datetime(2026, 10, 27, 11, 0),
-           "title": "Zahnarzt Dr. Krause", "calendar": "Privat"}
+           "title": "Dentist Dr. Krause", "calendar": "Private"}
 HAIRCUT = {"start": dt.datetime(2026, 10, 27, 16, 0), "end": dt.datetime(2026, 10, 27, 17, 0),
-           "title": "Friseur", "calendar": "Privat"}
-HOLIDAY = {"start": dt.datetime(2026, 10, 27), "end": dt.datetime(2026, 10, 28), "title": "Urlaub",
-           "allday": True, "calendar": "Privat"}
+           "title": "Hairdresser", "calendar": "Private"}
+HOLIDAY = {"start": dt.datetime(2026, 10, 27), "end": dt.datetime(2026, 10, 28), "title": "Holiday",
+           "allday": True, "calendar": "Private"}
 
 
 class Similar(unittest.TestCase):
     def test_same_appointment(self):
-        self.assertTrue(cal.similar("Zahnarzt", "Zahnarzt Dr. Krause"))
-        self.assertTrue(cal.similar("Golfspiel: Ost Tee 10", "golfspiel ost tee 10"))
-        self.assertTrue(cal.similar("Training bei Max", "Golftraining Max"))
+        self.assertTrue(cal.similar("Dentist", "Dentist Dr. Krause"))
+        self.assertTrue(cal.similar("Golf round: East tee 10", "golf round east tee 10"))
+        self.assertTrue(cal.similar("Training with Max", "Golf training Max"))
 
     def test_different_appointment(self):
-        self.assertFalse(cal.similar("Zahnarzt", "Friseur"))
-        self.assertFalse(cal.similar("Termin bei Anna", "Termin bei Ben"))
-        self.assertFalse(cal.similar("", "Friseur"))
+        self.assertFalse(cal.similar("Dentist", "Hairdresser"))
+        self.assertFalse(cal.similar("Appointment with Anna", "Appointment with Ben"))
+        self.assertFalse(cal.similar("", "Hairdresser"))
 
 
 class Check(unittest.TestCase):
     def test_already_there_same_day_similar_title(self):
-        found = cal.check("Zahnarzt", "2026-10-27 14:00", existing=[DENTIST, HAIRCUT])
+        found = cal.check("Dentist", "2026-10-27 14:00", existing=[DENTIST, HAIRCUT])
         self.assertEqual(found["same"], [DENTIST])
-        self.assertIn("Steht schon im Kalender", cal.clash_text(found))
+        self.assertIn("Already in the calendar", cal.clash_text(found))
 
     def test_other_day_is_not_the_same(self):
-        found = cal.check("Zahnarzt", "2026-10-28 10:00", existing=[DENTIST])
+        found = cal.check("Dentist", "2026-10-28 10:00", existing=[DENTIST])
         self.assertEqual(found, {"same": [], "overlap": []})
         self.assertEqual(cal.clash_text(found), "")
 
     def test_overlap_is_named(self):
-        found = cal.check("Physiotherapie", "2026-10-27 10:30", "2026-10-27 11:30", existing=[DENTIST, HAIRCUT, HOLIDAY])
+        found = cal.check("Physiotherapy", "2026-10-27 10:30", "2026-10-27 11:30", existing=[DENTIST, HAIRCUT, HOLIDAY])
         self.assertEqual((found["same"], found["overlap"]), ([], [DENTIST]))
-        self.assertIn("Überschneidet sich mit: 27.10. 10:00–11:00 Zahnarzt Dr. Krause", cal.clash_text(found))
+        self.assertIn("Overlaps with: 2026-10-27 10:00–11:00 Dentist Dr. Krause", cal.clash_text(found))
 
     def test_back_to_back_and_all_day_do_not_overlap(self):
         self.assertEqual(cal.check("Physio", "2026-10-27 11:00", existing=[DENTIST, HOLIDAY])["overlap"], [])
-        self.assertEqual(cal.check("Paket", "2026-10-27", existing=[DENTIST])["overlap"], [])
+        self.assertEqual(cal.check("Parcel", "2026-10-27", existing=[DENTIST])["overlap"], [])
 
     def test_reads_the_calendar_itself(self):
         asked = []
         real = cal.events
         try:
             cal.events = lambda start, days: (asked.append((start, days)), [DENTIST])[1]
-            self.assertEqual(cal.check("Zahnarzt", dt.datetime(2026, 10, 27, 9, 0))["same"], [DENTIST])
+            self.assertEqual(cal.check("Dentist", dt.datetime(2026, 10, 27, 9, 0))["same"], [DENTIST])
         finally:
             cal.events = real
         self.assertEqual(asked, [(DAY, 1)])
@@ -76,7 +76,7 @@ def ics(start, end, summary, uid):
 
 
 def mail(summary, start, end, uid):
-    return {"from": "Praxis", "addr": "info@praxis.example", "subject": f"Ihr Termin: {summary}",
+    return {"from": "Practice", "addr": "info@practice.example", "subject": f"Your appointment: {summary}",
             "date": "24.10.2026", "text": summary, "ics": [ics(start, end, summary, uid)]}
 
 
@@ -85,19 +85,19 @@ class MailEventsCheck(unittest.TestCase):
 
     def test_already_entered_by_hand_is_not_offered(self):
         # the user entered it themselves at another hour: same day and title is enough
-        m = mail("Zahnarzt", "20261027T140000", "20261027T150000", "z-1")
+        m = mail("Dentist", "20261027T140000", "20261027T150000", "z-1")
         self.assertEqual(mail_events.candidates([m], [DENTIST], now=self.NOW), [])
 
     def test_overlap_goes_with_the_offer(self):
-        m = mail("Physiotherapie", "20261027T103000", "20261027T113000", "p-1")
+        m = mail("Physiotherapy", "20261027T103000", "20261027T113000", "p-1")
         (c,) = mail_events.candidates([m], [DENTIST, HAIRCUT], now=self.NOW)
-        self.assertIn("Zahnarzt Dr. Krause", c["clash"])
-        self.assertIn("Überschneidet sich mit", mail_events.describe([c]))
+        self.assertIn("Dentist Dr. Krause", c["clash"])
+        self.assertIn("Overlaps with", mail_events.describe([c]))
 
     def test_proposal_names_the_overlap(self):
         import events
         import proposals
-        m = mail("Physiotherapie", "20261027T103000", "20261027T113000", "p-2")
+        m = mail("Physiotherapy", "20261027T103000", "20261027T113000", "p-2")
         real = (cal.configured, cal.events, events.publish)
         said = []
         try:
@@ -109,20 +109,20 @@ class MailEventsCheck(unittest.TestCase):
             cal.configured, cal.events, events.publish = real
         (p,) = [p for p in proposals.pending() if p["source"] == "mail_events"]
         self.addCleanup(proposals.resolve, p["id"], "declined")   # other tests expect no open proposal
-        self.assertIn("Überschneidet sich mit", p["why"])
-        self.assertIn("Überschneidet sich mit", said[-1])
-        self.assertIn("Überschneidet sich mit", proposals.describe(p))
+        self.assertIn("Overlaps with", p["why"])
+        self.assertIn("Overlaps with", said[-1])
+        self.assertIn("Overlaps with", proposals.describe(p))
 
 
 class ShipmentsCheck(unittest.TestCase):
     def test_own_entry_that_day_means_no_second_one(self):
         added = []
         real = (cal.events, cal.add_event)
-        d = {"items": {"a1": {"key": "a1", "shop": "Amazon", "carrier": "DHL", "status": "unterwegs",
+        d = {"items": {"a1": {"key": "a1", "shop": "Amazon", "carrier": "DHL", "status": "on the way",
                               "eta": DAY.isoformat()}}}
         try:
-            cal.events = lambda start, days: [{"start": dt.datetime(2026, 10, 27), "title": "Paket Amazon",
-                                               "allday": True, "calendar": "Privat"}]
+            cal.events = lambda start, days: [{"start": dt.datetime(2026, 10, 27), "title": "Parcel Amazon",
+                                               "allday": True, "calendar": "Private"}]
             cal.add_event = lambda *a, **k: (added.append(a), ("ok", "https://cal/x@jarvis-hud.ics"))[1]
             shipments.sync(d, now=dt.datetime(2026, 10, 24, 12, 0))
             shipments.sync(d, now=dt.datetime(2026, 10, 24, 12, 30))
@@ -134,7 +134,7 @@ class ShipmentsCheck(unittest.TestCase):
     def test_free_day_gets_its_entry(self):
         added = []
         real = (cal.events, cal.add_event)
-        d = {"items": {"b1": {"key": "b1", "shop": "Zalando", "carrier": "Hermes", "status": "unterwegs",
+        d = {"items": {"b1": {"key": "b1", "shop": "Zalando", "carrier": "Hermes", "status": "on the way",
                               "eta": DAY.isoformat()}}}
         try:
             cal.events = lambda start, days: [DENTIST]
@@ -163,10 +163,10 @@ class ModelPath(unittest.TestCase):
         yesterday = f"{dt.date.today() - dt.timedelta(days=1):%Y-%m-%d} 10:00"
         verdict = jarvis_mcp._approve("mcp__jarvis__calendar_add", {"title": "Golf", "start": yesterday})
         self.assertEqual(verdict["behavior"], "deny")
-        self.assertIn("Vergangenheit", verdict["message"])
+        self.assertIn("in the past", verdict["message"])
         self.assertEqual(self.cards, [])
         cal.add_event = lambda *a, **k: self.fail("a past event is never entered")
-        self.assertIn("Vergangenheit", jarvis_mcp._calendar("calendar_add", {"title": "Golf", "start": yesterday}))
+        self.assertIn("in the past", jarvis_mcp._calendar("calendar_add", {"title": "Golf", "start": yesterday}))
 
     def test_what_counts_as_past(self):
         past, today = self.real[4], dt.date.today()
@@ -174,33 +174,33 @@ class ModelPath(unittest.TestCase):
         self.assertFalse(past({"start": f"{today}"}), "an all-day event today is still on")
         self.assertTrue(past({"start": f"{today - dt.timedelta(days=1)}T09:00"}))
         self.assertFalse(past({"start": f"{today + dt.timedelta(days=1)} 09:00"}))
-        self.assertFalse(past({"start": "nächsten Dienstag"}), "an odd date is the calendar's to refuse")
+        self.assertFalse(past({"start": "next Tuesday"}), "an odd date is the calendar's to refuse")
 
     def test_already_there_is_refused_before_any_card(self):
-        verdict = jarvis_mcp._approve("mcp__jarvis__calendar_add", {"title": "Zahnarzt", "start": "2026-10-27 10:00"})
+        verdict = jarvis_mcp._approve("mcp__jarvis__calendar_add", {"title": "Dentist", "start": "2026-10-27 10:00"})
         self.assertEqual(verdict["behavior"], "deny")
-        self.assertIn("Steht schon im Kalender", verdict["message"])
+        self.assertIn("Already in the calendar", verdict["message"])
         self.assertEqual(self.cards, [])
 
     def test_overlap_is_on_the_card_not_in_the_entry(self):
         args = {"title": "Physio", "start": "2026-10-27 10:30"}
         verdict = jarvis_mcp._approve("mcp__jarvis__calendar_add", args)
-        self.assertIn("Überschneidet sich mit", self.cards[0]["_hinweis"])
+        self.assertIn("Overlaps with", self.cards[0]["_note"])
         self.assertEqual(verdict["updatedInput"], args)
 
     def test_free_slot_is_a_plain_card(self):
         jarvis_mcp._approve("mcp__jarvis__calendar_add", {"title": "Physio", "start": "2026-10-27 13:00"})
-        self.assertNotIn("_hinweis", self.cards[0])
+        self.assertNotIn("_note", self.cards[0])
 
     def test_add_itself_checks_again(self):
         cal.add_event = lambda *a, **k: self.fail("must not be entered twice")
-        text = jarvis_mcp._calendar("calendar_add", {"title": "Zahnarzt", "start": "2026-10-27 10:00"})
-        self.assertIn("Nicht eingetragen", text)
+        text = jarvis_mcp._calendar("calendar_add", {"title": "Dentist", "start": "2026-10-27 10:00"})
+        self.assertIn("Not entered", text)
 
     def test_prompt_rules_say_it_too(self):
         rule = commands.LEAN_GROUP_RULES["calendar"]
-        self.assertIn("Vor jedem Terminvorschlag erst calendar_events", rule)
-        self.assertIn("24 Stunden", rule)
+        self.assertIn("Before every appointment suggestion read calendar_events", rule)
+        self.assertIn("24 hours", rule)
 
 
 class FakeBox:

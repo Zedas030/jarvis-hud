@@ -31,26 +31,26 @@ class Engine(unittest.TestCase):
         tasks.RECIPES.update(self._recipes)
 
     def recipe(self, steps, name="test"):
-        tasks.RECIPES[name] = ("Testprüfung", steps)
+        tasks.RECIPES[name] = ("Test check", steps)
         return name
 
     def test_all_ok(self):
-        r = self.recipe([("A", lambda: 1, lambda x: ("ok", "eins"), 0), ("B", lambda: 2, lambda x: ("ok", "zwei"), 0)])
+        r = self.recipe([("A", lambda: 1, lambda x: ("ok", "one"), 0), ("B", lambda: 2, lambda x: ("ok", "two"), 0)])
         tid, msg = tasks.start(r, speak=False, wait=True)
         t = tasks.get(tid)
         self.assertEqual(t["status"], "COMPLETED")
         self.assertEqual([s["status"] for s in t["steps"]], ["ok", "ok"])
-        self.assertIn("alle 2 Schritte in Ordnung", t["report"])
+        self.assertIn("all 2 steps fine", t["report"])
 
     def test_findings_with_recovery_and_no_repair(self):
-        r = self.recipe([("Speicherplatz", lambda: 96, lambda x: ("fail", "96 % belegt"), 0),
-                         ("Auslastung", lambda: 1, lambda x: ("ok", "fein"), 0)])
+        r = self.recipe([("Storage space", lambda: 96, lambda x: ("fail", "96 % used"), 0),
+                         ("Load", lambda: 1, lambda x: ("ok", "fine"), 0)])
         tid, _ = tasks.start(r, speak=False, wait=True)
         rep = tasks.get(tid)["report"]
-        self.assertIn("1 von 2 Schritten in Ordnung", rep)
-        self.assertIn("Speicherplatz — Problem: 96 % belegt", rep)
-        self.assertIn("ich lösche nichts selbst", rep)
-        self.assertIn("ohne Ihre Freigabe", rep)
+        self.assertIn("1 of 2 steps fine", rep)
+        self.assertIn("Storage space — problem: 96 % used", rep)
+        self.assertIn("I delete nothing myself", rep)
+        self.assertIn("without your approval", rep)
 
     def test_retry_then_success(self):
         calls = {"n": 0}
@@ -58,8 +58,8 @@ class Engine(unittest.TestCase):
         def flaky():
             calls["n"] += 1
             if calls["n"] < 2:
-                raise ConnectionError("kurz weg")
-            return "da"
+                raise ConnectionError("gone briefly")
+            return "there"
         r = self.recipe([("Flaky", flaky, lambda x: ("ok", x), 1)])
         tid, _ = tasks.start(r, speak=False, wait=True)
         step = tasks.get(tid)["steps"][0]
@@ -70,15 +70,15 @@ class Engine(unittest.TestCase):
 
         def missing():
             calls["n"] += 1
-            raise LookupError("NAS nicht verbunden")
+            raise LookupError("NAS not connected")
         r = self.recipe([("NAS", missing, lambda x: ("ok", ""), 3)])
         tid, _ = tasks.start(r, speak=False, wait=True)
         self.assertEqual(calls["n"], 1)
         self.assertEqual(tasks.get(tid)["status"], "FAILED")
-        self.assertIn("nicht verfügbar", tasks.get(tid)["steps"][0]["finding"])
+        self.assertIn("not available", tasks.get(tid)["steps"][0]["finding"])
 
     def test_timeout(self):
-        r = self.recipe([("Langsam", lambda: time.sleep(2), lambda x: ("ok", ""), 0)])
+        r = self.recipe([("Slow", lambda: time.sleep(2), lambda x: ("ok", ""), 0)])
         tid, _ = tasks.start(r, speak=False, wait=True, step_timeout=0.2)
         self.assertEqual(tasks.get(tid)["steps"][0]["status"], "timeout")
         self.assertEqual(tasks.get(tid)["status"], "TIMED_OUT")
@@ -95,14 +95,14 @@ class Engine(unittest.TestCase):
 
     def test_cancel_and_no_duplicate(self):
         gate = threading.Event()
-        r = self.recipe([("Warten", lambda: gate.wait(5), lambda x: ("ok", ""), 0),
-                         ("Danach", lambda: 1, lambda x: ("ok", ""), 0)])
+        r = self.recipe([("Wait", lambda: gate.wait(5), lambda x: ("ok", ""), 0),
+                         ("After", lambda: 1, lambda x: ("ok", ""), 0)])
         tid, _ = tasks.start(r, speak=False)
         time.sleep(0.2)
         same, msg = tasks.start(r, speak=False)
         self.assertEqual(same, tid)
-        self.assertIn("läuft schon", msg)
-        self.assertIn("1 Prüfung", tasks.cancel())
+        self.assertIn("already running", msg)
+        self.assertIn("1 check", tasks.cancel())
         gate.set()
         for _ in range(50):
             if tasks.get(tid)["status"] == "CANCELLED":
@@ -121,9 +121,9 @@ class Engine(unittest.TestCase):
         self.assertEqual(kinds[-1], "say")
 
     def test_check_error_does_not_crash(self):
-        r = self.recipe([("Kaputt", lambda: None, lambda x: x["fehlt"], 0)])
+        r = self.recipe([("Broken", lambda: None, lambda x: x["missing"], 0)])
         tid, _ = tasks.start(r, speak=False, wait=True)
-        self.assertIn("Prüfung fehlgeschlagen", tasks.get(tid)["steps"][0]["finding"])
+        self.assertIn("check failed", tasks.get(tid)["steps"][0]["finding"])
 
 
 class Recipes(unittest.TestCase):
@@ -147,19 +147,19 @@ class Trigger(unittest.TestCase):
     def setUp(self):
         self._start = tasks.start
         self.started = []
-        tasks.start = lambda recipe, speak=True, **kw: (self.started.append(recipe) or ("x", f"{recipe} gestartet"))
+        tasks.start = lambda recipe, speak=True, **kw: (self.started.append(recipe) or ("x", f"{recipe} started"))
 
     def tearDown(self):
         tasks.start = self._start
 
     def test_phrases(self):
-        for text, recipe in (("Prüf mein NAS", "nas"), ("Jarvis, prüfe den Pi", "pi"), ("Systemcheck", "system"),
-                             ("Check mal das Netzwerk", "netz"), ("Prüf den PC", "pc")):
+        for text, recipe in (("Check my NAS", "nas"), ("Jarvis, check the Pi", "pi"), ("System check", "system"),
+                             ("Check the network", "network"), ("Check the PC", "pc")):
             self.assertEqual(router.route(text)["kind"], "local", text)
-        self.assertEqual(self.started, ["nas", "pi", "system", "netz", "pc"])
+        self.assertEqual(self.started, ["nas", "pi", "system", "network", "pc"])
 
     def test_questions_are_not_checks(self):
-        self.assertEqual(router.route("Prüf mal, ob im Wohnzimmer das Licht an ist")["kind"], "llm")
+        self.assertEqual(router.route("Check whether the light is on in the living room")["kind"], "llm")
         self.assertEqual(self.started, [])
 
     def test_read_only_classes(self):

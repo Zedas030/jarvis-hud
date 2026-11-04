@@ -33,8 +33,8 @@ def fake_ask(answer):
 
 def diary(day, rows):
     memory.DIARY_DIR.mkdir(parents=True, exist_ok=True)
-    path = memory.DIARY_DIR / f"Gespräch {day}.md"
-    text = f"---\ntype: gespraech\nupdated: {day}\n---\n\n# Gespräch {day}\n\nAutomatisches Protokoll.\n"
+    path = memory.DIARY_DIR / f"Conversation {day}.md"
+    text = f"---\ntype: conversation\nupdated: {day}\n---\n\n# Conversation {day}\n\nAutomatic log.\n"
     for t, u, a in rows:
         text += f"\n**{t} · User:** {u}\n\n**Jarvis:** {a}\n"
     path.write_text(text, encoding="utf-8")
@@ -44,7 +44,7 @@ def diary(day, rows):
 class Base(unittest.TestCase):
     def setUp(self):
         PROMPTS.clear()
-        for name in ("Lernprotokoll", "Vorlieben"):
+        for name in ("Learning log", "Preferences"):
             p = memory.MEMORY_DIR / f"{name}.md"
             if p.exists():
                 p.unlink()
@@ -59,54 +59,54 @@ class Base(unittest.TestCase):
 
 class Privacy(Base):
     def test_work_terms(self):
-        self.assertTrue(privacy.is_work("Wie lief das Meeting mit dem Chef?"))
-        self.assertTrue(privacy.is_work("Schick das an Contoso"))          # JARVIS_WORK_TERMS
-        self.assertTrue(privacy.is_work("Ich muss morgen ins Büro"))
-        self.assertFalse(privacy.is_work("Die Gartenarbeit war anstrengend"))
-        self.assertFalse(privacy.is_work("Mach das Licht im Wohnzimmer aus"))
+        self.assertTrue(privacy.is_work("How did the meeting with the boss go?"))
+        self.assertTrue(privacy.is_work("Send that to Contoso"))          # JARVIS_WORK_TERMS
+        self.assertTrue(privacy.is_work("I have to go to the office tomorrow"))
+        self.assertFalse(privacy.is_work("The gardening was exhausting"))
+        self.assertFalse(privacy.is_work("Turn off the light in the living room"))
 
     def test_conversation_log_skips_work(self):
-        memory.log_turn("Erinnere mich an das Meeting mit den Kollegen", "Gern, Sir.")
-        memory.log_turn("Wie wird das Wetter?", "Sonnig, Sir.")
-        text = (memory.DIARY_DIR / f"Gespräch {time.strftime('%Y-%m-%d')}.md").read_text(encoding="utf-8")
-        self.assertNotIn("Kollegen", text)
-        self.assertIn("Arbeitsthema, nicht protokolliert", text)
-        self.assertIn("Wie wird das Wetter?", text)
+        memory.log_turn("Remind me about the meeting with the colleagues", "Gladly, Sir.")
+        memory.log_turn("What will the weather be like?", "Sunny, Sir.")
+        text = (memory.DIARY_DIR / f"Conversation {time.strftime('%Y-%m-%d')}.md").read_text(encoding="utf-8")
+        self.assertNotIn("colleagues", text)
+        self.assertIn("work topic, not logged", text)
+        self.assertIn("What will the weather be like?", text)
 
     def test_memory_save_refuses_work(self):
-        out = jarvis_mcp._memory("memory_save", {"note": "Wissen", "text": "Der Kunde Contoso zahlt spät"})
-        self.assertIn("Arbeitsthemen", out)
+        out = jarvis_mcp._memory("memory_save", {"note": "Knowledge", "text": "The customer Contoso pays late"})
+        self.assertIn("work topics", out)
 
 
 class Loop(Base):
     def test_parse_exchanges(self):
-        p = diary("2026-10-20", [("10:00", "Licht aus", "Erledigt."), ("10:05", "Nein, ich meinte die Küche", "Ah.")])
+        p = diary("2026-10-20", [("10:00", "Light off", "Done."), ("10:05", "No, I meant the kitchen", "Ah.")])
         ex = reflection.exchanges(p.read_text(encoding="utf-8"))
         self.assertEqual(len(ex), 2)
-        self.assertEqual(ex[1][1], "Nein, ich meinte die Küche")
+        self.assertEqual(ex[1][1], "No, I meant the kitchen")
 
     def test_reflect_writes_log_without_work(self):
         today = time.strftime("%Y-%m-%d")
-        diary(today, [("09:00", "Mach das Licht im Wohnzimmer aus", "Erledigt, Sir."),
-                      ("09:01", "Nein, ich meinte die Küche", "Verzeihung, Küche ist aus."),
-                      ("09:05", "Was steht beim Kunden Contoso an?", "Das weiß ich nicht.")])
-        background.ask = fake_ask({"gut": ["Schnell geschaltet"],
-                                   "korrigiert": ["Wohnzimmer statt Küche geschaltet — erst nachfragen"],
-                                   "lehren": ["Bei mehrdeutigen Räumen kurz nachfragen", "Termine beim Kunden vorbereiten"]})
+        diary(today, [("09:00", "Turn off the light in the living room", "Done, Sir."),
+                      ("09:01", "No, I meant the kitchen", "Sorry, the kitchen is off."),
+                      ("09:05", "What is coming up with the customer Contoso?", "I do not know.")])
+        background.ask = fake_ask({"good": ["Switched quickly"],
+                                   "corrected": ["Switched the living room instead of the kitchen — ask first"],
+                                   "lessons": ["Ask briefly when the room is ambiguous", "Prepare appointments with the customer"]})
         n = reflection.reflect()
         self.assertEqual(n, 3)                                 # the work lesson was dropped
         self.assertNotIn("Contoso", PROMPTS[0][1])             # and the model never saw the work exchange
-        self.assertIn("Nein, ich meinte", PROMPTS[0][1])
-        log = (memory.MEMORY_DIR / "Lernprotokoll.md").read_text(encoding="utf-8")
-        self.assertIn("- Korrigiert: Wohnzimmer statt Küche", log)
-        self.assertNotIn("Kunde", log)
+        self.assertIn("No, I meant", PROMPTS[0][1])
+        log = (memory.MEMORY_DIR / "Learning log.md").read_text(encoding="utf-8")
+        self.assertIn("- Corrected: Switched the living room instead of the kitchen", log)
+        self.assertNotIn("customer", log)
         self.assertEqual(reflection.reflect(), 0)               # nothing new: no second call
         self.assertEqual(len(PROMPTS), 1)
 
     def test_waits_for_the_conversation_to_end(self):
         diary(time.strftime("%Y-%m-%d"), [("09:00", "a", "b"), ("09:01", "c", "d")])
         commands.update_state(lambda d: d.__setitem__("last_turn_at", time.time()))
-        background.ask = fake_ask({"gut": ["x"]})
+        background.ask = fake_ask({"good": ["x"]})
         self.assertEqual(reflection.reflect(), 0)
         self.assertEqual(PROMPTS, [])
 
@@ -119,61 +119,61 @@ class Loop(Base):
 
 class Rules(Base):
     def test_consolidate_makes_a_proposal_not_a_rule(self):
-        reflection.append_log({"korrigiert": ["Zu lange Antwort"], "lehren": ["Kürzer antworten"]})
-        reflection.append_log({"lehren": ["Kürzer antworten, höchstens zwei Sätze"]})
-        background.ask = fake_ask({"regeln": [{"regel": "Antworte in höchstens zwei Sätzen.", "grund": "Zweimal zu lang"},
-                                              {"regel": "Bereite Kundentermine vor.", "grund": "Arbeit"}]})
+        reflection.append_log({"corrected": ["Answer too long"], "lessons": ["Answer more briefly"]})
+        reflection.append_log({"lessons": ["Answer more briefly, two sentences at most"]})
+        background.ask = fake_ask({"rules": [{"rule": "Answer in two sentences at most.", "why": "Too long twice"},
+                                             {"rule": "Prepare customer appointments.", "why": "Work"}]})
         before = len(events._LOG)
         pid = reflection.consolidate()
         p = proposals.get(pid)
         self.assertEqual(p["kind"], "rules")
-        self.assertEqual([r["regel"] for r in p["payload"]["rules"]], ["Antworte in höchstens zwei Sätzen."])
+        self.assertEqual([r["rule"] for r in p["payload"]["rules"]], ["Answer in two sentences at most."])
         self.assertEqual(reflection.rules_list(), [])            # nothing written before the card
-        self.assertIn("Regeln übernehmen", events._LOG[-1]["text"])
+        self.assertIn("accept the rules", events._LOG[-1]["text"])
         self.assertGreater(len(events._LOG), before)
 
     def test_accept_writes_section_and_prompt(self):
-        pid = proposals.add("rules", "1 Regel", "Test", {"rules": [{"regel": "Frag bei Räumen nach.", "grund": "x"}]},
+        pid = proposals.add("rules", "1 rule", "Test", {"rules": [{"rule": "Ask about rooms.", "why": "x"}]},
                             source="reflection")
         self.assertIn(pid, proposals.block())
-        self.assertIn("1 Regel(n)", proposals.accept(pid))
-        self.assertEqual(reflection.rules_list(), ["Frag bei Räumen nach."])
-        self.assertIn("Frag bei Räumen nach.", reflection.rules_block())
-        self.assertIn("Frag bei Räumen nach.", commands.lean_system([]))
-        self.assertEqual(proposals.accept(pid), "Dieser Vorschlag ist nicht mehr offen.")
+        self.assertIn("1 rule(s)", proposals.accept(pid))
+        self.assertEqual(reflection.rules_list(), ["Ask about rooms."])
+        self.assertIn("Ask about rooms.", reflection.rules_block())
+        self.assertIn("Ask about rooms.", commands.lean_system([]))
+        self.assertEqual(proposals.accept(pid), "This proposal is no longer open.")
         self.assertEqual(proposals.block(), "")
 
     def test_memory_save_after_section_stays_outside(self):
-        reflection.apply_rules(["Regel eins."])
-        jarvis_mcp._memory("memory_save", {"note": "Vorlieben", "text": "Mag kurze Antworten"})
-        self.assertEqual(reflection.rules_list(), ["Regel eins."])
-        self.assertIn("Mag kurze Antworten", (memory.MEMORY_DIR / "Vorlieben.md").read_text(encoding="utf-8"))
+        reflection.apply_rules(["Rule one."])
+        jarvis_mcp._memory("memory_save", {"note": "Preferences", "text": "Likes short answers"})
+        self.assertEqual(reflection.rules_list(), ["Rule one."])
+        self.assertIn("Likes short answers", (memory.MEMORY_DIR / "Preferences.md").read_text(encoding="utf-8"))
 
     def test_duplicates_cap_and_remove(self):
-        reflection.apply_rules(["Regel eins."])
-        self.assertIn("Nichts Neues", reflection.apply_rules(["regel EINS"]))
-        reflection.apply_rules([f"Regel {i}." for i in range(30)])
+        reflection.apply_rules(["Rule one."])
+        self.assertIn("Nothing new", reflection.apply_rules(["rule ONE"]))
+        reflection.apply_rules([f"Rule {i}." for i in range(30)])
         self.assertEqual(len(reflection.rules_list()), reflection.MAX_RULES)
-        self.assertIn("gestrichen", reflection.remove_rule("Regel 29"))
-        self.assertNotIn("Regel 29.", reflection.rules_list())
-        self.assertIn("Keine gelernte Regel", reflection.remove_rule("gibt es nicht"))
+        self.assertIn("dropped", reflection.remove_rule("Rule 29"))
+        self.assertNotIn("Rule 29.", reflection.rules_list())
+        self.assertIn("No learned rule", reflection.remove_rule("does not exist"))
 
     def test_decline_and_expiry(self):
-        pid = proposals.add("idea", "Idee", "weil", source="suggestions")
-        self.assertEqual(proposals.decline(pid), "Verworfen.")
+        pid = proposals.add("idea", "Idea", "because", source="suggestions")
+        self.assertEqual(proposals.decline(pid), "Discarded.")
         self.assertEqual(proposals.pending(), [])
-        old = proposals.add("idea", "Alt", "weil")
+        old = proposals.add("idea", "Old", "because")
         proposals._update(lambda items: [p.__setitem__("expires", 0) for p in items if p["id"] == old])
         self.assertEqual(proposals.pending(), [])
 
     def test_week_claim_once(self):
-        self.assertTrue(background.claim("reflection-week", "2026-KW43"))
-        self.assertFalse(background.claim("reflection-week", "2026-KW43"))
-        self.assertTrue(background.claim("reflection-week", "2026-KW44"))
+        self.assertTrue(background.claim("reflection-week", "2026-W43"))
+        self.assertFalse(background.claim("reflection-week", "2026-W43"))
+        self.assertTrue(background.claim("reflection-week", "2026-W44"))
 
     def test_parse_json_from_prose(self):
-        self.assertEqual(background.parse_json('Klar! ```json\n{"a": {"b": 1}}\n``` fertig'), {"a": {"b": 1}})
-        self.assertIsNone(background.parse_json("kein json"))
+        self.assertEqual(background.parse_json('Sure! ```json\n{"a": {"b": 1}}\n``` done'), {"a": {"b": 1}})
+        self.assertIsNone(background.parse_json("no json"))
 
 
 if __name__ == "__main__":

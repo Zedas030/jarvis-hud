@@ -443,10 +443,10 @@ body.remote #btnPair{display:none}
 body:not(.remote) #btnStation{display:none}
 body.station .stagetools #btnWall,body.station .stagetools #btnMini{display:none}
 /* After a reload iOS holds the audio back until one tap: the whole screen is the button. */
-body.station.mic-tap::after,body.autolive.mic-tap::after{content:'Tippen, damit Jarvis zuhört';position:fixed;inset:0;z-index:60;display:grid;
+body.station.mic-tap::after,body.autolive.mic-tap::after{content:'Tap so that Jarvis listens';position:fixed;inset:0;z-index:60;display:grid;
   place-items:center;background:rgba(2,5,9,.78);color:#ffb340;font-size:26px;letter-spacing:.08em}
 /* Server gone: a banner above everything, the page reloads itself once he is back. */
-body.offline::before{content:'Verbindung zu Jarvis weg — verbinde neu …';position:fixed;left:0;right:0;top:0;z-index:70;
+body.offline::before{content:'Connection to Jarvis lost — reconnecting …';position:fixed;left:0;right:0;top:0;z-index:70;
   padding:10px 16px;text-align:center;background:rgba(255,107,166,.16);border-bottom:1px solid #ff6ba6;color:#ff6ba6;
   font-size:14px;letter-spacing:.06em;backdrop-filter:blur(4px)}
 /* Night on the station: black, a clock you only see when you look for it. While

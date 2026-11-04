@@ -1,15 +1,15 @@
 """
 Proactive notices — Jarvis speaks up by himself. Plain rules, 0 tokens.
 
-  appliances   "Die Waschmaschine ist fertig" — from a power sensor in Home
+  appliances   "The washing machine is done" — from a power sensor in Home
                Assistant (config/home.json → "appliances", see the example).
-  calendar     "In 15 Minuten: Zahnarzt" (JARVIS_EVENT_LEAD_MIN, 0 = off); with a place
-               in the appointment: "Zeit loszufahren" from the driving time (commute.py)
-  parcels      "Heute kommt ein Paket von …" from shipping mails (parcels.py)
-  storage      "Der Speicher ist voll, gute Zeit für die Waschmaschine" — once a day
+  calendar     "In 15 minutes: dentist" (JARVIS_EVENT_LEAD_MIN, 0 = off); with a place
+               in the appointment: "time to leave" from the driving time (commute.py)
+  parcels      "A parcel from … arrives today" from shipping mails (parcels.py)
+  storage      "The storage is full, a good time for the washing machine" — once a day
   nas          a disk not healthy or the volume over 90 % — once a day
-  network      a new device in the WLAN (from the network watchdog in briefing.py)
-  printer      "Der 3D-Druck ist fertig", failed, paused for a reason, an error (printer.py)
+  network      a new device on the WiFi (from the network watchdog in briefing.py)
+  printer      "The 3D print is finished", failed, paused for a reason, an error (printer.py)
   away         after leaving home: what still runs goes to the phone and becomes a proposal (away_check.py)
   morning      the first light/TV/Echo in the living room in the morning: the Echo briefs (morning_echo.py)
 
@@ -68,7 +68,7 @@ def appliances(states, now=None):
     now = now or time.time()
     by = {s["entity_id"]: s["state"] for s in states}
     for a in profile.ha("appliances", []) or []:
-        name, watts = a.get("name") or "Gerät", _num(by.get(a.get("power", "")))
+        name, watts = a.get("name") or "Device", _num(by.get(a.get("power", "")))
         if watts is None:
             continue
         st = _APPL.setdefault(name, {"running": False, "since": now, "high": None})
@@ -84,8 +84,8 @@ def appliances(states, now=None):
             st["since"] = now
         elif now - st["since"] >= float(a.get("off_min", 3)) * 60:
             st.update(running=False, high=None, since=now)
-            article = a.get("article") or ("die " if name.lower().endswith("maschine") else "")
-            events.publish("say", a.get("say") or f"Sir, {article}{name} ist fertig.", kind="appliance")
+            article = a.get("article") if a.get("article") is not None else "the "
+            events.publish("say", a.get("say") or f"Sir, {article}{name} is done.", kind="appliance")
 
 
 # ── calendar ─────────────────────────────────────────────────
@@ -109,14 +109,14 @@ def calendar(now=None):
         if drive is not None:
             leave = (e["start"] - now).total_seconds() / 60 - drive - commute_buffer()
             if leave <= LEAVE_WARN_MIN:
-                once(f"leave:{key}", f"Sir, Zeit loszufahren: {e.get('title', 'Ihr Termin')} um "
-                                     f"{e['start'].hour}:{e['start'].minute:02d}, Fahrzeit etwa {drive} Minuten.",
+                once(f"leave:{key}", f"Sir, time to leave: {e.get('title', 'your appointment')} at "
+                                     f"{e['start'].hour}:{e['start'].minute:02d}, about {drive} minutes by car.",
                      kind="calendar")
             continue                       # with a drive the leave notice replaces the plain one
         if 0 < mins <= EVENT_LEAD_MIN:
             where = f" in {e['location'].split(',')[0]}" if e.get("location") else ""
             once(f"cal:{key}",
-                 f"Sir, in {max(1, round(mins))} Minuten: {e.get('title', 'ein Termin')}{where}.", kind="calendar")
+                 f"Sir, in {max(1, round(mins))} minutes: {e.get('title', 'an appointment')}{where}.", kind="calendar")
 
 
 def departure_prep(states, now=None):
@@ -159,8 +159,8 @@ def parcel_today():
     _PARCEL["at"] = time.time()
     import parcels
     for s in parcels.current(parcels.shipments()):
-        if s["status"] == "heute":
-            once(f"parcel:{s['id'][:80]}", f"Sir, heute kommt ein Paket von {s['sender']}.", kind="parcel")
+        if s["status"] == "today":
+            once(f"parcel:{s['id'][:80]}", f"Sir, a parcel from {s['sender']} arrives today.", kind="parcel")
 
 
 # ── storage + NAS ────────────────────────────────────────────
@@ -172,8 +172,8 @@ def storage(states, now=None):
     soc = _num(by.get(profile.ha("storage_soc") or ""))
     solar = sum(_num(by.get(e)) or 0 for e in profile.ha("solar_power", []) or [])
     if soc is not None and soc >= STORAGE_FULL and solar >= 300:
-        once("storage_full", f"Sir, der Speicher ist voll und die Sonne liefert {round(solar)} Watt. "
-                             "Gute Zeit für Waschmaschine oder Trockner.", kind="energy")
+        once("storage_full", f"Sir, the storage is full and the sun is delivering {round(solar)} watts. "
+                             "A good time for the washing machine or the dryer.", kind="energy")
 
 
 def nas():
@@ -182,15 +182,15 @@ def nas():
     if not isinstance(s, dict) or s.get("error"):
         return
     if not s.get("ok"):
-        once("nas_health", "Sir, das NAS meldet ein Problem mit einer Platte oder einem Volume. "
-                           "Fragen Sie mich nach dem NAS, dann sage ich mehr.", kind="systems")
+        once("nas_health", "Sir, the NAS reports a problem with a disk or a volume. "
+                           "Ask me about the NAS and I will tell you more.", kind="systems")
     elif (s.get("used_pct") or 0) >= 90:
-        once("nas_full", f"Sir, das NAS ist zu {s['used_pct']} Prozent voll.", kind="systems")
+        once("nas_full", f"Sir, the NAS is {s['used_pct']} percent full.", kind="systems")
 
 
 # ── the phone's answer, the power budget ─────────────────────
 def phone_answers(states):
-    """A Ja/Nein tapped on the phone comes back through a Home Assistant helper (phone_actions.py)."""
+    """A yes/no tapped on the phone comes back through a Home Assistant helper (phone_actions.py)."""
     import phone_actions
     if states:
         phone_actions.poll(states)

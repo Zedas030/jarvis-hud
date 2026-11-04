@@ -63,7 +63,7 @@ def _claude(system, prompt, tools=""):
     try:
         out = json.loads(p.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError):
-        raise RuntimeError((p.stderr or p.stdout or "keine Antwort").strip()[:200]) from None
+        raise RuntimeError((p.stderr or p.stdout or "no answer").strip()[:200]) from None
     if out.get("is_error") or out.get("subtype") != "success":
         raise RuntimeError(str(out.get("result") or out.get("subtype"))[:200])
     return out.get("result") or "", out.get("usage") or {}
@@ -97,13 +97,13 @@ def ask(job, system, prompt, tools=""):
                 _log(job, MODEL, usage, prompt, text, int((time.time() - t0) * 1000))
                 return text
             except (RuntimeError, OSError, subprocess.TimeoutExpired) as e:
-                log.warning("%s: Claude nicht verfügbar (%s)%s", job, e, "" if tools else ", versuche Ersatz")
+                log.warning("%s: Claude not available (%s)%s", job, e, "" if tools else ", trying a stand-in")
         if tools:
             return None
         try:
             text, usage, who = _chain(system, prompt)
         except Exception as e:  # noqa: BLE001
-            log.warning("%s: kein Modell verfügbar (%s)", job, e)
+            log.warning("%s: no model available (%s)", job, e)
             return None
         _log(job, f"fallback:{who}", usage, prompt, text, int((time.time() - t0) * 1000))
         return text
@@ -129,7 +129,7 @@ def parse_json(text):
 
 def week_key(day=None):
     y, w, _ = (day or dt.date.today()).isocalendar()
-    return f"{y}-KW{w:02d}"
+    return f"{y}-W{w:02d}"
 
 
 def claim(job, key):

@@ -3,9 +3,9 @@ House habits ("Hunches"): what the user does by hand at the same time of day, le
 Home Assistant history (the recorder keeps about ten days) — plain rules, 0 tokens.
 
   habits      a light or plug switched on or off within ±TOLERANCE minutes of the same time of
-              day on at least MIN_DAYS different days ("Licht aus gegen 22:45, an 5 von 10 Tagen")
+              day on at least MIN_DAYS different days ("light off around 22:45, on 5 of 10 days")
   routine     habits of one part of the day (morning, evening, night) become one routine
-              proposal — "Gute Nacht: Licht aus, TV Schlafzimmer aus" — at most one a week, only
+              proposal — "Good night: light off, bedroom TV off" — at most one a week, only
               if no routine of that name exists; it is created only after the card (proposals.py)
   long on     a light that has been on for much longer than it usually is (twice its usual
               longest, at least two hours) is mentioned once, outside the quiet hours
@@ -29,9 +29,9 @@ DAYS = 10
 MIN_DAYS = int(os.environ.get("JARVIS_HABITS_MIN_DAYS", "4"))
 TOLERANCE = 45                 # minutes around the usual time
 LONG_MIN_H = 2.0
-PHASES = [("Guten Morgen", ["guten morgen", "ich bin wach"], 5, 10),
-          ("Feierabend", ["feierabend", "ich bin zu hause"], 16, 21),
-          ("Gute Nacht", ["gute nacht", "ich geh schlafen"], 21, 27)]       # 27 = 3 h after midnight
+PHASES = [("Good morning", ["good morning", "i am awake"], 5, 10),
+          ("Home from work", ["home from work", "i am home"], 16, 21),
+          ("Good night", ["good night", "i am going to bed"], 21, 27)]       # 27 = 3 h after midnight
 _CACHE = {"day": "", "history": {}}
 
 
@@ -127,8 +127,8 @@ def routine_proposal(found, names, existing):
             continue
         triggers, hs = by_phase[name]
         steps = [{"ha": f"{h['entity'].split('.')[0]}.turn_{h['state']}", "entity_id": h["entity"]} for h in hs]
-        why = "; ".join(f"{names.get(h['entity'], h['entity'])} {'an' if h['state'] == 'on' else 'aus'} "
-                        f"gegen {h['at']} (an {h['days']} von {DAYS} Tagen)" for h in hs)
+        why = "; ".join(f"{names.get(h['entity'], h['entity'])} {h['state']} "
+                        f"around {h['at']} (on {h['days']} of {DAYS} days)" for h in hs)
         return {"name": name, "triggers": triggers, "steps": steps}, why
     return None
 
@@ -193,8 +193,8 @@ def step(now=None):
             key = f"longon:{eid}:{states[eid].get('last_changed', '')}"
             if commands.update_state(lambda d, k=key: d.setdefault("habit_notes", {}).get(k) is None
                                      and not d["habit_notes"].update({k: today})):
-                events.publish("say", f"Sir, {names.get(eid, eid)} ist seit {round(hours)} Stunden an — "
-                                      f"sonst selten länger als {max(1, round(usual_hours(rows)))}.", kind="habit")
+                events.publish("say", f"Sir, {names.get(eid, eid)} has been on for {round(hours)} hours — "
+                                      f"usually rarely longer than {max(1, round(usual_hours(rows)))}.", kind="habit")
     commands.update_state(lambda d: d.update(habit_notes={k: v for k, v in (d.get("habit_notes") or {}).items()
                                                           if v >= (now.date() - dt.timedelta(days=3)).isoformat()}))
 
@@ -206,9 +206,9 @@ def _propose(found, names):
     if not hit:
         return None
     payload, why = hit
-    proposals.add("routine", f"Routine „{payload['name']}“", "Gewohnheit im Haus: " + why, payload, source="house_habits")
-    events.publish("say", f"Sir, mir ist etwas aufgefallen: {why}. Soll ich daraus die Routine „{payload['name']}“ machen? "
-                          "Sag einfach ja.", kind="habit")
+    proposals.add("routine", f"Routine “{payload['name']}”", "Habit in the house: " + why, payload, source="house_habits")
+    events.publish("say", f"Sir, I noticed something: {why}. Shall I make the routine “{payload['name']}” from it? "
+                          "Just say yes.", kind="habit")
     return payload
 
 

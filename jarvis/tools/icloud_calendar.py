@@ -58,9 +58,9 @@ def _request(method, url, body=None, depth=None, ctype="application/xml; charset
                 url = urllib.parse.urljoin(url, e.headers["Location"])
                 continue
             if e.code == 401:
-                raise RuntimeError("iCloud lehnt die Anmeldung ab — Apple-ID oder app-spezifisches Passwort prüfen.")
+                raise RuntimeError("iCloud refuses the login — check the Apple ID or the app-specific password.")
             raise RuntimeError(f"iCloud CalDAV HTTP {e.code}: {e.read(200).decode('utf-8', 'replace')}")
-    raise RuntimeError("zu viele Weiterleitungen von iCloud")
+    raise RuntimeError("too many redirects from iCloud")
 
 
 def _propfind(url, props, depth=0):
@@ -151,7 +151,7 @@ def events(start=None, days=1):
     """Events from `start` (date or datetime, default today) for `days` days,
     recurring ones expanded by the server. Sorted by start."""
     if not configured():
-        raise RuntimeError("iCloud-Kalender ist nicht eingerichtet (ICLOUD_USER / ICLOUD_APP_PASSWORD fehlen).")
+        raise RuntimeError("iCloud calendar is not set up (ICLOUD_USER / ICLOUD_APP_PASSWORD missing).")
     if start is None:
         start = dt.date.today()
     if isinstance(start, dt.date) and not isinstance(start, dt.datetime):
@@ -177,17 +177,17 @@ def events(start=None, days=1):
 
 def describe(evts):
     if not evts:
-        return "Keine Termine."
+        return "No appointments."
     lines, day = [], None
     for e in evts:
-        d = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")[e["start"].weekday()] + e["start"].strftime(" %d.%m.")
+        d = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")[e["start"].weekday()] + e["start"].strftime(" %Y-%m-%d")
         if d != day:
             lines.append(d)
             day = d
-        t = "ganztägig" if e.get("allday") else e["start"].strftime("%H:%M") + (
+        t = "all day" if e.get("allday") else e["start"].strftime("%H:%M") + (
             "–" + e["end"].strftime("%H:%M") if e.get("end") else "")
         loc = f" ({e['location']})" if e.get("location") else ""
-        lines.append(f"  {t}  {e.get('title', '(ohne Titel)')}{loc}  [{e['calendar']}]")
+        lines.append(f"  {t}  {e.get('title', '(no title)')}{loc}  [{e['calendar']}]")
     return "\n".join(lines)
 
 
@@ -209,9 +209,9 @@ def agenda_block():
 def _refresh_agenda():
     try:
         text = describe(events(dt.date.today(), 2))
-        block = "## Kalender (iPhone/iCloud) — heute und morgen\n" + text
+        block = "## Calendar (iPhone/iCloud) — today and tomorrow\n" + text
     except Exception as e:  # noqa: BLE001
-        block = f"## Kalender (iPhone/iCloud)\nNicht erreichbar: {str(e)[:160]}"
+        block = f"## Calendar (iPhone/iCloud)\nNot reachable: {str(e)[:160]}"
     _CACHE.update(agenda=block, agenda_at=time.time(), refreshing=False)
     return block
 
@@ -220,10 +220,10 @@ def add_event(title, start, end=None, location="", notes="", calendar="", allday
     """Create an event. start/end: 'YYYY-MM-DD HH:MM' (local) or 'YYYY-MM-DD' for all-day.
     return_url: -> (text, url) — the url is what delete_event() needs to take it out again."""
     if not configured():
-        raise RuntimeError("iCloud-Kalender ist nicht eingerichtet.")
+        raise RuntimeError("iCloud calendar is not set up.")
     cals = calendars()
     if not cals:
-        raise RuntimeError("Keine Kalender gefunden.")
+        raise RuntimeError("No calendars found.")
     want = (calendar or os.environ.get("ICLOUD_DEFAULT_CALENDAR", "")).strip().lower()
     target = next((c for c in cals if c[0].lower() == want), cals[0])
 
@@ -259,7 +259,7 @@ def delete_event(url):
     """Remove one event Jarvis created (its url from add_event). Only urls of our own
     entries ever get here — mail_events keeps them; nothing else is deleted."""
     if not url or "@jarvis-hud" not in url:
-        raise ValueError("nur von Jarvis angelegte Termine")
+        raise ValueError("only appointments created by Jarvis")
     try:
         _request("DELETE", url)
     except RuntimeError as e:
@@ -270,8 +270,10 @@ def delete_event(url):
 
 # ── before offering an event: what is already there ─────────────
 # Words that say nothing about which appointment it is
-_FILLER = {"bei", "mit", "und", "der", "die", "das", "den", "dem", "des", "für", "von", "vom", "zum", "zur",
-           "aus", "auf", "termin", "buchung", "the", "and", "for"}
+# (German ones too: booking mails and calendars may be in German)
+_FILLER = {"the", "and", "for", "with", "at", "from", "appointment", "booking", "meeting",
+           "bei", "mit", "und", "der", "die", "das", "den", "dem", "des", "für", "von", "vom", "zum", "zur",
+           "aus", "auf", "termin", "buchung"}
 
 
 def _words(title):
@@ -279,8 +281,8 @@ def _words(title):
 
 
 def similar(a, b):
-    """True when two titles name the same appointment: one contains the other ("Zahnarzt" in
-    "Zahnarzt Dr. Krause") or at least half of the shorter one's words are in the other."""
+    """True when two titles name the same appointment: one contains the other ("Dentist" in
+    "Dentist Dr. Krause") or at least half of the shorter one's words are in the other."""
     a, b = " ".join((a or "").lower().split()), " ".join((b or "").lower().split())
     if not a or not b:
         return False
@@ -328,16 +330,16 @@ def check(title, start, end=None, allday=False, existing=None):
 
 
 def _short(e):
-    when = e["start"].strftime("%d.%m.") + ("" if e.get("allday") else e["start"].strftime(" %H:%M")
+    when = e["start"].strftime("%Y-%m-%d") + ("" if e.get("allday") else e["start"].strftime(" %H:%M")
                                            + (e["end"].strftime("–%H:%M") if e.get("end") else ""))
-    return f"{when} {e.get('title') or '(ohne Titel)'}"
+    return f"{when} {e.get('title') or '(no title)'}"
 
 
 def clash_text(found):
-    """German, for the card and the model: '' when there is nothing to say."""
+    """For the card and the model: '' when there is nothing to say."""
     parts = []
     if found.get("same"):
-        parts.append("Steht schon im Kalender: " + "; ".join(_short(e) for e in found["same"][:3]))
+        parts.append("Already in the calendar: " + "; ".join(_short(e) for e in found["same"][:3]))
     if found.get("overlap"):
-        parts.append("Überschneidet sich mit: " + "; ".join(_short(e) for e in found["overlap"][:3]))
+        parts.append("Overlaps with: " + "; ".join(_short(e) for e in found["overlap"][:3]))
     return ". ".join(parts)

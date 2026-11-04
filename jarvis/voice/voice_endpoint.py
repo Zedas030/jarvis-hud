@@ -5,10 +5,10 @@ When is the user done? Not after a fixed silence, but after a wait that depends 
     wait_ms = ep.wait_for(partial_text)       # how long to wait after the last speech frame
     ep.learn(user_continued=True)             # the turn was closed too early: wait longer next time
 
-Rules (all German, from the old HUD's experience plus a few more):
+Rules (English, from the old HUD's experience plus a few more):
   - unfinished: trailing comma, dash, ellipsis, a connector or filler as the last word
-    ("und", "aber", "weil", "ähm", "also"), an article or preposition without its noun, a modal
-    verb without its verb ("ich will", "kannst du"), fewer than three words and no full stop
+    ("and", "but", "because", "um", "so"), an article or preposition without its noun, a modal
+    verb without its verb ("I want", "can you"), fewer than three words and no full stop
   - question: ends with "?" or starts with a question word and has no full stop
   - no text (CPU mode has no partials): a plain middle wait
 An optional turn model (smart-turn as ONNX) can replace the rules: set endpoint.turn_model; it gets
@@ -17,12 +17,12 @@ the last seconds of audio and says "finished" with a probability. Not shipped, h
 import re
 
 UNFINISHED_END = re.compile(
-    r"(?:^|\s)(ähm|äh|ehm|öhm|hm+|mhm|und|oder|aber|also|dass|weil|wenn|ob|der|die|den|dem|des|ein|eine|einen|"
-    r"einem|einer|mit|für|von|vom|zum|zur|im|in|an|auf|bei|nach|halt|quasi|sozusagen|irgendwie|nämlich|dann|"
-    r"noch|mal|so|ich|du|wir|ihr|sie|es|das|ist|sind|war|wird|kann|kannst|könnte|könntest|will|möchte|soll|"
-    r"sollst|muss|musst|bitte\s*,|was|wie|wo|wann|warum|wieso|welche[rsn]?)\s*[,.…\-–]*\s*$", re.I)
-QUESTION_START = re.compile(r"^\W*(was|wie|wo|wann|warum|wieso|weshalb|welche[rsn]?|wer|wem|wen|ist|sind|hast|hat|"
-                            r"kannst|kann|könntest|gibt|läuft|geht|soll|wird|war|habe|haben|bin|bist|sag|zeig)\b", re.I)
+    r"(?:^|\s)(um|uh|erm|er|hm+|mhm|and|or|but|so|that|because|if|when|whether|the|a|an|my|your|his|her|their|"
+    r"with|for|from|to|of|in|on|at|by|into|about|like|basically|kind of|sort of|i mean|then|"
+    r"also|just|i|you|we|they|it|is|are|was|will|can|could|would|should|want|wanna|gonna|"
+    r"must|please\s*,|what|how|where|when|why|which)\s*[,.…\-–]*\s*$", re.I)
+QUESTION_START = re.compile(r"^\W*(what|whats|how|where|when|why|which|who|whom|whose|is|are|was|were|do|does|did|"
+                            r"have|has|can|could|would|will|should|shall|am|tell|show)\b", re.I)
 TRAILING_PUNCT = re.compile(r"(\.\.\.|…|,|-|–|;|:)\s*$")
 SENTENCE_END = re.compile(r"[.!?][\"”'»)]?\s*$")
 
@@ -67,7 +67,7 @@ class Endpointer:
             try:
                 self.turn_model = TurnModel(path)
             except Exception as e:  # noqa: BLE001
-                print(f"  voice: Turn-Modell nicht ladbar ({str(e)[:80]}) — Regeln", flush=True)
+                print(f"  voice: turn model not loadable ({str(e)[:80]}) — rules", flush=True)
 
     def wait_for(self, partial_text=None, audio=None):
         """ms to wait after the last speech frame before the utterance is final."""
@@ -98,12 +98,12 @@ class Endpointer:
     def reasons(self, partial_text):
         """For the state log: why this wait."""
         if partial_text is None or not str(partial_text).strip():
-            return "kein Text"
+            return "no text"
         if looks_unfinished(partial_text):
-            return "klingt unfertig"
+            return "sounds unfinished"
         if looks_like_question(partial_text):
-            return "Frage"
-        return "Satz fertig"
+            return "question"
+        return "sentence done"
 
 
 class TurnModel:

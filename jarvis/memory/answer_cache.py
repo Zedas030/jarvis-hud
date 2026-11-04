@@ -1,7 +1,7 @@
 """
 Short-lived answer cache for the LLM path.
 
-"Hab ich neue Mails?" twice in five minutes costs one call, not two. Only
+"Do I have new mails?" twice in five minutes costs one call, not two. Only
 read-only questions are cached (groups mail, calendar, systems, health, web,
 weather, memory), never anything that changes something. A turn in which the LLM saved
 a note or marked mails read empties the cache. JARVIS_CACHE_S (default 300, 0 = off).
@@ -14,14 +14,14 @@ import time
 TTL = int(os.environ.get("JARVIS_CACHE_S", "300"))
 READ_ONLY = {"memory", "mail", "calendar", "systems", "health", "web", "weather"}
 _WRITES = ("memory_save", "mail_mark_read")   # tools that change what later answers would say
-_CHANGES = re.compile(r"\b(merk|markier|speicher|notier|erinner|trag\w*|schreib|lösch|setz|schalt|mach|öffne|spiel|"
-                      r"start|kauf|bestell|sende|schick|änder|stell|füg|nimm|streich|vergiss)", re.I)
+_CHANGES = re.compile(r"\b(remember|mark|save|store|note|remind|add|enter|put|write|delete|set|switch|turn|make|"
+                      r"open|play|start|buy|order|send|change|take|drop|cross|forget)", re.I)
 _DATA = {}
 _LOCK = threading.Lock()
 
 
 def _key(message, groups):
-    return (" ".join(re.sub(r"[^\wäöüß]+", " ", (message or "").lower()).split()), tuple(sorted(groups)))
+    return (" ".join(re.sub(r"[^\w]+", " ", re.sub(r"['’]", "", (message or "").lower())).split()), tuple(sorted(groups)))
 
 
 def cacheable(message, groups):
@@ -40,7 +40,7 @@ def get(message, groups):
 
 def put(message, groups, reply, tools_used=()):
     if any(t.endswith(_WRITES) for t in tools_used):
-        clear()          # e.g. "Hab ich neue Mails?" is stale once mails were marked read
+        clear()          # e.g. "Do I have new mails?" is stale once mails were marked read
         return
     if not reply or not cacheable(message, groups):
         return

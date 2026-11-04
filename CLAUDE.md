@@ -1,6 +1,6 @@
 # CLAUDE.md — working on JARVIS
 
-JARVIS is a German-speaking voice assistant for one person on Windows 11. The brain is the
+JARVIS is an English-speaking voice assistant for one person on Windows 11. The brain is the
 Claude Code CLI on a subscription; a local intent router answers simple commands with 0 tokens.
 Read `ARCHITECTURE.md` for the module map and `SECURITY.md` before touching tools or permissions.
 
@@ -13,12 +13,12 @@ start-jarvis.bat                                            # supervisor + serve
 ```
 
 A running Jarvis restarts itself when its code changes. For a throwaway instance use another
-port and state file (see `docs/installation.md`, "Entwicklung und Diagnose"); `JARVIS_RUNTIME=mock` avoids Claude calls.
+port and state file (see `docs/installation.md`, "Development and diagnosis"); `JARVIS_RUNTIME=mock` avoids Claude calls.
 
 ## Conventions
 
 - Python 3.12, standard library first. New dependencies only with the user's OK.
-- Code, comments and docs in English; everything Jarvis **says**, router patterns and prompts in German.
+- Everything is English: code, comments, docs, everything Jarvis **says**, router patterns and prompts. A German edition is maintained separately in the repository jarvis-hud-de.
 - One module per feature in `jarvis/<group>/` (core, safety, tools, memory, voice, llm, watch), plain functions,
   module-level config from environment variables with defaults. Imports stay flat (`import memory`) — `paths.py`
   adds the group folders to `sys.path`; a new entry point must `import paths` first. Paths to config, logs, vault
@@ -27,7 +27,7 @@ port and state file (see `docs/installation.md`, "Entwicklung und Diagnose"); `J
 - Every test file imports `tests/isolate.py` first — it moves state, vault, logs and config into a
   temp folder. A new data file needs an env var and an entry there.
 - Comments explain why, not what. Match the surrounding density.
-- Commit messages in German, author from the local git config (`Zedas030`, GitHub noreply address); no Claude co-author line.
+- Commit messages in English, author from the local git config (`Zedas030`, GitHub noreply address); no Claude co-author line.
 
 ## Rules that must not break
 

@@ -90,10 +90,10 @@ class Hold(unittest.TestCase):
         spotify.hold("PC")
         spotify._HELD.update(device=None, at=0.0)  # what a fresh process knows
         spotify._restore()
-        self.assertTrue(spotify.release("PC", "denkt"))
+        self.assertTrue(spotify.release("PC", "thinking"))
         self.assertTrue(self.player.playing)
         self.assertFalse(spotify.HELD_FILE.exists())
-        self.assertIn("PC: weiter nach", spotify.LOG.read_text(encoding="utf-8"))
+        self.assertIn("PC: on after", spotify.LOG.read_text(encoding="utf-8"))
 
     def test_off_switch_and_no_login(self):
         spotify.HOLD = False
@@ -139,11 +139,11 @@ class RoundedLoudPlayer(LoudPlayer):
 
 
 class Quiet(unittest.TestCase):
-    """JARVIS_SPOTIFY_HOLD_MODE=leise: down to the lowest step instead of a pause, and back after."""
+    """JARVIS_SPOTIFY_HOLD_MODE=quiet: down to the lowest step instead of a pause, and back after."""
 
     def setUp(self):
         self.saved = (spotify._api, spotify.CLIENT_ID, spotify.HOLD_MODE)
-        spotify.CLIENT_ID, spotify.HOLD_MODE = "test", "leise"
+        spotify.CLIENT_ID, spotify.HOLD_MODE = "test", "quiet"
         spotify.save_token({"refresh_token": "r"})
         spotify.forget()
         self.player = spotify._api = LoudPlayer()
@@ -261,9 +261,9 @@ if __name__ == "__main__":
 class Transfer(unittest.TestCase):
     """The music into another room: Spotify Connect, device found by its name."""
 
-    DEVICES = [{"id": "echo", "name": "Nutzer' Echo Dot", "type": "Speaker", "is_active": False},
-               {"id": "wz", "name": "Wohnzimmer", "type": "Unknown", "is_active": False},
-               {"id": "pc", "name": "NUTZER", "type": "Computer", "is_active": False}]
+    DEVICES = [{"id": "echo", "name": "User's Echo Dot", "type": "Speaker", "is_active": False},
+               {"id": "wz", "name": "Living room", "type": "Unknown", "is_active": False},
+               {"id": "pc", "name": "USER", "type": "Computer", "is_active": False}]
 
     def setUp(self):
         self.saved = (spotify._api, spotify.CLIENT_ID)
@@ -282,31 +282,31 @@ class Transfer(unittest.TestCase):
         if path == "/me/player/devices":
             return 200, {"devices": list(self.DEVICES)}
         if path == "/me/player":                  # the Sonos plays, but Spotify leaves it out of the device list
-            return 200, {"is_playing": True, "device": {"id": "sz", "name": "Schlafzimmer"}}
+            return 200, {"is_playing": True, "device": {"id": "sz", "name": "Bedroom"}}
         return 204, None
 
     def test_active_device_missing_from_the_list_is_still_known(self):
-        self.assertEqual([d["name"] for d in spotify.devices()][-1], "Schlafzimmer")
-        self.assertEqual(spotify.find_device("schlafzimmer")["id"], "sz")
+        self.assertEqual([d["name"] for d in spotify.devices()][-1], "Bedroom")
+        self.assertEqual(spotify.find_device("bedroom")["id"], "sz")
 
     def test_exact_name_beats_substring(self):
-        self.assertEqual(spotify.find_device("Wohnzimmer")["id"], "wz")
+        self.assertEqual(spotify.find_device("Living room")["id"], "wz")
         self.assertEqual(spotify.find_device("Echo")["id"], "echo")
-        self.assertIsNone(spotify.find_device("Bad"))
+        self.assertIsNone(spotify.find_device("Bathroom"))
 
     def test_transfer_moves_and_plays(self):
-        self.assertEqual(spotify.transfer("Wohnzimmer"), (True, "Wohnzimmer"))
+        self.assertEqual(spotify.transfer("Living room"), (True, "Living room"))
         self.assertIn(("PUT", "/me/player", {"device_ids": ["wz"], "play": True}), self.calls)
 
     def test_unknown_device_names_the_reachable_ones(self):
-        ok, text = spotify.transfer("Bad")
+        ok, text = spotify.transfer("Bathroom")
         self.assertFalse(ok)
-        self.assertIn("Wohnzimmer", text)
+        self.assertIn("Living room", text)
         self.assertFalse([c for c in self.calls if c[:2] == ("PUT", "/me/player")])
 
     def test_wake_word_hold_is_forgotten_and_old_room_gets_its_volume_back(self):
         spotify._HELD.update(device="sz", at=1.0, volume=40, quiet=12)
-        self.assertTrue(spotify.transfer("Wohnzimmer")[0])
+        self.assertTrue(spotify.transfer("Living room")[0])
         self.assertIn(("PUT", "/me/player/volume", None), self.calls)
         self.assertIsNone(spotify._HELD["device"])
 
@@ -324,8 +324,8 @@ class RoomViaHomeAssistant(unittest.TestCase):
         self.calls, self.ha = [], []
         spotify._api = self.api
         self.patches = [
-            mock.patch.object(speakers, "_cfg", return_value=({"Schlafzimmer": {"player": "media_player.sz"},
-                                                               "Wohnzimmer": {"notify": "notify.echo"}}, None)),
+            mock.patch.object(speakers, "_cfg", return_value=({"Bedroom": {"player": "media_player.sz"},
+                                                               "Living room": {"notify": "notify.echo"}}, None)),
             mock.patch.object(jarvis_mcp, "_ha", side_effect=lambda path, body=None: self.ha.append((path, body)))]
         for p in self.patches:
             p.start()
@@ -340,26 +340,26 @@ class RoomViaHomeAssistant(unittest.TestCase):
     def api(self, method, path, retry=True, body=None):
         self.calls.append((method, path.split("?")[0], body))
         if path == "/me/player/devices":
-            return 200, {"devices": [{"id": "wz", "name": "Wohnzimmer"}]}
+            return 200, {"devices": [{"id": "wz", "name": "Living room"}]}
         if path == "/me/player":
-            return 200, {"is_playing": True, "device": {"id": "wz", "name": "Wohnzimmer"},
+            return 200, {"is_playing": True, "device": {"id": "wz", "name": "Living room"},
                          "context": {"uri": "spotify:user:spotify:playlist:37i9"}, "item": {"uri": "spotify:track:t1"}}
         return 204, None
 
     def test_listed_device_goes_through_spotify_connect(self):
-        text = self.music({"action": "transfer", "room": "Wohnzimmer"})
-        self.assertEqual(text, "Die Musik läuft jetzt im Wohnzimmer.")
+        text = self.music({"action": "transfer", "room": "Living room"})
+        self.assertEqual(text, "The music is now playing in the Living room.")
         self.assertEqual(self.ha, [])
 
     def test_unlisted_sonos_gets_the_playlist_from_home_assistant(self):
-        text = self.music({"action": "transfer", "room": "Schlafzimmer"})
-        self.assertIn("im Schlafzimmer", text)
+        text = self.music({"action": "transfer", "room": "Bedroom"})
+        self.assertIn("in the Bedroom", text)
         self.assertEqual(self.ha, [("/api/services/media_player/play_media",
                                     {"entity_id": "media_player.sz", "media_content_type": "music",
                                      "media_content_id": "spotify:playlist:37i9", "enqueue": "replace"})])
         self.assertIn(("PUT", "/me/player/pause", None), self.calls)      # not playing twice
 
     def test_unknown_room_without_player_is_refused(self):
-        text = self.music({"action": "transfer", "room": "Bad"})
-        self.assertIn("kennt kein Gerät", text)
+        text = self.music({"action": "transfer", "room": "Bathroom"})
+        self.assertIn("knows no device", text)
         self.assertEqual(self.ha, [])

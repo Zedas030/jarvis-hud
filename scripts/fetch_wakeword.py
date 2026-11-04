@@ -52,7 +52,7 @@ def _get(url, sha):
 def _check(name, data, sha):
     got = hashlib.sha256(data).hexdigest()
     if got != sha:
-        sys.exit(f"Prüfsumme stimmt nicht: {name}\n  erwartet {sha}\n  bekommen {got}")
+        sys.exit(f"checksum does not match: {name}\n  expected {sha}\n  got {got}")
 
 
 def _write(path, data):
@@ -66,7 +66,7 @@ def main():
     ort_dir, oww_dir = VENDOR / f"ort-{ORT}", VENDOR / f"oww-{OWW}"
     wanted = list(OWW_FILES) + list(COMMUNITY_FILES)
     if all((ort_dir / n).exists() for n in ORT_FILES) and all((oww_dir / n).exists() for n in wanted):
-        print(f"Schon da: {ort_dir.relative_to(ROOT)}, {oww_dir.relative_to(ROOT)}")
+        print(f"Already there: {ort_dir.relative_to(ROOT)}, {oww_dir.relative_to(ROOT)}")
         return
     if not all((ort_dir / n).exists() for n in ORT_FILES):
         print(f"onnxruntime-web {ORT} …")
@@ -81,10 +81,10 @@ def main():
             _write(oww_dir / name, _get(f"https://github.com/dscripka/openWakeWord/releases/download/{OWW}/{name}", sha))
     for name, sha in COMMUNITY_FILES.items():
         if not (oww_dir / name).exists():
-            print(f"Community-Modell {name} …")
+            print(f"community model {name} …")
             _write(oww_dir / name, _get("https://raw.githubusercontent.com/fwartner/home-assistant-wakewords-collection/"
                                         f"{COMMUNITY}/en/jarvis/{name}", sha))
-    print(f"Fertig: {VENDOR.relative_to(ROOT)}")
+    print(f"Done: {VENDOR.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

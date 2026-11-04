@@ -2,12 +2,12 @@
 PC control without the LLM: system volume, opening apps, locking the screen,
 and "ducking" — Spotify gets quieter while Jarvis speaks.
 
-    "Lautstärke auf 30 Prozent", "PC lauter", "Ton aus", "Wie laut ist der PC?"
-    "Öffne Spotify", "Starte den Rechner", "Sperr den Bildschirm"
+    "Volume to 30 percent", "PC louder", "Sound off", "How loud is the PC?"
+    "Open Spotify", "Start the calculator", "Lock the screen"
 
 Volume uses Windows Core Audio through pycaw (pip install pycaw); without it,
 only the media keys are left (louder/quieter in 2 % steps). Apps come from a
-small whitelist plus config/apps.json ({"Steuer": "C:\\\\Programme\\\\...exe"});
+small whitelist plus config/apps.json ({"Tax": "C:\\\\Program Files\\\\...exe"});
 anything else goes to the LLM, which asks before running commands.
 """
 import json
@@ -23,11 +23,11 @@ APPS_FILE = pathlib.Path(os.environ.get("JARVIS_APPS", ROOT / "config" / "apps.j
 DUCK = float(os.environ.get("JARVIS_DUCK", "0.3"))           # Spotify volume factor while Jarvis talks, 0 = off
 DUCK_APPS = {a.strip().lower() for a in os.environ.get("JARVIS_DUCK_APPS", "spotify.exe").split(",") if a.strip()}
 APPS = {
-    "spotify": "spotify:", "rechner": "calc", "taschenrechner": "calc", "editor": "notepad", "notepad": "notepad",
-    "explorer": "explorer", "datei explorer": "explorer", "chrome": "chrome", "edge": "msedge", "firefox": "firefox",
-    "outlook": "outlook", "einstellungen": "ms-settings:", "discord": "discord:", "steam": "steam:",
+    "spotify": "spotify:", "calculator": "calc", "the calculator": "calc", "editor": "notepad", "notepad": "notepad",
+    "explorer": "explorer", "file explorer": "explorer", "chrome": "chrome", "edge": "msedge", "firefox": "firefox",
+    "outlook": "outlook", "settings": "ms-settings:", "discord": "discord:", "steam": "steam:",
     "task manager": "taskmgr", "taskmanager": "taskmgr", "paint": "mspaint", "word": "winword", "excel": "excel",
-    "terminal": "wt", "kalender": "outlookcal:", "uhr": "ms-clock:", "kamera": "microsoft.windows.camera:",
+    "terminal": "wt", "calendar": "outlookcal:", "clock": "ms-clock:", "camera": "microsoft.windows.camera:",
 }
 _LOCK = threading.Lock()
 _DUCKED = {}
@@ -142,50 +142,49 @@ def lock():
 
 
 # ── the voice side ───────────────────────────────────────────
-_SYS = r"\b(pc|computer|rechner|system|windows|gesamt|lautsprecher)\b"
-_MUSIC = re.compile(r"\b(musik|spotify|song|lied|titel|track)\b")
-# "Lautstärke auf 80", but also "stell den PC auf 100 % (Lautstärke)" — there the
-# number comes first, and the bare "lautstärke" at the end used to read the volume out.
-_SET = re.compile(r"\blautstärke\b.*?\bauf (\d{1,3})\s*(%|prozent)?|\bauf (\d{1,3})\s*(%|prozent)")
-_OPEN = re.compile(r"^\W*(?:jarvis\W+)?(?:bitte\s+)?(?:öffne|starte?|mach)\s+(?:mir\s+)?(?:bitte\s+)?(?:mal\s+)?"
-                   r"(?:den|die|das)?\s*(?P<app>[\wäöüß ]+?)(?:\s+auf)?(?:\s+bitte)?\W*$", re.I)
-_LOCKRX = re.compile(r"\b(sperr\w*|lock)\b.*\b(pc|computer|rechner|bildschirm|windows)\b|"
-                     r"\b(bildschirm|pc|computer|rechner)\s+sperren\b")
+_SYS = r"\b(pc|computer|system|windows|overall|speakers?)\b"
+_MUSIC = re.compile(r"\b(music|spotify|song|track)\b")
+# "volume to 80", but also "set the PC to 100 % (volume)" — there the
+# number comes first, and the bare "volume" at the end used to read the volume out.
+_SET = re.compile(r"\bvolume\b.*?\bto (\d{1,3})\s*(%|percent)?|\bto (\d{1,3})\s*(%|percent)")
+_OPEN = re.compile(r"^\W*(?:jarvis\W+)?(?:please\s+)?(?:open|start|launch|run)\s+(?:up\s+)?(?:please\s+)?"
+                   r"(?:the|my)?\s*(?P<app>[\w ]+?)(?:\s+up)?(?:\s+please)?\W*$", re.I)
+_LOCKRX = re.compile(r"\block\b.*\b(pc|computer|screen|windows)\b")
 
 
 def handle(n, raw=""):
     if _LOCKRX.search(n):
         lock()
-        return "Gesperrt, Sir."
+        return "Locked, Sir."
     m = _OPEN.match(raw or "")
     if m and m.group("app").lower().strip() in apps():
         open_app(m.group("app"))
-        return f"{m.group('app').strip().capitalize()} kommt, Sir."
+        return f"{m.group('app').strip().capitalize()} is coming up, Sir."
     if _MUSIC.search(n):
         return None                                   # music volume stays with the music handler
-    # "Lautspecke", "Lautstärker": how Whisper hears "Lautstärke" now and then
-    systemish = re.search(_SYS, n) or re.search(r"\b(lautstärke|lauts[pt]\w*|ton|stumm\w*|mute)\b", n)
+    # "volumn", "valium": how Whisper hears "volume" now and then
+    systemish = re.search(_SYS, n) or re.search(r"\b(volume|volum\w*|sound|mute\w*|unmute)\b", n)
     if not systemish:
         return None
     s = _SET.search(n)
     if s:
         pct = min(100, int(s.group(1) or s.group(3)))
         if set_volume(pct):
-            return f"Lautstärke {pct} Prozent."
+            return f"Volume {pct} percent."
         return None
-    if re.search(r"\b(ton an|stumm aus|laut schalten|stummschaltung (aus|aufheben)|ton wieder|nicht mehr stumm)\b", n):
+    if re.search(r"\b(sound on|unmute|mute off|sound back on|no longer muted)\b", n):
         mute(False)
-        return "Ton ist wieder an."
-    if re.search(r"\b(stumm|ton aus|mute)\b", n):
+        return "Sound is back on."
+    if re.search(r"\b(mute|sound off)\b", n):
         mute(True)
-        return "Stumm, Sir."
-    if re.search(r"\blauter\b", n):
+        return "Muted, Sir."
+    if re.search(r"\b(louder|volume up)\b", n):
         v = step(+10)
-        return f"Lauter, jetzt {v} Prozent." if v is not None else "Lauter."
-    if re.search(r"\bleiser\b", n):
+        return f"Louder, now {v} percent." if v is not None else "Louder."
+    if re.search(r"\b(quieter|softer|volume down)\b", n):
         v = step(-10)
-        return f"Leiser, jetzt {v} Prozent." if v is not None else "Leiser."
-    if re.search(r"\b(wie laut|welche lautstärke|lautstärke\s*$)", n):
+        return f"Quieter, now {v} percent." if v is not None else "Quieter."
+    if re.search(r"\b(how loud|what volume|what is the volume|whats the volume|volume\s*$)", n):
         v = volume()
-        return f"Die Lautstärke steht auf {v} Prozent, Sir." if v is not None else None
+        return f"The volume is at {v} percent, Sir." if v is not None else None
     return None

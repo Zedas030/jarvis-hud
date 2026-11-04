@@ -100,8 +100,8 @@ so these work today; they only belong behind one name.
 ### 6. File system behaviour (S, but easy to miss)
 
 - **Case-sensitive file names.** `memory_save` writes `MEMORY_DIR / (note + ".md")`
-  (`jarvis/tools/jarvis_mcp.py` near the `# memory_save` comment). On Windows "vorlieben" and
-  "Vorlieben" are the same file; on Linux the model would create a second note. Look up an
+  (`jarvis/tools/jarvis_mcp.py` near the `# memory_save` comment). On Windows "preferences" and
+  "Preferences" are the same file; on Linux the model would create a second note. Look up an
   existing note case-insensitively first (`memory_read` already compares `stem.lower()`).
   The same holds for `config/*.json` names and anything matched by name in the vault.
 - Line endings: the repository uses `core.autocrlf=true`. On Linux set `autocrlf=input`;
@@ -155,8 +155,8 @@ media_key(action)
 ```
 
 `local` imports `_pc_win` or `_pc_linux`; `remote` posts to the PC agent (token like the
-existing pairing, LAN only, every call audited); `off` answers "Am Server gibt es keinen
-Bildschirm". `pc.py`, `desktop.py` and `vision.py` keep their German answers, routing and policy
+existing pairing, LAN only, every call audited); `off` answers "There is no screen on the
+server". `pc.py`, `desktop.py` and `vision.py` keep their answers, routing and policy
 classes unchanged and only call `pc_backend`. The policy stays where it is: the agent executes,
 it never decides.
 

@@ -1,7 +1,7 @@
 """
 Leaving home: once the user's person entity in Home Assistant has been away for a few minutes,
 Jarvis looks at what is still on and tells the phone. He switches nothing himself — what is on
-becomes one proposal ("Ausschalten: …"), which goes through the confirmation card in Jarvis.
+becomes one proposal ("Switch off: …"), which goes through the confirmation card in Jarvis.
 
   what counts    lights that are on, media players that play, and the plugs listed in
                  config/home.json → "away_check" → "switches" that draw more than their
@@ -11,12 +11,12 @@ becomes one proposal ("Ausschalten: …"), which goes through the confirmation c
   what is kept   only the times of the last handled leaving and coming back (state.json →
                  away_checked, away_since, welcomed), no record of comings and goings
 
-Coming back: after at least JARVIS_WELCOME_MINUTES (20) away, "Willkommen zurück" with what
+Coming back: after at least JARVIS_WELCOME_MINUTES (20) away, "welcome back" with what
 Jarvis announced in the meantime (events.notices_since) — the package, the dishwasher, an
-outage. An open "Ausschalten" proposal from the leaving is dropped: the user is home now.
+outage. An open "switch off" proposal from the leaving is dropped: the user is home now.
 
 config/home.json:
-  "away_check": {"switches": {"switch.tv": 30, "switch.kuche_boiler": 20}, "lights": true, "media": true}
+  "away_check": {"switches": {"switch.tv": 30, "switch.kitchen_boiler": 20}, "lights": true, "media": true}
 """
 import datetime as dt
 import os
@@ -26,7 +26,7 @@ MINUTES = float(os.environ.get("JARVIS_AWAY_MINUTES", "3"))
 WELCOME_MIN = float(os.environ.get("JARVIS_WELCOME_MINUTES", "20"))
 SKIP_KINDS = {"alarm", "timers", "welcome", "wake"}
 ENABLED = os.environ.get("JARVIS_AWAY_CHECK", "1").strip() not in ("0", "false", "no", "off")
-POWER_SUFFIX = os.environ.get("JARVIS_PLUG_POWER_SUFFIX", "_derzeitiger_verbrauch")
+POWER_SUFFIX = os.environ.get("JARVIS_PLUG_POWER_SUFFIX", "_current_consumption")
 
 
 def _num(v):
@@ -77,8 +77,8 @@ def left_home(person, handled, now):
 
 def message(found):
     names = ", ".join(label for _, label in found)
-    return (f"Du bist unterwegs, zu Hause läuft noch: {names}. "
-            "Sag Jarvis „ausschalten“, dann kommt eine Karte zum Bestätigen.")
+    return (f"You are out, at home this is still running: {names}. "
+            "Tell Jarvis “switch off” and a card comes up to confirm.")
 
 
 def came_back(person, away_since, welcomed, now):
@@ -109,9 +109,9 @@ def welcome(notes):
             seen.add(text)
             items.append(text)
     if not items:
-        return "Willkommen zurück, Sir. Während du weg warst, war alles ruhig."
-    more = f" Und {len(items) - 4} weitere Meldungen in der Glocke." if len(items) > 4 else ""
-    return "Willkommen zurück, Sir. Während du weg warst: " + " ".join(items[-4:]) + more
+        return "Welcome back, Sir. While you were out, everything was quiet."
+    more = f" And {len(items) - 4} more notices in the bell." if len(items) > 4 else ""
+    return "Welcome back, Sir. While you were out: " + " ".join(items[-4:]) + more
 
 
 def check(states_list, now=None):
@@ -138,11 +138,11 @@ def check(states_list, now=None):
     import phone_actions
     import proposals
     text = message(found)
-    pid = proposals.add("switch_off", "Ausschalten: " + ", ".join(label for _, label in found)[:100],
-                        "Du bist nicht zu Hause und das läuft noch.", {"entities": [e for e, _ in found],
+    pid = proposals.add("switch_off", "Switch off: " + ", ".join(label for _, label in found)[:100],
+                        "You are not at home and this is still running.", {"entities": [e for e, _ in found],
                                                                      "labels": [label for _, label in found]},
                         source="away_check")
-    phone_actions.push_proposal(pid, text, title="Jarvis · unterwegs")     # Ja/Nein on the phone = the card
+    phone_actions.push_proposal(pid, text, title="Jarvis · out")     # yes/no on the phone = the card
     return text
 
 

@@ -28,7 +28,7 @@ container grafana: Up 2 hours (unhealthy)"""
 
 
 def finding(key="pi", ok=False, severity="critical"):
-    return dict(key=key, ok=ok, severity=severity, down="Der Pi ist seit {min} Minuten weg.", up="Der Pi ist wieder da.")
+    return dict(key=key, ok=ok, severity=severity, down="The Pi has been gone for {min} minutes.", up="The Pi is back.")
 
 
 class Watch(unittest.TestCase):
@@ -41,9 +41,9 @@ class Watch(unittest.TestCase):
     def test_outage_needs_two_checks_and_recovery_once(self):
         t = 1_000_000
         self.assertEqual(hw.process([finding()], now=t, quiet=False), [])
-        self.assertEqual(hw.process([finding()], now=t + 300, quiet=False), ["Der Pi ist seit 5 Minuten weg."])
+        self.assertEqual(hw.process([finding()], now=t + 300, quiet=False), ["The Pi has been gone for 5 minutes."])
         self.assertEqual(hw.process([finding()], now=t + 600, quiet=False), [])          # once per incident
-        self.assertEqual(hw.process([finding(ok=True)], now=t + 900, quiet=False), ["Der Pi ist wieder da."])
+        self.assertEqual(hw.process([finding(ok=True)], now=t + 900, quiet=False), ["The Pi is back."])
         self.assertEqual(hw.process([finding(ok=True)], now=t + 1200, quiet=False), [])
 
     def test_blip_stays_silent(self):
@@ -54,7 +54,7 @@ class Watch(unittest.TestCase):
         warn = finding("pi_container:x", severity="warn")
         hw.process([warn, finding()], now=1, quiet=True)
         out = hw.process([warn, finding()], now=301, quiet=True)
-        self.assertEqual(out, ["Der Pi ist seit 5 Minuten weg."])
+        self.assertEqual(out, ["The Pi has been gone for 5 minutes."])
         out = hw.process([warn], now=8 * 3600, quiet=False)          # morning, still broken: now it is said
         self.assertEqual(len(out), 1)
 
@@ -92,13 +92,13 @@ class Watch(unittest.TestCase):
         limits = dict(hw.LIMITS)
         bad = [f for f in hw.value_findings({"pi_temp": 80.0}, limits) if not f["ok"]]
         self.assertEqual(len(bad), 1)
-        self.assertIn("80 Grad", bad[0]["down"])
+        self.assertIn("80 degrees", bad[0]["down"])
         # one learning week at ~0.8 load: 2.5 is an outlier, 1.1 is not
         hw.BASELINE.write_text(json.dumps({"pi_load": {"samples": [0.7, 0.8, 0.9] * 56, "last": 0}}), encoding="utf-8")
         self.assertTrue(all(f["ok"] for f in hw.value_findings({"pi_load": 1.1}, limits)))
         odd = [f for f in hw.value_findings({"pi_load": 2.5}, limits) if not f["ok"]]
         self.assertEqual(len(odd), 1)
-        self.assertIn("sonst um 0,8", odd[0]["down"])
+        self.assertIn("usually around 0.8", odd[0]["down"])
 
     def test_no_outliers_while_learning(self):
         hw.BASELINE.write_text(json.dumps({"pi_load": {"samples": [0.8] * 20, "last": 0}}), encoding="utf-8")
@@ -115,8 +115,8 @@ class Watch(unittest.TestCase):
         self.assertEqual([(f["ok"], f["severity"]) for f in found], [(True, "critical"), (False, "warn")])
 
     def test_wording(self):
-        self.assertEqual(hw.sir("Der Pi ist weg."), "Sir, der Pi ist weg.")
-        self.assertEqual(hw.sir("Home Assistant antwortet nicht."), "Sir, Home Assistant antwortet nicht.")
+        self.assertEqual(hw.sir("The Pi is gone."), "Sir, the Pi is gone.")
+        self.assertEqual(hw.sir("Home Assistant does not answer."), "Sir, Home Assistant does not answer.")
 
 
 if __name__ == "__main__":

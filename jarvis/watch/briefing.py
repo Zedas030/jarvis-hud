@@ -2,7 +2,7 @@
 Morning briefing + home-network watchdog.
 
 The briefing is not a separate screen: on the first conversation of the day
-(before BRIEFING_UNTIL o'clock) the turn's <kontext> gets weather, battery and
+(before BRIEFING_UNTIL o'clock) the turn's <context> gets weather, battery and
 mail figures plus an instruction to open with a short spoken briefing.
 
 The watchdog polls the FRITZ!Box device trackers in Home Assistant. A device
@@ -27,12 +27,12 @@ WATCH_EVERY = int(os.environ.get("JARVIS_NET_WATCH_SECONDS", "300"))
 # Weather location (JARVIS_WEATHER_LAT/LON in .env).
 LAT, LON = os.environ.get("JARVIS_WEATHER_LAT", "50.11"), os.environ.get("JARVIS_WEATHER_LON", "8.68")
 TZ_Q = profile.TIMEZONE.replace("/", "%2F")
-DEVICE_DIR = memory.VAULT / "Erinnerungen" / "Netzwerk-Geräte"
+DEVICE_DIR = memory.VAULT / "Memories" / "Network devices"
 
-WEATHER_CODES = {0: "klar", 1: "überwiegend klar", 2: "teils bewölkt", 3: "bedeckt", 45: "Nebel", 48: "Nebel",
-                 51: "Niesel", 53: "Niesel", 55: "Niesel", 61: "leichter Regen", 63: "Regen", 65: "starker Regen",
-                 71: "Schnee", 73: "Schnee", 75: "starker Schnee", 80: "Schauer", 81: "Schauer",
-                 82: "heftige Schauer", 95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Gewitter mit Hagel"}
+WEATHER_CODES = {0: "clear", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45: "fog", 48: "fog",
+                 51: "drizzle", 53: "drizzle", 55: "drizzle", 61: "light rain", 63: "rain", 65: "heavy rain",
+                 71: "snow", 73: "snow", 75: "heavy snow", 80: "showers", 81: "showers",
+                 82: "heavy showers", 95: "thunderstorms", 96: "thunderstorms with hail", 99: "thunderstorms with hail"}
 
 
 def _get(url, headers=None, timeout=10):
@@ -53,10 +53,10 @@ def _weather():
     d = _get("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=%s"
              "&forecast_days=1&daily=weather_code,temperature_2m_max,temperature_2m_min,"
              "precipitation_probability_max,precipitation_sum,wind_speed_10m_max,sunset" % (LAT, LON, TZ_Q))["daily"]
-    return (f"Wetter heute{profile.place_suffix()}: {WEATHER_CODES.get(d['weather_code'][0], 'wechselhaft')}, "
-            f"{d['temperature_2m_min'][0]:.0f} bis {d['temperature_2m_max'][0]:.0f} °C, "
-            f"Regenrisiko {d['precipitation_probability_max'][0]} % ({d['precipitation_sum'][0]} mm), "
-            f"Wind bis {d['wind_speed_10m_max'][0]:.0f} km/h, Sonnenuntergang {d['sunset'][0][-5:]}.")
+    return (f"Weather today{profile.place_suffix()}: {WEATHER_CODES.get(d['weather_code'][0], 'changeable')}, "
+            f"{d['temperature_2m_min'][0]:.0f} to {d['temperature_2m_max'][0]:.0f} °C, "
+            f"chance of rain {d['precipitation_probability_max'][0]} % ({d['precipitation_sum'][0]} mm), "
+            f"wind up to {d['wind_speed_10m_max'][0]:.0f} km/h, sunset {d['sunset'][0][-5:]}.")
 
 
 def _energy(states):
@@ -72,9 +72,9 @@ def _energy(states):
     total = f"{float(total):.0f}" if num(total) else "?"
     gen = sum(float(by[e]) for e in profile.ha("generation_today", []) if num(by.get(e, "")))
     solar = sum(float(by[e]) for e in profile.ha("solar_power", []) if num(by.get(e, "")))
-    bat_txt = f" (Batterien: {' / '.join(socs)} %)" if socs else ""
-    return (f"Speicher ({profile.ha('storage_name', 'Batteriespeicher')}): Ladestand gesamt {total} %{bat_txt}, "
-            f"Solar gerade {solar:.0f} W, heute erzeugt {gen:.1f} kWh.")
+    bat_txt = f" (batteries: {' / '.join(socs)} %)" if socs else ""
+    return (f"Storage ({profile.ha('storage_name', 'battery storage')}): total charge {total} %{bat_txt}, "
+            f"solar right now {solar:.0f} W, generated today {gen:.1f} kWh.")
 
 
 def _coach():
@@ -100,7 +100,7 @@ def _batteries(states):
             continue
         if level <= BATTERY_LOW:
             low.append(f"{a.get('friendly_name') or s['entity_id']} {level:.0f} %")
-    return ("Batterien fast leer (bitte tauschen): " + ", ".join(sorted(low)) + ".") if low else ""
+    return ("Batteries nearly empty (please replace): " + ", ".join(sorted(low)) + ".") if low else ""
 
 
 def _mail_count():
@@ -113,7 +113,7 @@ def _mail_count():
         return ""
     n = sum(c for _, c in results)
     split = f" ({', '.join(f'{a}: {c}' for a, c in results)})" if len(results) > 1 else ""
-    return f"Postfach: {n} ungelesene Mails{split} (Details bei Bedarf mit mail_inbox)."
+    return f"Mailbox: {n} unread mails{split} (details with mail_inbox when needed)."
 
 def morning_block():
     """Briefing data on the day's first turn, once. Empty string otherwise."""
@@ -135,15 +135,15 @@ def morning_block():
             text = ""
         if text:
             lines.append("- " + text)
-    lines.append("- Termine: siehe Kalender oben.")
+    lines.append("- Appointments: see the calendar above.")
     gentle = _gentle_line()
-    return ("## Morgenbriefing — erstes Gespräch heute\n"
-            + ("Beginne mit einem sehr kurzen, ruhigen Morgenbriefing (zwei Sätze: Termine und Wetter), ohne "
-               "Pointe und ohne Vorschläge. " + gentle if gentle else
-               "Beginne deine Antwort mit einem kurzen gesprochenen Morgenbriefing (drei bis vier Sätze): "
-               "Termine, Wetter mit Einschätzung, ob es zum Golfen taugt, Ladestand des Speichers, ungelesene Mails, "
-               "und fast leere Batterien, falls welche gemeldet sind. ")
-            + "Danach geh auf die Nachricht des Users ein.\n" + "\n".join(lines))
+    return ("## Morning briefing — first conversation today\n"
+            + ("Start with a very short, calm morning briefing (two sentences: appointments and weather), without "
+               "a punchline and without suggestions. " + gentle if gentle else
+               "Start your answer with a short spoken morning briefing (three to four sentences): "
+               "appointments, weather with a verdict on whether it is fit for golf, the storage charge, unread mails, "
+               "and nearly empty batteries if any are reported. ")
+            + "Then respond to the user's message.\n" + "\n".join(lines))
 
 
 def _gentle_line():
@@ -162,7 +162,7 @@ LIVE_TTL = 30
 
 
 def live():
-    """Per note id: online (bool|None) and pegel (0..1|None), from the HA entities
+    """Per note id: online (bool|None) and level (0..1|None), from the HA entities
     named in the note's frontmatter. Cached so a dozen open tabs don't hammer HA."""
     if time.time() - _LIVE["at"] < LIVE_TTL:
         return _LIVE["data"]
@@ -173,14 +173,14 @@ def live():
     out = {}
     if by:
         for n in memory.build_graph()["nodes"]:
-            on, lvl = by.get(n.get("online") or ""), by.get(n.get("pegel") or "")
+            on, lvl = by.get(n.get("online") or ""), by.get(n.get("level") or "")
             if on is None and lvl is None:
                 continue
             try:
                 lvl = max(0.0, min(1.0, float(lvl) / 100))
             except (TypeError, ValueError):
                 lvl = None
-            out[n["id"]] = dict(online=None if on is None else on == "home", pegel=lvl)
+            out[n["id"]] = dict(online=None if on is None else on == "home", level=lvl)
     _LIVE.update(at=time.time(), data=out)
     return out
 
@@ -188,20 +188,20 @@ def live():
 # ── network watchdog ─────────────────────────────
 
 def _slug(name):
-    return re.sub(r'[\\/:*?"<>|\[\]#]', "-", name).strip(" .-") or "Gerät"
+    return re.sub(r'[\\/:*?"<>|\[\]#]', "-", name).strip(" .-") or "Device"
 
 
 def _new_device_note(name, ip, mac):
     DEVICE_DIR.mkdir(parents=True, exist_ok=True)
-    title = f"Neu {_slug(name)}"
+    title = f"New {_slug(name)}"
     path = DEVICE_DIR / f"{title}.md"
     if path.exists():
         return
     path.write_text(
-        "---\ntype: geraet\nupdated: %s\nwichtigkeit: mittel\n---\n\n# %s\n\n"
-        "Hängt an der [[FRITZ!Box]]. Vom Netzwerk-Wachhund am %s neu entdeckt — noch nicht zugeordnet.\n\n"
-        "- Name im Netz: %s\n- IP: %s\n- MAC: %s\n"
-        % (time.strftime("%Y-%m-%d"), title, time.strftime("%d.%m.%Y um %H:%M"), name, ip or "?", mac or "?"),
+        "---\ntype: device\nupdated: %s\nimportance: medium\n---\n\n# %s\n\n"
+        "Hangs on the [[FRITZ!Box]]. Newly discovered by the network watchdog on %s — not assigned yet.\n\n"
+        "- Name on the network: %s\n- IP: %s\n- MAC: %s\n"
+        % (time.strftime("%Y-%m-%d"), title, time.strftime("%Y-%m-%d at %H:%M"), name, ip or "?", mac or "?"),
         encoding="utf-8")
 
 
@@ -222,7 +222,7 @@ def _check_network():
         for s in fresh:
             a = s.get("attributes", {})
             alerts.append(dict(name=a.get("friendly_name") or s["entity_id"], ip=a.get("ip", ""),
-                               mac=a.get("mac", ""), at=time.strftime("%d.%m. %H:%M")))
+                               mac=a.get("mac", ""), at=time.strftime("%m-%d %H:%M")))
         return fresh
 
     for s in commands.update_state(merge):
@@ -230,7 +230,7 @@ def _check_network():
         name = a.get("friendly_name") or s["entity_id"].split(".", 1)[1]
         _new_device_note(name, a.get("ip", ""), a.get("mac", ""))
         import events
-        events.publish("say", f"Sir, ein neues Gerät ist im WLAN: {name}. Kennen Sie das?", kind="network")
+        events.publish("say", f"Sir, a new device is on the WiFi: {name}. Do you know it?", kind="network")
 
 
 def network_block():
@@ -239,9 +239,9 @@ def network_block():
     if not alerts:
         return ""
     rows = "\n".join(f"- {a['at']}: {a['name']} (IP {a['ip'] or '?'}, MAC {a['mac'] or '?'})" for a in alerts)
-    return ("## Netzwerk-Wachhund: neue Geräte im WLAN\n"
-            "Erwähne das gleich zu Beginn kurz und frag, ob der User das Gerät kennt. "
-            "Es hat schon einen Stern unter Netzwerk-Geräte; benenne die Notiz um, sobald der User sagt, was es ist.\n"
+    return ("## Network watchdog: new devices on the WiFi\n"
+            "Mention this briefly right at the start and ask whether the user knows the device. "
+            "It already has a star under Network devices; rename the note as soon as the user says what it is.\n"
             + rows)
 
 
@@ -281,7 +281,7 @@ def briefing_facts():
             lines.append("- " + text)
     try:
         w = dashboard._weather()
-        lines.append(f"- Golf-Einschätzung (berücksichtigt Tageslicht und Arbeitszeit): {w['golf']} "
+        lines.append(f"- Golf verdict (takes daylight and working hours into account): {w['golf']} "
                      f"({w['golf_day']}).")
     except Exception:  # noqa: BLE001
         pass
@@ -293,5 +293,5 @@ def briefing_facts():
         pass
     gentle = _gentle_line()
     if gentle:
-        lines.append("- Hinweis: " + gentle + " Nur zwei Sätze: Termine und Wetter.")
+        lines.append("- Note: " + gentle + " Only two sentences: appointments and weather.")
     return "\n".join(lines)

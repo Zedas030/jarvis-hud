@@ -23,8 +23,8 @@ class Homelab(unittest.TestCase):
             self.assertEqual(policy.action_class(t), policy.READ, t)
 
     def test_router_brings_homelab_tools(self):
-        for text in ("Jarvis, wie schnell ist das Internet gerade?", "Wie viel hat der Pi-hole heute blockiert?",
-                     "Wann war die CPU heute am höchsten?"):
+        for text in ("Jarvis, how fast is the internet right now?", "How much has the Pi-hole blocked today?",
+                     "When was the CPU highest today?"):
             self.assertIn("homelab", router.llm_route(text)["groups"], text)
 
     def test_internet_uses_the_rate_gauge_not_the_wrapping_counter(self):
@@ -42,18 +42,18 @@ class Homelab(unittest.TestCase):
             return 42.0
         homelab.value = value
         homelab.values = lambda expr: []
-        text = homelab.describe("alles")
-        self.assertIn("pc: nicht lesbar", text)
+        text = homelab.describe("all")
+        self.assertIn("pc: not readable", text)
         self.assertIn("pi: 42", text)
 
     def test_unknown_topic(self):
-        self.assertIn("Unbekannt", homelab.describe("toaster"))
+        self.assertIn("Unknown", homelab.describe("toaster"))
 
     def test_tile_survives_missing_pihole_password(self):
         homelab.value = lambda expr: 1.0
 
         def no_password():
-            raise RuntimeError("PIHOLE_PASSWORD fehlt in .env")
+            raise RuntimeError("PIHOLE_PASSWORD missing in .env")
         homelab.pihole_data = no_password
         t = homelab.tile()
         self.assertEqual((t["down"], t["ph_pct"]), (1.0, None))
@@ -62,11 +62,11 @@ class Homelab(unittest.TestCase):
     def test_pihole_lists_only_blocked_domains(self):
         homelab.pihole_data = lambda: {"total": 1000, "blocked": 120, "pct": 12.0, "clients": 9, "list": 150000,
                                        "blocking": "enabled", "top_blocked": [("ads.example", 50)],
-                                       "top_clients": [("handy", 400)]}
+                                       "top_clients": [("phone", 400)]}
         text = homelab.pihole()
-        self.assertIn("Filter an", text)
+        self.assertIn("filter on", text)
         self.assertIn("ads.example", text)
-        self.assertNotIn("erlaubt", text)
+        self.assertNotIn("allowed", text)
 
 
 if __name__ == "__main__":

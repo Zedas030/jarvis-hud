@@ -1,46 +1,48 @@
-# Roadmap: Ausbau zum vollständigen Assistenten
+# Roadmap: growing into a complete assistant
 
-Status je Phase der Vorgabe vom 02.11.2026. Deutsch, weil es der Arbeitsplan des Nutzers ist. Die Analyse
-steht in `BESTANDSAUFNAHME.md` (Phase 0), die Sprachpipeline in `VOICE-ANALYSE.md`, der Server-Umzug in
-`UMBAU-SERVER.md`. Die Liste der kleinen Haken in `docs/funktionen.md` bleibt die Funktionsliste; hier steht der Plan.
+Status per phase of the brief from 2026-11-02. The analysis is in `INVENTORY.md` (phase 0), the voice
+pipeline in `VOICE-ANALYSIS.md`, the server move in `SERVER-REBUILD.md`. The checklist in
+`docs/features.md` stays the feature list; this page holds the plan.
 
-Legende: ✅ fertig · 🔄 in Arbeit · ⏸ wartet auf Freigabe · ⬜ offen
+Legend: ✅ done · 🔄 in progress · ⏸ waiting for approval · ⬜ open
 
-| Phase | Status | Stand |
+| Phase | Status | State |
 |---|---|---|
-| 0 Bestandsaufnahme | ✅ | Bericht `BESTANDSAUFNAHME.md`, freigegeben 02.11.2026. Die sieben Entscheidungen (Abschnitt 11) sind noch offen |
-| P0 Fundament | ✅ bis auf Linux-Lauf | 02.11.2026: Tests grün (637), Abhängigkeiten aufgeteilt, `jarvis_log.py` (JSON-Log), `metrics.py` (`/metrics` für alle Module), nicht-UTF-8-Anfragen → 400. Offen: Testlauf unter Linux (kein WSL auf dem PC), Schlüssel rotieren (Nutzer) |
-| 1 Sprachpipeline | ✅ Kern · ⬜ Rest | Engine auf dem Server seit 02.11. (Commit `b85eb0d`). Offen: iPad/iPhone an die Engine, Raum-Satellit, Sonos-AEC-Erprobung, RNNoise, Tuning mit echtem Mikrofon |
-| 2 Agenten-Kern | ⬜ | Vorhanden: Router, Haiku/Sonnet, Notbetrieb, Aktionsklassen, Audit, Persönlichkeit, Vault, Episoden. Fehlt: Plugin-Registry, YAML-Konfiguration, SQLite-Gedächtnis, Kurzzeit-Zusammenfassung, Sprecher-Erkennung, Trennung privat/beruflich |
-| 3 Server & Betrieb | ⬜ | Plan und Hardware in `UMBAU-SERVER.md`; `hostos.py` begonnen. Fehlt: Linux-Testlauf, PC-Agent, systemd, Secrets, Backups auf NAS, Watchdog, Selbstüberwachung |
-| 4 HA & Energie | ⬜ | Vorhanden: Räume/Aliase, Klima-Gruppen, eigene Routinen, Energie-Coach, Stromkosten, Budget. Fehlt: HA-Automationen per Sprache, PV-Prognose, Noah-SOC, PromQL aus Sprache mit Grafik |
-| 5 Proaktivität | ⬜ | Vorhanden: Watchers, Ruhezeiten, Prioritäten, Vorschläge, Morgen-Briefing, Handy-Push, Unwetter. Fehlt: Ereignis-Engine (HA-WebSocket, Alertmanager), Bündelung, Ausgabe nach Präsenz, Hinweise per Sprache anpassen |
-| 6 Präsenz & Multiroom | ⬜ | Vorhanden: Lautsprecher je Raum, Sonos-Ansagen, Musik umziehen. Fehlt: mmWave/CSI-Fusion, Arbitration mehrerer Mikros, Lautstärke je Raum und Tageszeit |
-| 7 Arbeitsassistent | ⬜ | Vorhanden: IMAP lesen, Entwürfe, CalDAV, Recherche, Pläne. Fehlt: M365 Graph, Fristen-Wächter, Diktat → Dokument, berufliches Gedächtnis (Entscheidung 1 nötig) |
-| 8 HUD | ⬜ | Vorhanden: 13 Layouts, iPad-Pairing, Zustandsanzeige, Graph. Fehlt: Kamera-Streams, Prometheus-Grafiken, Aufteilung von `app.js` |
-| 9 Netz & IT | ⬜ | Vorhanden: Pi/NAS/UniFi/Pi-hole, neue Geräte, Lagebericht, Updates mit Karte, `pi_run`. Fehlt: Alerts sprechen, Ursachen-Rückfrage, Neustart nach Freigabe |
+| 0 Inventory | ✅ | Report `INVENTORY.md`, approved 2026-11-02. The seven decisions (section 11) are still open |
+| P0 Foundation | ✅ except the Linux run | 2026-11-02: tests green (637), dependencies split, `jarvis_log.py` (JSON log), `metrics.py` (`/metrics` for all modules), non-UTF-8 requests → 400. Open: test run on Linux (no WSL on the PC), rotate keys (user) |
+| 1 Voice pipeline | ✅ core · ⬜ rest | Engine on the server since 2026-11-02 (commit `b85eb0d`). Open: iPad/iPhone on the engine, room satellite, Sonos AEC trial, RNNoise, tuning with a real microphone |
+| 2 Agent core | ⬜ | Present: router, Haiku/Sonnet, fallback mode, action classes, audit, personality, vault, episodes. Missing: plugin registry, YAML configuration, SQLite memory, short-term summary, speaker recognition, separation of private and work |
+| 3 Server & operations | ⬜ | Plan and hardware in `SERVER-REBUILD.md`; `hostos.py` started. Missing: Linux test run, PC agent, systemd, secrets, backups to the NAS, watchdog, self-monitoring |
+| 4 HA & energy | ⬜ | Present: rooms/aliases, climate groups, own routines, energy coach, electricity costs, budget. Missing: HA automations by voice, PV forecast, Noah SOC, PromQL from speech with a chart |
+| 5 Proactivity | ⬜ | Present: watchers, quiet hours, priorities, suggestions, morning briefing, phone push, severe weather. Missing: event engine (HA WebSocket, Alertmanager), bundling, output by presence, adjusting notices by voice |
+| 6 Presence & multiroom | ⬜ | Present: speaker per room, Sonos announcements, moving music. Missing: mmWave/CSI fusion, arbitration of several mics, volume per room and time of day |
+| 7 Work assistant | ⬜ | Present: reading IMAP, drafts, CalDAV, research, plans. Missing: M365 Graph, deadline watcher, dictation → document, work memory (decision 1 needed) |
+| 8 HUD | ⬜ | Present: 13 layouts, iPad pairing, state display, graph. Missing: camera streams, Prometheus charts, splitting `app.js` |
+| 9 Network & IT | ⬜ | Present: Pi/NAS/UniFi/Pi-hole, new devices, situation report, updates with a card, `pi_run`. Missing: speaking alerts, asking back about causes, restart after approval |
 
-## Querschnitt
+## Cross-cutting
 
-| Thema | Status | Stand |
+| Topic | Status | State |
 |---|---|---|
-| Tests | 🔄 | 637 Tests grün; `coverage` in `requirements-dev.txt`, noch keine Messung; nie auf Linux gelaufen |
-| Observability | 🔄 | `/metrics` für Anfragen, Dauer, Tokens, Karten, Jobs, Notbetrieb, Werkzeugaufrufe, Log-Fehler und Sprach-Engine; `logs/jarvis.log` als JSON. Prometheus auf dem Pi erreicht den PC nicht; kein Grafana-Dashboard „Jarvis“ |
-| Kostenkontrolle | ⬜ | Tokens je Route im Log, Strombudget vorhanden; kein API-Budget mit Warnung |
-| Datenschutz | 🔄 | Audio lokal, Rohaudio nur im Debug-Modus; Übersicht „welche Daten an welche Cloud“ fehlt als Dokument |
-| Konfiguration | 🔄 | `voice.yaml` als Muster; Rest in `.env` (333 Variablen) und 7 JSON-Dateien. Neu: `JARVIS_LOG_LEVEL`, `JARVIS_LOG_DEBUG`, `JARVIS_LOG_FILE` |
-| Dokumentation | 🔄 | README, ARCHITECTURE, SECURITY, PORTING, UMBAU-SERVER, VOICE-ANALYSE; README je Modul und Anleitung „neue Fähigkeit“ fehlen |
+| Tests | 🔄 | 664 tests green; `coverage` in `requirements-dev.txt`, no measurement yet; never run on Linux |
+| Observability | 🔄 | `/metrics` for requests, duration, tokens, cards, jobs, fallback mode, tool calls, log errors and the voice engine; `logs/jarvis.log` as JSON. Prometheus on the Pi does not reach the PC; no Grafana dashboard "Jarvis" |
+| Cost control | ⬜ | Tokens per route in the log, electricity budget present; no API budget with a warning |
+| Privacy | 🔄 | Audio local, raw audio only in debug mode; an overview "which data goes to which cloud" is missing as a document |
+| Configuration | 🔄 | `voice.yaml` as the model; the rest in `.env` (333 variables) and 7 JSON files. New: `JARVIS_LOG_LEVEL`, `JARVIS_LOG_DEBUG`, `JARVIS_LOG_FILE` |
+| Documentation | 🔄 | README, ARCHITECTURE, SECURITY, PORTING, SERVER-REBUILD, VOICE-ANALYSIS; a README per module and a "new ability" guide are missing |
+| Language | ✅ | English edition (this repository); the German edition is [jarvis-hud-de](https://github.com/Zedas030/jarvis-hud-de) |
 
-## Nächste Schritte (nach Freigabe von Phase 0)
+## Next steps (after approval of phase 0)
 
-1. Entscheidungen 1–7 aus `BESTANDSAUFNAHME.md`; Schlüssel aus Commit `f9f794f` rotieren (Nutzer); Prometheus auf dem Pi an `/metrics` anbinden, sobald der Jarvis-Host erreichbar ist.
-2. Phase 2 Agenten-Kern mit Registry, YAML-Konfiguration, SQLite-Gedächtnis.
-3. Phase 3 Server-Umzug nach `UMBAU-SERVER.md`.
+1. Decisions 1–7 from `INVENTORY.md`; rotate the keys from commit `f9f794f` (user); connect Prometheus on the Pi to `/metrics` as soon as the Jarvis host is reachable.
+2. Phase 2 agent core with registry, YAML configuration, SQLite memory.
+3. Phase 3 server move according to `SERVER-REBUILD.md`.
 
-## Verlauf
+## History
 
-- 02.11.2026 Phase 0 freigegeben, P0 Fundament gebaut (Logging, Metriken, Abhängigkeiten, Tests).
-- 02.11.2026 Phase 0 Bericht erstellt; Phase 1 Kern fertig (Sprach-Engine auf dem Server).
-- 29.10.2026 Server-Umbauplan (`UMBAU-SERVER.md`).
-- 24.10.2026 Portabilitätsprüfung (`PORTING.md`), `hostos.py`.
-- 14.10.2026 Erster Commit.
+- 2026-11-04 English edition: speech, prompts, intents, UI, docs and tests translated; German edition split off.
+- 2026-11-02 Phase 0 approved, P0 foundation built (logging, metrics, dependencies, tests).
+- 2026-11-02 Phase 0 report written; phase 1 core done (voice engine on the server).
+- 2026-10-29 Server rebuild plan (`SERVER-REBUILD.md`).
+- 2026-10-24 Portability review (`PORTING.md`), `hostos.py`.
+- 2026-10-14 First commit.

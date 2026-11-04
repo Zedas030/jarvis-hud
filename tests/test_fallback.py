@@ -130,9 +130,9 @@ class Chain(unittest.TestCase):
         self.assertEqual([n for n, _ in SEEN], ["groq"])
 
     def test_tool_loop_runs_real_jarvis_tool(self):
-        SCRIPT["groq"] = [tool_call("memory_search", {"query": "Anna"}), text("Nichts über Anna gemerkt.")]
-        evs, reply = self.run_chain(["memory"], message="Was weißt du über Anna?")
-        self.assertEqual(reply, "Nichts über Anna gemerkt.")
+        SCRIPT["groq"] = [tool_call("memory_search", {"query": "Anna"}), text("Nothing noted about Anna.")]
+        evs, reply = self.run_chain(["memory"], message="What do you know about Anna?")
+        self.assertEqual(reply, "Nothing noted about Anna.")
         names = {t["function"]["name"] for t in SEEN[0][1]["tools"]}
         self.assertEqual(names, {"memory_search", "memory_read", "memory_save"})
         tool_msg = SEEN[1][1]["messages"][-1]
@@ -146,10 +146,10 @@ class Chain(unittest.TestCase):
         import datetime as dt   # a day to come: a past one is refused before any card is asked for
         soon = f"{dt.date.today() + dt.timedelta(days=30)} 10:00"
         SCRIPT["groq"] = [tool_call("calendar_add", {"title": "Zahnarzt", "start": soon}),
-                          text("Das wurde nicht bestätigt.")]
-        self.run_chain(["calendar"], message="Trag Zahnarzt ein")
+                          text("That was not confirmed.")]
+        self.run_chain(["calendar"], message="Add the dentist")
         result = SEEN[1][1]["messages"][-1]["content"]
-        self.assertTrue("Abgelehnt" in result or "nicht bestätigt" in result, result)
+        self.assertTrue("Refused" in result or "not confirmed" in result, result)
 
     def test_no_handover_after_an_acting_tool(self):
         SCRIPT["groq"] = [tool_call("memory_save", {"note": "Test", "text": "x"}), (503, {"error": "down"}, None)]
@@ -171,17 +171,17 @@ class Chain(unittest.TestCase):
         self.assertEqual(reply.strip(), "6 Wochen, CPU-Temp")
 
     def test_profile_never_reaches_gemini(self):
-        system = ("Du bist JARVIS.\nDer User heißt Max.\n\nWas du über den User weißt:\nProfil:\n- Mail: max@example.org"
-                  "\n\nWeitere Notizen (memory_read): Wissen\n\nJede Nachricht beginnt mit einem <kontext>-Block.")
-        prefix = "<kontext>\nJetzt: x\n\nPassende Notizen:\n- Max mag Golf\n</kontext>"
+        system = ("You are JARVIS.\nThe user's name is Max.\n\nWhat you know about the user:\nProfile:\n- Mail: max@example.org"
+                  "\n\nMore notes (memory_read): Knowledge\n\nEvery message starts with a <context> block.")
+        prefix = "<context>\nNow: x\n\nMatching notes:\n- Max likes golf\n</context>"
         SCRIPT["groq"] = [(429, {}, {"retry-after": "60"})]
         SCRIPT["gemini"] = [text("ok")]
-        list(fallback_llm.run(system, prefix, "Wie wird das Wetter?", ["weather"]))
+        list(fallback_llm.run(system, prefix, "What will the weather be like?", ["weather"]))
         gemini = [b for n, b in SEEN if n == "gemini"][0]
         sent = json.dumps(gemini["messages"], ensure_ascii=False)
         self.assertNotIn("Max", sent)
         self.assertNotIn("max@example.org", sent)
-        self.assertIn("<kontext>-Block", sent)
+        self.assertIn("<context> block", sent)
         groq = [b for n, b in SEEN if n == "groq"][0]
         self.assertIn("max@example.org", json.dumps(groq["messages"], ensure_ascii=False))
 

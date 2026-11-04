@@ -165,7 +165,7 @@ TEST_OVERRIDES = {
 }
 
 
-def make_session(finals=(), partials=(), answer="Das Licht ist aus. Sonst noch etwas?", partials_enabled=False,
+def make_session(finals=(), partials=(), answer="The light is off. Anything else?", partials_enabled=False,
                  speak_stream=None, overrides=None, run_delay=0.0):
     """A Session wired to the fakes. Returns (session, client, shared)."""
     cfg = voice_config.make({**TEST_OVERRIDES, **(overrides or {})})

@@ -52,7 +52,7 @@ flowchart LR
 ```
 
 The target architecture for the planned expansion (plugin registry, YAML configuration, SQLite memory index,
-event engine, Linux server with a PC agent) is drawn in `BESTANDSAUFNAHME.md`, section 9; `ROADMAP.md` tracks
+event engine, Linux server with a PC agent) is drawn in `INVENTORY.md`, section 9; `ROADMAP.md` tracks
 the status of each phase.
 
 ## Request path
@@ -103,7 +103,7 @@ via `Path(__file__).resolve().parents[2]`, never via their own folder.
 | Forecasts | `monitoring.py` (daily values, linear forecast, recurring faults) |
 | Documents | `docsearch.py` (SQLite FTS5 index of shared folders, PDF via pypdf) |
 | Vision | `vision.py` (one screenshot → Claude without tools, card per picture) |
-| Episodes | `episodes.py` (what happened on which day: conversation log, Garmin, notices, incidents, metrics joined by date; local answers for "was habe ich dich gestern zu X gefragt") |
+| Episodes | `episodes.py` (what happened on which day: conversation log, Garmin, notices, incidents, metrics joined by date; local answers for "what did I ask you yesterday about X") |
 | User habits | `user_habits.py` (questions asked at the same time of day → proposal → a job that says the answer by itself or warms the answer cache) |
 | Wellbeing | `wellbeing.py` (Garmin as a trigger: a bad night makes the morning gentle — short briefings, soft notices shown not spoken, softer voice; an early-night hint in the evening) |
 | Departure | `departure.py` (30 min before leaving for an appointment: what still runs at home, thermostats to the away temperature — one prepared "switch_off" proposal, pushed to the phone) |
@@ -112,18 +112,18 @@ via `Path(__file__).resolve().parents[2]`, never via their own folder.
 | Phone | `phone_actions.py` (a proposal with Ja/Nein buttons on the phone; the answer comes back through a Home Assistant helper and counts as the card) |
 | Focus | `focus.py` (focus sessions: notices held, playlist, distraction hint from the active window, summary) |
 | Self-check | `selfcheck.py` (a rephrased question within seconds = a miss of the first answer; feeds reflection and the report) |
-| Voice by the hour | `daytime.py` (late: softer and slower; night: `[whispers]`; "Flüstermodus an/aus") |
+| Voice by the hour | `daytime.py` (late: softer and slower; night: `[whispers]`; "whisper mode on" / "stop whispering") |
 
 ## Data
 
 | Path | What |
 |---|---|
-| `vault/Erinnerungen/` | facts (bullets with provenance), Lernprotokoll, Vorlieben (with "Gelernte Regeln"), Vorschläge, Recherchen, Projekte, Gesundheit |
-| `vault/Gespraeche/` | daily conversation log (work topics redacted) |
-| `vault/Papierkorb/` | expired and forgotten entries, deleted after 30 days |
+| `vault/Memories/` | facts (bullets with provenance), Learning log, Preferences (with "Learned rules"), Suggestions, Research, Projects, Health |
+| `vault/Conversations/` | daily conversation log (work topics redacted) |
+| `vault/Trash/` | expired and forgotten entries, deleted after 30 days |
 | `state.json` | window of recent exchanges (shared by every device: PC, iPad, phone talk to the same server), timers, persona, pause, job stamps, incident state, `habit_jobs`, `wellbeing`, `focus`, `voice_mode`, `phone_action_seen` |
 | `logs/` | `usage.jsonl`, `audit.jsonl`, `proposals.json`, `health_daily.json`, `homelab_*`, `watchlist.json`, `tasks.json`, `metrics_daily.json`, `docindex.sqlite`, `energy_coach.json`, `notices.jsonl` (what Jarvis announced, last 300), `selfcheck.jsonl` (rephrased questions, last 500) |
-| `config/learned.json` | router aliases (after the card), drafts, and `choices` — answers to "Meinen Sie A oder B?" kept per wording |
+| `config/learned.json` | router aliases (after the card), drafts, and `choices` — answers to "Do you mean A or B?" kept per wording |
 | `backups/` | daily vault zip (14 kept) and exports |
 | `config/` | `home.json`, `routines.json`, `homelab.json`, `energy_coach.json`, `profiles.json`, `scripts.json` (+ `.example.json`) |
 

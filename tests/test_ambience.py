@@ -29,10 +29,10 @@ class Classify(unittest.TestCase):
         self.assertEqual(ambience.classify([player("tv", app_name="Netflix", media_title="Dark")])[0], "tv")
 
     def test_sport_wins_and_names_listed(self):
-        kind, names = ambience.classify([player("kueche", friendly_name="Küche", media_content_type="music"),
+        kind, names = ambience.classify([player("kitchen", friendly_name="Kitchen", media_content_type="music"),
                                          player("tv", friendly_name="TV", media_channel="Sky Sport Bundesliga")])
         self.assertEqual(kind, "sport")
-        self.assertEqual(names, ["Küche", "TV"])
+        self.assertEqual(names, ["Kitchen", "TV"])
 
     def test_muted_and_ignored_players_do_not_count(self):
         self.assertEqual(ambience.classify([player("tv", is_volume_muted=True, app_name="DAZN")])[0], "")
@@ -49,10 +49,10 @@ class Status(unittest.TestCase):
         ambience._STATE.update(kind="", players=[], at=0.0)
 
     def test_stale_answer_counts_as_nothing(self):
-        ambience._STATE.update(kind="music", players=["Küche"], at=time.time() - ambience.STALE_S - 1)
+        ambience._STATE.update(kind="music", players=["Kitchen"], at=time.time() - ambience.STALE_S - 1)
         self.assertEqual(ambience.status(), {"kind": "", "players": []})
         ambience._STATE.update(at=time.time())
-        self.assertEqual(ambience.status(), {"kind": "music", "players": ["Küche"]})
+        self.assertEqual(ambience.status(), {"kind": "music", "players": ["Kitchen"]})
 
     def test_no_token_means_nothing_playing(self):
         ambience.step()        # isolate.py clears HA_TOKEN: no request, no sound

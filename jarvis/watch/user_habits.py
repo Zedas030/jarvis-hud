@@ -3,18 +3,18 @@ The user's own habits: what he asks Jarvis at the same time of day, learned from
 (logs/usage.jsonl) — plain counting, 0 tokens.
 
   habits()   questions asked within ±TOLERANCE minutes of the same time on at least MIN_DAYS
-             different days ("Wann muss ich los?" tuesdays around 7:40). Only questions whose
+             different days ("When do I have to leave?" on Tuesdays around 7:40). Only questions whose
              answer is a reading (weather, commute, parcels, mail …) count — switching something
              at the same time every day is house_habits' business (and a routine's).
   proposal   once a week one habit becomes a proposal (proposals.py, kind "habit"): accepted on
              the card, it is a job in state.json → habit_jobs:
                say   a question the local router answers: Jarvis says the answer by himself at
-                     that time ("Pendelzeit heute 24 Minuten, losfahren um 7:55")
+                     that time ("commute today 24 minutes, leave at 7:55")
                warm  a question that needs the model: the answer is fetched a few minutes before
                      and put in the answer cache, so the question itself costs 0 tokens and no wait
   jobs       run by step() (every minute): once per job and day, never in the quiet hours for "say"
 
-"Welche Gewohnheiten kennst du?" lists the jobs, "Vergiss die Gewohnheit …" removes one.
+"Which habits do you know?" lists the jobs, "Forget the habit …" removes one.
 Work topics are skipped before anything is counted (privacy.py).
 """
 import collections
@@ -37,12 +37,12 @@ TOLERANCE = 30                     # minutes around the usual time
 WARM_LEAD_MIN = 3                  # fetch the model's answer this long before the usual time
 READ_HANDLERS = {"weather", "sun", "commute", "parcels", "nas", "pi", "costs", "situation", "coach", "context",
                  "report", "printer", "solar", "alerts", "episodes", "maintenance", "wellbeing", "media"}
-_SKIP_WORDS = re.compile(r"\b(schalt|mach|öffne|starte|spiel|timer|wecker|erinner|lösch|trag|merk|stopp)", re.I)
+_SKIP_WORDS = re.compile(r"\b(switch|turn|open|start|play|timer|alarm|remind|delete|add|remember|stop)", re.I)
 
 
 def _norm(message):
-    t = re.sub(r"[^\wäöüß ]+", " ", (message or "").lower())
-    t = re.sub(r"\b(jarvis|bitte|sir|mal|hey)\b", " ", t)
+    t = re.sub(r"[^\w ]+", " ", re.sub(r"['’]", "", (message or "").lower()))
+    t = re.sub(r"\b(jarvis|please|sir|hey)\b", " ", t)
     return " ".join(t.split())[:70]
 
 
@@ -109,7 +109,7 @@ def habits(rows=None, now=None):
             days_same = len({time.strftime("%Y-%m-%d", time.localtime(u["t"])) for u in near
                              if time.localtime(u["t"]).tm_wday == wd})
             if days_same >= MIN_SAME_WEEKDAY and days_same >= len(dates) - 1:
-                wds = [wd]                              # one weekday: "dienstags"
+                wds = [wd]                              # one weekday: "on Tuesdays"
             elif len(dates) >= MIN_DAYS:
                 wds = list(range(7))                    # most days: daily
             else:
@@ -126,12 +126,12 @@ def habits(rows=None, now=None):
 
 # ── jobs ─────────────────────────────────────────────────────
 
-WEEKDAY_NAMES = ("montags", "dienstags", "mittwochs", "donnerstags", "freitags", "samstags", "sonntags")
+WEEKDAY_NAMES = ("Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays")
 
 
 def _when(weekdays, at):
-    days = "täglich" if len(weekdays) >= 7 else ", ".join(WEEKDAY_NAMES[d] for d in sorted(weekdays))
-    return f"{days} um {int(at[:2])}:{at[3:]}"
+    days = "every day" if len(weekdays) >= 7 else "on " + ", ".join(WEEKDAY_NAMES[d] for d in sorted(weekdays))
+    return f"{days} at {int(at[:2])}:{at[3:]}"
 
 
 def jobs():
@@ -139,20 +139,20 @@ def jobs():
 
 
 def add_job(payload):
-    """Accepted proposal → job. Returns German text."""
+    """Accepted proposal → job. Returns spoken text."""
     job = dict(id=payload.get("key", "")[:70], text=str(payload.get("text", ""))[:120], at=str(payload.get("at", "08:00")),
                weekdays=[int(d) for d in payload.get("weekdays") or range(7)], mode=payload.get("mode") or "say")
     if not job["id"] or not job["text"]:
-        return "Dazu fehlt die Frage."
+        return "The question is missing for that."
 
     def mut(d):
         rest = [j for j in (d.get("habit_jobs") or []) if j.get("id") != job["id"]]
         d["habit_jobs"] = rest + [job]
     commands.update_state(mut)
     if job["mode"] == "say":
-        return f"Eingerichtet: {_when(job['weekdays'], job['at'])} sage ich Ihnen „{job['text']}“ von selbst."
-    return (f"Eingerichtet: {_when(job['weekdays'], job['at'])} hole ich die Antwort auf „{job['text']}“ vorab, "
-            "dann kommt sie sofort und ohne Tokens.")
+        return f"Set up: {_when(job['weekdays'], job['at'])} I will tell you “{job['text']}” on my own."
+    return (f"Set up: {_when(job['weekdays'], job['at'])} I will fetch the answer to “{job['text']}” in advance, "
+            "so it comes instantly and without tokens.")
 
 
 def remove_job(words):
@@ -160,18 +160,18 @@ def remove_job(words):
     keep = [j for j in jobs() if want and want not in _norm(j["text"]) and _norm(j["text"]) not in want]
     gone = len(jobs()) - len(keep)
     if not gone:
-        return "Keine Gewohnheit passt dazu, Sir."
+        return "No habit matches that, Sir."
     commands.update_state(lambda d: d.__setitem__("habit_jobs", keep))
-    return f"Vergessen, Sir. {gone} Gewohnheit(en) gestrichen."
+    return f"Forgotten, Sir. {gone} habit(s) dropped."
 
 
 def describe_jobs():
     js = jobs()
     if not js:
-        return "Ich habe noch keine Ihrer Gewohnheiten übernommen, Sir. Vorschläge dazu mache ich samstags."
-    rows = [f"{_when(j['weekdays'], j['at'])}: „{j['text']}“ ({'sage ich von selbst' if j['mode'] == 'say' else 'hole ich vorab'})"
+        return "I have not taken over any of your habits yet, Sir. I make suggestions for that on Saturdays."
+    rows = [f"{_when(j['weekdays'], j['at'])}: “{j['text']}” ({'I say it on my own' if j['mode'] == 'say' else 'I fetch it in advance'})"
             for j in js]
-    return "Ihre Gewohnheiten, die ich kenne: " + "; ".join(rows) + "."
+    return "Your habits that I know: " + "; ".join(rows) + "."
 
 
 def _mode(route):
@@ -191,13 +191,13 @@ def propose(found=None, now=None):
         mode = _mode(h["route"])
         when = _when(h["weekdays"], h["at"])
         payload = dict(key=h["key"], text=h["text"], at=h["at"], weekdays=h["weekdays"], mode=mode)
-        why = f"Sie haben das an {h['days']} Tagen um diese Zeit gefragt."
-        title = (f"{when.capitalize()} von selbst sagen: „{h['text']}“" if mode == "say"
-                 else f"{when.capitalize()} vorab holen: „{h['text']}“")
+        why = f"You asked this on {h['days']} days around this time."
+        title = (f"{when[:1].upper() + when[1:]} say on my own: “{h['text']}”" if mode == "say"
+                 else f"{when[:1].upper() + when[1:]} fetch in advance: “{h['text']}”")
         pid = proposals.add("habit", title, why, payload, source=f"user_habits:{h['key']}")
-        events.publish("say", f"Sir, mir ist aufgefallen: {why} Soll ich das {when} "
-                              f"{'von selbst sagen' if mode == 'say' else 'vorab holen, damit es sofort kommt'}? "
-                              "Sag einfach ja.", kind="habit")
+        events.publish("say", f"Sir, I noticed: {why} Shall I "
+                              f"{'say it on my own' if mode == 'say' else 'fetch it in advance, so it comes instantly'} {when}? "
+                              "Just say yes.", kind="habit")
         return pid
     return None
 
@@ -240,7 +240,7 @@ def run_job(job, now=None):
         return None
     reply = router.run_local(job["text"])
     if reply:
-        events.publish("say", f"Sir, wie gewohnt: {reply}", kind="habit", key=f"habit:{job['id']}")
+        events.publish("say", f"Sir, as usual: {reply}", kind="habit", key=f"habit:{job['id']}")
     return reply
 
 
@@ -267,9 +267,9 @@ def step(now=None):
 # ── local router ─────────────────────────────────────────────
 
 def handle(n):
-    if re.search(r"\b(welche|was für) gewohnheiten (kennst|weißt|hast) du\b|\bmeine gewohnheiten\b", n):
+    if re.search(r"\b(which|what) habits (do you know|have you got|do you have)\b|\bmy habits\b", n):
         return describe_jobs()
-    m = re.search(r"\b(?:vergiss|streich|lösch\w*) (?:die |meine )?gewohnheit (.+)$", n.strip())
+    m = re.search(r"\b(?:forget|drop|delete|remove) (?:the |my )?habit (.+)$", n.strip())
     if m:
         return remove_job(m.group(1))
     return None

@@ -19,10 +19,10 @@ import morning_echo      # noqa: E402
 import router            # noqa: E402
 import sonos             # noqa: E402
 
-ECHO = "notify.alexa_media_nutzer_echo_dot"
-PROF = {"speakers": {"Wohnzimmer": {"notify": ECHO},
-                     "Schlafzimmer": {"tts": "tts.google", "player": "media_player.sonos"}},
-        "morning_briefing": {"room": "Wohnzimmer", "triggers": ["light.licht", "media_player.nutzer_echo_dot"]}}
+ECHO = "notify.alexa_media_user_echo_dot"
+PROF = {"speakers": {"Living room": {"notify": ECHO},
+                     "Bedroom": {"tts": "tts.google", "player": "media_player.sonos"}},
+        "morning_briefing": {"room": "Living room", "triggers": ["light.lamp", "media_player.user_echo_dot"]}}
 
 
 def prof():
@@ -33,16 +33,16 @@ class EchoOutput(unittest.TestCase):
     def test_echo_is_an_output(self):
         with prof(), mock.patch.object(sonos, "HA_TOKEN", "x"), mock.patch.object(sonos, "SPEAKERS", []):
             self.assertTrue(sonos.configured())
-            self.assertEqual(sonos.label(ECHO), "Echo Wohnzimmer")
+            self.assertEqual(sonos.label(ECHO), "Echo Living room")
             self.assertEqual([s["id"] for s in sonos.status("pc")["speakers"]], [ECHO])
             sonos.set_output("pc", ECHO)
             self.assertEqual(sonos.output_for("pc"), ECHO)
             sonos.set_output("pc", "")
 
     def test_clean_and_pieces(self):
-        self.assertEqual(alexa_voice.clean("[ruhig] **Gut**, Sir… siehe https://x.y/z"), "Gut , Sir. siehe")
-        self.assertEqual(alexa_voice.clean("📦 Amazon: Erde · DHL ✅"), "Amazon: Erde, DHL")
-        long = "Ein Satz mit etwas Inhalt. " * 20
+        self.assertEqual(alexa_voice.clean("[calm] **Good**, Sir… see https://x.y/z"), "Good , Sir. see")
+        self.assertEqual(alexa_voice.clean("📦 Amazon: Soil · DHL ✅"), "Amazon: Soil, DHL")
+        long = "A sentence with some content. " * 20
         parts = alexa_voice.pieces(long)
         self.assertTrue(all(len(p) <= alexa_voice.MAX_CHARS for p in parts))
         self.assertTrue(all(p.endswith(".") for p in parts))
@@ -52,28 +52,28 @@ class EchoOutput(unittest.TestCase):
         sent = []
         with mock.patch("jarvis_mcp._ha", side_effect=lambda path, body: sent.append((path, body))), \
                 mock.patch.object(alexa_voice, "CHARS_PER_S", 1000.0), mock.patch.object(alexa_voice, "LAG_S", 0.05):
-            first = alexa_voice.say(ECHO, "Erster Satz.")
-            second = alexa_voice.say(ECHO, "Zweiter Satz.")
+            first = alexa_voice.say(ECHO, "First sentence.")
+            second = alexa_voice.say(ECHO, "Second sentence.")
             self.assertGreater(second, first)
             time.sleep(second + 0.3)
-        self.assertEqual([b["message"] for _, b in sent], ["Erster Satz.", "Zweiter Satz."])
-        self.assertEqual(sent[0][0], "/api/services/notify/alexa_media_nutzer_echo_dot")
+        self.assertEqual([b["message"] for _, b in sent], ["First sentence.", "Second sentence."])
+        self.assertEqual(sent[0][0], "/api/services/notify/alexa_media_user_echo_dot")
         self.assertEqual(sent[0][1]["data"], {"type": "tts"})
 
     def test_sentences_while_she_speaks_go_out_as_one(self):
         sent = []
         with mock.patch("jarvis_mcp._ha", side_effect=lambda path, body: sent.append(body["message"])),                 mock.patch.object(alexa_voice, "CHARS_PER_S", 1000.0), mock.patch.object(alexa_voice, "LAG_S", 0.3):
-            alexa_voice.say(ECHO, "Eins.")
-            alexa_voice.say(ECHO, "Zwei.")
-            done = alexa_voice.say(ECHO, "Drei.")
+            alexa_voice.say(ECHO, "One.")
+            alexa_voice.say(ECHO, "Two.")
+            done = alexa_voice.say(ECHO, "Three.")
             time.sleep(done + 0.3)
-        self.assertEqual(sent, ["Eins.", "Zwei. Drei."])
+        self.assertEqual(sent, ["One.", "Two. Three."])
 
     def test_stop_drops_what_waits(self):
         sent = []
         with mock.patch("jarvis_mcp._ha", side_effect=lambda path, body: sent.append(body)):
             alexa_voice._BUSY[ECHO] = time.time() + 5             # Alexa still speaks the sentence before
-            alexa_voice.say(ECHO, "Gleich.")
+            alexa_voice.say(ECHO, "In a moment.")
             alexa_voice.stop(ECHO)
             time.sleep(0.2)
         self.assertEqual(sent, [])
@@ -83,7 +83,7 @@ class EchoOutput(unittest.TestCase):
         sent = []
         with prof(), mock.patch("jarvis_mcp._ha", side_effect=lambda path, body: sent.append((path, body))):
             alexa_voice.stop(ECHO, hard=True)
-        self.assertEqual(sent, [("/api/services/media_player/media_stop", {"entity_id": "media_player.nutzer_echo_dot"})])
+        self.assertEqual(sent, [("/api/services/media_player/media_stop", {"entity_id": "media_player.user_echo_dot"})])
 
 
 class Morning(unittest.TestCase):
@@ -92,22 +92,22 @@ class Morning(unittest.TestCase):
         commands.update_state(lambda d: d.pop("briefing_day", None))
 
     def st(self, light="off", called="1"):
-        return [{"entity_id": "light.licht", "state": light},
-                {"entity_id": "media_player.nutzer_echo_dot", "state": "idle",
+        return [{"entity_id": "light.lamp", "state": light},
+                {"entity_id": "media_player.user_echo_dot", "state": "idle",
                  "attributes": {"last_called_timestamp": called}}]
 
     def test_triggers(self):
         last = {}
-        trig = ["light.licht", "media_player.nutzer_echo_dot"]
+        trig = ["light.lamp", "media_player.user_echo_dot"]
         self.assertIsNone(morning_echo.triggered(self.st(), trig, last))          # first look only
         self.assertIsNone(morning_echo.triggered(self.st(), trig, last))
-        self.assertEqual(morning_echo.triggered(self.st("on"), trig, last), "light.licht")
+        self.assertEqual(morning_echo.triggered(self.st("on"), trig, last), "light.lamp")
         self.assertIsNone(morning_echo.triggered(self.st("on"), trig, last))
-        self.assertEqual(morning_echo.triggered(self.st("on", "2"), trig, last), "media_player.nutzer_echo_dot")
+        self.assertEqual(morning_echo.triggered(self.st("on", "2"), trig, last), "media_player.user_echo_dot")
 
     def test_once_a_morning_and_counts_as_briefing(self):
         now = dt.datetime(2026, 10, 29, 7, 10)
-        with prof(), mock.patch.object(morning_echo, "text", return_value="Guten Morgen, Sir.") as text, \
+        with prof(), mock.patch.object(morning_echo, "text", return_value="Good morning, Sir.") as text, \
                 mock.patch.object(morning_echo, "_speak") as speak, mock.patch.object(morning_echo, "ECHO_WAIT_S", 0):
             morning_echo.check(self.st(), now)
             morning_echo.check(self.st("on"), now)
@@ -115,7 +115,7 @@ class Morning(unittest.TestCase):
             morning_echo.check(self.st("on"), now)
             time.sleep(0.2)
         self.assertEqual(speak.call_count, 1)
-        speak.assert_called_with("Wohnzimmer", "Guten Morgen, Sir.")
+        speak.assert_called_with("Living room", "Good morning, Sir.")
         self.assertEqual(commands.load()["briefing_day"], "2026-10-29")
         text.assert_called_once()
 
@@ -127,21 +127,21 @@ class Morning(unittest.TestCase):
 
     def test_agenda_with_parcel(self):
         today = dt.datetime.combine(dt.date.today(), dt.time(9, 30))
-        evts = [{"start": today, "allday": True, "title": "📦 Amazon: Erde · DHL"},
-                {"start": today, "title": "Zahnarzt"}]
+        evts = [{"start": today, "allday": True, "title": "📦 Amazon: Soil · DHL"},
+                {"start": today, "title": "Dentist"}]
         with mock.patch("icloud_calendar.configured", return_value=True),                 mock.patch("icloud_calendar.events", return_value=evts):
-            self.assertEqual(morning_echo._agenda(), "Heute kommt ein Paket von Amazon. Termine: um 9:30 Zahnarzt.")
+            self.assertEqual(morning_echo._agenda(), "Today a parcel arrives from Amazon. Appointments: at 9:30 Dentist.")
 
     def test_text(self):
-        with mock.patch.object(morning_echo, "_weather", return_value="Heute teils bewölkt, 5 bis 12 Grad"), \
+        with mock.patch.object(morning_echo, "_weather", return_value="Today partly cloudy, 5 to 12 degrees"), \
                 mock.patch.object(morning_echo, "_alerts", return_value=""), \
-                mock.patch.object(morning_echo, "_agenda", return_value="Termine: um 9:30 Zahnarzt."), \
-                mock.patch.object(morning_echo, "_coach", side_effect=RuntimeError("weg")), \
+                mock.patch.object(morning_echo, "_agenda", return_value="Appointments: at 9:30 Dentist."), \
+                mock.patch.object(morning_echo, "_coach", side_effect=RuntimeError("gone")), \
                 mock.patch.object(morning_echo, "_night", return_value=""), \
-                mock.patch.object(morning_echo, "_mail", return_value="Sie haben 2 ungelesene Mails."), \
+                mock.patch.object(morning_echo, "_mail", return_value="You have 2 unread mails."), \
                 mock.patch("jarvis_profile.USER_NAME", ""):
-            self.assertEqual(morning_echo.text(), "Guten Morgen, Sir. Heute teils bewölkt, 5 bis 12 Grad. "
-                                                  "Termine: um 9:30 Zahnarzt. Sie haben 2 ungelesene Mails.")
+            self.assertEqual(morning_echo.text(), "Good morning, Sir. Today partly cloudy, 5 to 12 degrees. "
+                                                  "Appointments: at 9:30 Dentist. You have 2 unread mails.")
 
 
 def dev(eid, name, words=None):
@@ -151,15 +151,15 @@ def dev(eid, name, words=None):
 
 
 class FollowUp(unittest.TestCase):
-    DEVS = [dev("light.licht", "LED", ["wohnzimmer", "licht"]), dev("switch.tv", "TV"),
-            dev("switch.tv_schlafzimmer", "TV Schlafzimmer")]
+    DEVS = [dev("light.lamp", "LED", ["living", "room", "light"]), dev("switch.tv", "TV"),
+            dev("switch.tv_bedroom", "TV bedroom")]
 
     def setUp(self):
         self.saved = dict(router._DEV)
         router._DEV.update(at=time.time() + 10 ** 9, list=self.DEVS)
         router._SWITCHED.update(devs=[], service="", at=0.0)
         self.calls = []
-        self.p = mock.patch("jarvis_mcp._home", side_effect=lambda tool, a: self.calls.append(a) or "Erledigt.")
+        self.p = mock.patch("jarvis_mcp._home", side_effect=lambda tool, a: self.calls.append(a) or "Done.")
         self.p.start()
         self.lp = mock.patch("learning.alias", return_value=None)
         self.lp.start()
@@ -173,37 +173,37 @@ class FollowUp(unittest.TestCase):
         return router._local(text, router.LOCAL_HANDLERS)
 
     def test_nothing_without_a_switch_before(self):
-        self.assertIsNone(router._followup("heller"))
+        self.assertIsNone(router._followup("brighter"))
 
     def test_brighter_then_off(self):
-        reply, h = self.run_("Licht im Wohnzimmer an")
+        reply, h = self.run_("Light in the living room on")
         self.assertEqual(h, "home")
-        reply, h = self.run_("Etwas heller bitte")
+        reply, h = self.run_("A bit brighter please")
         self.assertEqual(h, "followup")
-        self.assertEqual(self.calls[-1], {"entity_id": "light.licht", "service": "turn_on",
+        self.assertEqual(self.calls[-1], {"entity_id": "light.lamp", "service": "turn_on",
                                           "data": {"brightness_step_pct": 25}})
-        self.run_("dunkler")
+        self.run_("darker")
         self.assertEqual(self.calls[-1]["data"], {"brightness_step_pct": -25})
-        self.run_("auf 30 Prozent")
+        self.run_("to 30 percent")
         self.assertEqual(self.calls[-1]["data"], {"brightness_pct": 30})
-        reply, _ = self.run_("Und wieder aus")
+        reply, _ = self.run_("And off again")
         self.assertEqual(self.calls[-1]["service"], "turn_off")
-        self.assertIn("LED ist aus", reply)
+        self.assertIn("LED is off", reply)
 
     def test_other_room_too(self):
-        self.run_("Schalte den TV an")
+        self.run_("Turn the TV on")
         self.assertEqual(self.calls[-1]["entity_id"], "switch.tv")
-        reply, h = self.run_("Und im Schlafzimmer auch")
-        self.assertEqual(self.calls[-1], {"entity_id": "switch.tv_schlafzimmer", "service": "turn_on", "data": {}})
+        reply, h = self.run_("And in the bedroom too")
+        self.assertEqual(self.calls[-1], {"entity_id": "switch.tv_bedroom", "service": "turn_on", "data": {}})
 
     def test_too_late(self):
-        self.run_("Licht im Wohnzimmer an")
+        self.run_("Light in the living room on")
         router._SWITCHED["at"] -= router.FOLLOW_S + 1
-        self.assertIsNone(router._followup("heller"))
+        self.assertIsNone(router._followup("brighter"))
 
     def test_protected_not_off(self):
         router._SWITCHED.update(devs=[dev("switch.router", "Router")], service="turn_on", at=time.time())
-        self.assertIsNone(router._followup("wieder aus"))
+        self.assertIsNone(router._followup("off again"))
 
 
 
@@ -211,13 +211,13 @@ class GolfIsNotAlwaysWeather(unittest.TestCase):
     def test_weather_questions_only(self):
         fc = {"daily": {"weather_code": [3, 3], "temperature_2m_max": [12, 12], "temperature_2m_min": [5, 5],
                         "precipitation_probability_max": [10, 10], "wind_speed_10m_max": [10, 10]}}
-        with mock.patch.object(router, "_forecast", return_value=fc),                 mock.patch.object(router, "_dash", return_value={"golf": "ja", "golf_day": "morgen"}):
-            for asks in ("Kann ich morgen Golf spielen?", "Wie ist das Golfwetter morgen?", "Golf heute?",
-                         "Lohnt sich Golf morgen?"):
+        with mock.patch.object(router, "_forecast", return_value=fc),                 mock.patch.object(router, "_dash", return_value={"golf": "yes", "golf_day": "tomorrow"}):
+            for asks in ("Can I play golf tomorrow?", "What is the golf weather like tomorrow?", "Golf today?",
+                         "Is golf worth it tomorrow?"):
                 self.assertTrue(router._weather(router._norm(asks)), asks)
-            for talk in ("Ich habe morgen Trainerstunde. Golf, was empfiehlst du mir?",
-                         "Ich habe morgen eine Trainerstunde zum Golfen. Was würdest du mir empfehlen?",
-                         "Ich habe mir neue Golfschläger gekauft, Ping G440, was hältst du davon?"):
+            for talk in ("I have a lesson with the coach tomorrow. Golf, what do you recommend?",
+                         "Tomorrow I have a golf lesson with the coach. What would you recommend to me?",
+                         "I bought new golf clubs, Ping G440, what do you think of them?"):
                 self.assertIsNone(router._weather(router._norm(talk)), talk)
 
 

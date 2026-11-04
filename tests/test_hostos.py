@@ -102,11 +102,11 @@ class NoteNames(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("---\ntype: wissen\n---\n\n- alt\n", encoding="utf-8")
         self.addCleanup(lambda: path.exists() and path.unlink())
-        jarvis_mcp.call_tool("memory_save", {"note": "testnotiz hostos", "text": "Neuer Eintrag zum Testen",
+        jarvis_mcp.call_tool("memory_save", {"note": "test note hostos", "text": "New entry for testing",
                                              "quelle": "gesagt"})
-        same = [p for p in memory.MEMORY_DIR.glob("*.md") if p.stem.lower() == "testnotiz hostos"]
+        same = [p for p in memory.MEMORY_DIR.glob("*.md") if p.stem.lower() == "test note hostos"]
         self.assertEqual(len(same), 1)
-        self.assertIn("Neuer Eintrag zum Testen", same[0].read_text(encoding="utf-8"))
+        self.assertIn("New entry for testing", same[0].read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

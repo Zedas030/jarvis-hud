@@ -1,5 +1,5 @@
 """Move the given unread mails (matched by sender substring) into the trash folder.
-Nothing is deleted permanently: mails are moved to the trash folder ("Papierkorb")."""
+Nothing is deleted permanently: mails are moved to the trash folder ("Trash", or "Papierkorb" on German servers)."""
 import imaplib, os, re, sys
 from pathlib import Path
 
@@ -21,7 +21,7 @@ for raw in box.list()[1]:
         trash = name
         break
 if not trash:
-    sys.exit("Kein Papierkorb-Ordner gefunden.")
+    sys.exit("No trash folder found.")
 
 box.select("INBOX")
 moved = 0
@@ -34,5 +34,5 @@ for uid in box.uid("search", None, "UNSEEN")[1][0].split():
             box.uid("STORE", uid, "+FLAGS", "(\\Deleted)")
             box.expunge()
         moved += 1
-print(f"{moved} Mails nach '{trash}' verschoben.")
+print(f"{moved} mails moved to '{trash}'.")
 box.logout()

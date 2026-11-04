@@ -10,7 +10,7 @@ Small signal helpers of the voice engine, all on 16-bit PCM bytes.
                                    optional speexdsp echo canceller when the package is there
   estimate_delay(ref, mic, rate)   cross-correlation: how many ms later the speaker's sound arrives
 
-Rauschunterdrückung: RNNoise/DeepFilterNet are not wired in yet — Silero VAD copes with room noise
+Noise suppression: RNNoise/DeepFilterNet are not wired in yet — Silero VAD copes with room noise
 and the browser already applies its own suppression. The hook is `denoise()`; it returns the frame
 unchanged unless a denoiser was registered.
 """

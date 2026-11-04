@@ -11,12 +11,12 @@ Energy coach: when is solar power left over, and what is worth running then — 
 Rarely used plugs: a plug that is off the first time the coach sees it counts as rarely used
 (the user switches such plugs — the boiler — on only now and then) and is never suggested.
 It counts as used again after JARVIS_COACH_REUSE_DAYS (2) days of use within two weeks; a plug
-not switched on for 14 days becomes rare. What the user says ("den Boiler nutze ich oft")
+not switched on for 14 days becomes rare. What the user says ("I use the boiler often")
 overrides both and stays.
 
   advise(...)   pure: the numbers and the best window, from states, memory and forecast
   report()      the spoken answer for the router and the energy_coach tool
-  set_usage()   "nutze ich oft/selten" for one plug
+  set_usage()   "I use it often/rarely" for one plug
   step()        background: learn, calibrate in the evening, announce a surplus once a day
 
 Also kept for other modules: each plug's lowest draw per day while switched on (standby, power_costs.py)
@@ -39,9 +39,10 @@ STATE = pathlib.Path(os.environ.get("JARVIS_ENERGY_COACH_STATE", ROOT / "logs" /
 CONFIG = pathlib.Path(os.environ.get("JARVIS_ENERGY_COACH_CONFIG", ROOT / "config" / "energy_coach.json"))
 ENABLED = os.environ.get("JARVIS_ENERGY_COACH", "1").strip() not in ("0", "false", "no", "off")
 EVERY = int(os.environ.get("JARVIS_ENERGY_COACH_SECONDS", "300"))
-POWER_SUFFIX = os.environ.get("JARVIS_PLUG_POWER_SUFFIX", "_derzeitiger_verbrauch")
-DAY_SUFFIX = os.environ.get("JARVIS_PLUG_DAY_SUFFIX", "_heutiger_verbrauch")
-HOUSE = os.environ.get("JARVIS_HOUSE_POWER", "sensor.hausverbrauch")
+# entity ids as Home Assistant names them in English (a German HA: _derzeitiger_verbrauch, _heutiger_verbrauch)
+POWER_SUFFIX = os.environ.get("JARVIS_PLUG_POWER_SUFFIX", "_current_consumption")
+DAY_SUFFIX = os.environ.get("JARVIS_PLUG_DAY_SUFFIX", "_today_s_consumption")
+HOUSE = os.environ.get("JARVIS_HOUSE_POWER", "sensor.house_consumption")
 REUSE_DAYS = int(os.environ.get("JARVIS_COACH_REUSE_DAYS", "2"))
 IDLE_DAYS = 14                 # not switched on for this long = rarely used
 USED_KWH, RUN_W = 0.05, 10     # a day counts as used from 50 Wh; a plug is running from 10 W
@@ -85,8 +86,8 @@ def _num(v):
         return None
 
 
-def _de(x, digits=1):
-    return f"{x:.{digits}f}".replace(".", ",")
+def _fmt(x, digits=1):
+    return f"{x:.{digits}f}"
 
 
 def _day(now):
@@ -117,14 +118,14 @@ def _recent(days, now, span=IDLE_DAYS):
 
 
 def learn(mem, found, now):
-    """Updates the plug memory; returns [(name, 'selten'|'genutzt')] for plugs that changed."""
+    """Updates the plug memory; returns [(name, 'rare'|'used')] for plugs that changed."""
     today, changed = _day(now), []
     for eid, p in found.items():
         d = mem["devices"].get(eid)
         if d is None:
             d = mem["devices"][eid] = dict(name=p["name"], first_seen=today, used_days=[], watts=[], day_kwh={},
                                            rare=not p["on"], by="auto",
-                                           why="war aus, als ich die Steckdosen kennengelernt habe" if not p["on"] else "")
+                                           why="was off when I first got to know the sockets" if not p["on"] else "")
         d["name"] = p["name"]
         if p["on"]:
             d["last_on"] = today
@@ -142,11 +143,11 @@ def learn(mem, found, now):
         if d.get("by") == "user":
             continue                                   # what the user said stays
         if d["rare"] and len(_recent(d["used_days"], now)) >= REUSE_DAYS:
-            d.update(rare=False, why="wird wieder regelmäßig genutzt")
-            changed.append((d["name"], "genutzt"))
+            d.update(rare=False, why="used regularly again")
+            changed.append((d["name"], "used"))
         elif not d["rare"] and not p["on"] and (d.get("last_on") or d["first_seen"]) < _day(now - dt.timedelta(days=IDLE_DAYS)):
-            d.update(rare=True, why=f"seit über {IDLE_DAYS} Tagen nicht eingeschaltet")
-            changed.append((d["name"], "selten"))
+            d.update(rare=True, why=f"not switched on for more than {IDLE_DAYS} days")
+            changed.append((d["name"], "rare"))
     return changed
 
 
@@ -158,7 +159,7 @@ def typical(d):
 
 
 def _match(word, mem):
-    """The plug whose name fits a spoken word ('Boiler' → 'Küche Boiler')."""
+    """The plug whose name fits a spoken word ('boiler' → 'Kitchen Boiler')."""
     w = _norm(word)
     hits = [eid for eid, d in mem["devices"].items() if w and (w in _norm(d["name"]) or _norm(d["name"]) in w)]
     return hits[0] if len(hits) == 1 else None
@@ -170,18 +171,18 @@ def _norm(s):
 
 
 def set_usage(word, often):
-    """'nutze ich oft/selten' for one plug; the user's word overrides what the coach learned."""
+    """'I use it often/rarely' for one plug; the user's word overrides what the coach learned."""
     with _LOCK:
         mem = load()
         eid = _match(word, mem)
         if not eid:
-            known = ", ".join(sorted(d["name"] for d in mem["devices"].values())) or "noch keine"
-            return f"Welche Steckdose meinst du mit „{word}“? Ich kenne: {known}."
+            known = ", ".join(sorted(d["name"] for d in mem["devices"].values())) or "none yet"
+            return f"Which socket do you mean by “{word}”? I know: {known}."
         d = mem["devices"][eid]
-        d.update(rare=not often, by="user", why="so gesagt" if often else "selten genutzt, so gesagt")
+        d.update(rare=not often, by="user", why="said so" if often else "rarely used, said so")
         save(mem)
-    return (f"Gemerkt: {d['name']} nutzt du {'oft' if often else 'selten'} — "
-            + ("ich schlage sie bei Sonnenüberschuss wieder vor." if often else "ich schlage sie nicht mehr vor."))
+    return (f"Noted: you use {d['name']} {'often' if often else 'rarely'} — "
+            + ("I will suggest it again when there is solar surplus." if often else "I will not suggest it any more."))
 
 
 # ── forecast ─────────────────────────────────────────────────
@@ -292,35 +293,35 @@ def _fits(cands, kwh):
 
 def _names(cands):
     labels = [c["label"] for c in cands]
-    return labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " oder " + labels[-1] if labels else ""
+    return labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " or " + labels[-1] if labels else ""
 
 
 def say(a, detail=True):
     parts = []
     if a["soc"] is not None:
-        parts.append(f"Akku {round(a['soc'])} Prozent, Sonne gerade {round(a['solar'])} Watt"
-                     + (f", das Haus braucht {round(a['house'])}" if a["house"] is not None else "") + ".")
+        parts.append(f"Battery {round(a['soc'])} percent, sun right now {round(a['solar'])} watts"
+                     + (f", the house needs {round(a['house'])}" if a["house"] is not None else "") + ".")
     if a["spill_now"] >= MIN_SPILL_W:
         fit = _fits(a["cands"], 99)
-        parts.append(f"Jetzt ist {round(a['spill_now'])} Watt Überschuss da, der Akku ist voll"
-                     + (f" — ein guter Moment für {_names(fit)}." if fit else "."))
+        parts.append(f"There are {round(a['spill_now'])} watts of surplus right now, the battery is full"
+                     + (f" — a good moment for {_names(fit)}." if fit else "."))
     kwh, h1, h2 = a["today"]
     if kwh >= 0.3:
         fit = _fits(a["cands"], kwh)
-        parts.append(f"Heute zwischen {h1} und {h2} Uhr bleiben etwa {_de(kwh)} Kilowattstunden übrig, wenn der Akku voll ist"
-                     + (f" — passend für {_names(fit)}." if fit else "."))
+        parts.append(f"Today between {h1}:00 and {h2}:00 about {_fmt(kwh)} kilowatt hours are left over once the battery is full"
+                     + (f" — right for {_names(fit)}." if fit else "."))
     else:
-        parts.append(f"Heute kommt noch etwa {_de(a['pv_today'])} Kilowattstunden Sonne — "
-                     + ("das geht in den Akku, Überschuss gibt es nicht." if a["pv_today"] >= 0.2 else "praktisch nichts."))
+        parts.append(f"Today about {_fmt(a['pv_today'])} more kilowatt hours of sun are coming — "
+                     + ("that goes into the battery, there is no surplus." if a["pv_today"] >= 0.2 else "practically nothing."))
     kwh2, t1, t2 = a["tomorrow"]
     if kwh2 >= 0.3:
         fit = _fits(a["cands"], kwh2)
-        parts.append(f"Morgen sieht es besser aus: zwischen {t1} und {t2} Uhr etwa {_de(kwh2)} Kilowattstunden Überschuss"
-                     + (f", gut für {_names(fit)}." if fit else "."))
+        parts.append(f"Tomorrow looks better: between {t1}:00 and {t2}:00 about {_fmt(kwh2)} kilowatt hours of surplus"
+                     + (f", good for {_names(fit)}." if fit else "."))
     elif detail:
-        parts.append("Morgen gibt es voraussichtlich auch keinen Überschuss.")
+        parts.append("Tomorrow there will probably be no surplus either.")
     if detail and a["rare"]:
-        parts.append("Nicht vorgeschlagen, weil selten genutzt: " + ", ".join(a["rare"]) + ".")
+        parts.append("Not suggested because rarely used: " + ", ".join(a["rare"]) + ".")
     return " ".join(parts)
 
 
@@ -332,7 +333,7 @@ def _states():
 def report(detail=True):
     states = _states()
     if not states:
-        return "Ohne Home Assistant kann ich gerade keinen Energie-Tipp geben."
+        return "Without Home Assistant I cannot give an energy tip right now."
     mem, cfg = load(), config()
     try:
         fc = forecast()
@@ -352,8 +353,8 @@ def morning_line():
     if kwh < 0.3:
         return ""
     fit = _fits(a["cands"], kwh)
-    return (f"Energie-Coach: heute zwischen {h1} und {h2} Uhr etwa {_de(kwh)} kWh Sonnenüberschuss"
-            + (f", gut für {_names(fit)}." if fit else "."))
+    return (f"Energy coach: today between {h1}:00 and {h2}:00 about {_fmt(kwh)} kWh of solar surplus"
+            + (f", good for {_names(fit)}." if fit else "."))
 
 
 # ── background ───────────────────────────────────────────────
@@ -366,8 +367,8 @@ def surplus_notice(a, mem, now, quiet, cfg):
     if mem["streak"] < 2 or mem["announced"] == _day(now) or quiet or not h0 <= now.hour < h1 or not fit:
         return None
     mem["announced"] = _day(now)
-    return (f"Sir, der Akku ist voll und die Sonne liefert gerade {round(a['spill_now'])} Watt mehr, als das Haus braucht. "
-            f"Ein guter Moment für {_names(fit)}.")
+    return (f"Sir, the battery is full and the sun is delivering {round(a['spill_now'])} watts more than the house needs. "
+            f"A good moment for {_names(fit)}.")
 
 
 def step():

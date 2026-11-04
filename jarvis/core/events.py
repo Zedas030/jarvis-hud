@@ -5,7 +5,7 @@ Timers, reminders, the wake word and the watchers publish here; the HUD keeps
 one EventSource open and speaks what arrives. Nothing here costs tokens.
 
 Event kinds:
-  say     something Jarvis says by himself ("Die Waschmaschine ist fertig")
+  say     something Jarvis says by himself ("The washing machine is done")
   alarm   a timer, alarm clock or reminder — rings, then speaks
   wake    the wake word was heard (wakeword.py)
   timers  the current list of timers, for the countdown in the top bar
@@ -18,7 +18,7 @@ the next connect, so an alarm does not vanish because the tab was reloading.
 
 Every `say` and `alarm` is also appended to a small notice log (JARVIS_NOTICES,
 logs/notices.jsonl, the last NOTICES_KEEP), because the event list itself only
-lasts half an hour — "Willkommen zurück" sums up what came while the user was out.
+lasts half an hour — "welcome back" sums up what came while the user was out.
 """
 import datetime as dt
 import itertools
@@ -47,7 +47,7 @@ CLIENTS = [0]
 def quiet_now(now=None):
     """True inside the quiet hours. '22-7' wraps over midnight, '' or 'off' = never."""
     spec = QUIET_HOURS.lower()
-    if not spec or spec in ("0", "off", "aus", "none"):
+    if not spec or spec in ("0", "off", "none"):
         return False
     try:
         start, end = (int(x) for x in spec.split("-", 1))
@@ -127,7 +127,7 @@ def notices_since(ts):
 
 
 def _norm(text):
-    """Same notice regardless of numbers that tick ('seit 5' vs 'seit 10 Minuten') and case."""
+    """Same notice regardless of numbers that tick ('for 5' vs 'for 10 minutes') and case."""
     return " ".join("".join(c for c in (text or "").lower() if not c.isdigit()).split())
 
 

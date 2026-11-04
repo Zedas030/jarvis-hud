@@ -32,23 +32,22 @@ TYPE_COLOURS = {
     "sop":      "#ff8c42",
     "brief":    "#cbd6e4",
     "campaign": "#dfe8f3",
-    "erinnerung": "#5fe4ff",
-    "gespraech": "#7d8da3",
-    "profil":   "#ffd84d",
+    "memory":   "#5fe4ff",
+    "conversation": "#7d8da3",
+    "profile":  "#ffd84d",
     "website":  "#4c9bff",
-    "befehl":   "#ff8c42",
-    "vorliebe": "#ff6ba6",
-    "termin":   "#2ed99b",
-    "projekt":  "#5f7cff",
-    "wissen":   "#cbd6e4",
-    "golfrunde": "#7bd88f",
+    "command":  "#ff8c42",
+    "preference": "#ff6ba6",
+    "appointment": "#2ed99b",
+    "knowledge": "#cbd6e4",
+    "golf round": "#7bd88f",
 }
 
 # Long-term memory JARVIS writes itself (one note per fact/topic), and the
 # conversation diary the server appends to after every turn.
-MEMORY_DIR = VAULT / "Erinnerungen"
-DIARY_DIR = VAULT / "Gespraeche"
-TRASH_DIR = VAULT / "Papierkorb"
+MEMORY_DIR = VAULT / "Memories"
+DIARY_DIR = VAULT / "Conversations"
+TRASH_DIR = VAULT / "Trash"
 DIARY_KEEP_DAYS = int(os.environ.get("JARVIS_DIARY_DAYS", "30"))   # diary -> trash after
 TRASH_KEEP_DAYS = int(os.environ.get("JARVIS_TRASH_DAYS", "30"))   # trash -> deleted after
 
@@ -61,8 +60,8 @@ def _notes():
 
 
 def note_path(name):
-    """The note `name` ("Vorlieben", "Projekte/Umzug") under MEMORY_DIR. An existing one is found
-    whatever its case: Windows does not tell "vorlieben" from "Vorlieben", Linux would start a
+    """The note `name` ("Preferences", "Projects/Move") under MEMORY_DIR. An existing one is found
+    whatever its case: Windows does not tell "preferences" from "Preferences", Linux would start a
     second note."""
     path = MEMORY_DIR / f"{name}.md"
     if path.exists() or not MEMORY_DIR.exists():
@@ -130,9 +129,9 @@ def build_graph(force=False):
                     tags=[t.strip() for t in (meta.get("tags") or "").split(",") if t.strip()],
                     updated=meta.get("updated", ""),
                     snippet=snippet, degree=0,
-                    # Home-Assistant-Entitäten für lebendige Sterne (siehe briefing.live)
-                    online=meta.get("online", ""), pegel=meta.get("pegel", ""),
-                    groesse=meta.get("groesse", ""),   # extra radius for a hand-picked star
+                    # Home Assistant entities for live stars (see briefing.live)
+                    online=meta.get("online", ""), level=meta.get("level", ""),
+                    size=meta.get("size", ""),   # extra radius for a hand-picked star
                 )
                 by_title[key] = key
                 for target in WIKILINK.findall(body):
@@ -222,16 +221,16 @@ def _strip_tags(text):
 
 # Device notes and single golf rounds are many and small; they are looked up
 # on demand instead of riding along in every system prompt.
-ON_DEMAND_DIRS = {"netzwerk-geräte", "golfrunden"}
+ON_DEMAND_DIRS = {"network-devices", "golf rounds"}
 
 
 def core_memory(limit_chars=6000):
-    """Every note in Erinnerungen/ (the profile first), in full. These are small,
+    """Every note in Memories/ (the profile first), in full. These are small,
     curated facts, so JARVIS gets all of them on every turn instead of a
     keyword-matched excerpt. Whatever does not fit is listed by name only."""
     if not MEMORY_DIR.exists():
         return ""
-    rank = {"hoch": 0, "mittel": 1, "niedrig": 2}
+    rank = {"high": 0, "medium": 1, "low": 2}
     entries, later = [], []
     for path in MEMORY_DIR.rglob("*.md"):
         if path.parent.name.lower() in ON_DEMAND_DIRS:
@@ -241,8 +240,8 @@ def core_memory(limit_chars=6000):
             meta, body = _parse_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
         except OSError:
             continue
-        entries.append((path.stem.lower() != "profil",
-                        rank.get(meta.get("wichtigkeit", "mittel").lower(), 1),
+        entries.append((path.stem.lower() != "profile",
+                        rank.get(meta.get("importance", "medium").lower(), 1),
                         -path.stat().st_mtime, path, body))
     out, used = [], 0
     for *_, path, body in sorted(entries, key=lambda e: e[:3]):
@@ -255,7 +254,7 @@ def core_memory(limit_chars=6000):
         used += len(chunk)
     if later:
         names = ", ".join(sorted(str(p.relative_to(MEMORY_DIR).with_suffix("")) for p in later))
-        out.append(f"### Weitere Notizen (bei Bedarf mit Read aus {MEMORY_DIR} lesen)\n{names}")
+        out.append(f"### More notes (read them from {MEMORY_DIR} with Read when needed)\n{names}")
     return "\n\n".join(out)
 
 
@@ -267,15 +266,15 @@ def log_turn(user_text, reply_text):
         return
     import privacy
     if privacy.is_work(user_text, reply):          # work stays out of the vault
-        user_text, reply = "(Arbeitsthema, nicht protokolliert)", "(nicht protokolliert)"
+        user_text, reply = "(work topic, not logged)", "(not logged)"
     DIARY_DIR.mkdir(parents=True, exist_ok=True)
     day = time.strftime("%Y-%m-%d")
-    path = DIARY_DIR / f"Gespräch {day}.md"
+    path = DIARY_DIR / f"Conversation {day}.md"
     new = not path.exists()
     with path.open("a", encoding="utf-8") as fh:
         if new:
-            fh.write(f"---\ntype: gespraech\nupdated: {day}\n---\n\n# Gespräch {day}\n\n"
-                     "Automatisches Protokoll. Verknüpft mit [[Profil]].\n")
+            fh.write(f"---\ntype: conversation\nupdated: {day}\n---\n\n# Conversation {day}\n\n"
+                     "Automatic log. Linked to [[Profile]].\n")
         fh.write(f"\n**{time.strftime('%H:%M')} · {_user_label()}:** {user_text.strip()}\n\n"
                  f"**Jarvis:** {reply}\n")
 
@@ -297,9 +296,9 @@ def recent_turns(max_chars=1200):
 
 
 def housekeeping():
-    """Forget on purpose. Expired memories (frontmatter `ablauf:` in the past) and
+    """Forget on purpose. Expired memories (frontmatter `expires:` in the past) and
     diary days older than DIARY_KEEP_DAYS move to the trash; trash older than
-    TRASH_KEEP_DAYS is deleted. Durable facts live in Erinnerungen/ and stay."""
+    TRASH_KEEP_DAYS is deleted. Durable facts live in Memories/ and stay."""
     import shutil
     today = time.strftime("%Y-%m-%d")
     moved, deleted = [], 0
@@ -319,8 +318,8 @@ def housekeeping():
                 meta, _ = _parse_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
             except OSError:
                 continue
-            ablauf = (meta.get("ablauf") or "").strip()
-            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", ablauf) and ablauf < today:
+            expires = (meta.get("expires") or "").strip()
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", expires) and expires < today:
                 to_trash(path)
     if DIARY_DIR.exists():
         cutoff = time.time() - DIARY_KEEP_DAYS * 86400

@@ -87,8 +87,8 @@
         vx: 0, vy: 0, vz: 0,
         phase: (i * 1.7) % (Math.PI * 2),   // unique drift offset per node
         wob: 0.55 + ((i * 37) % 100) / 140, // and a slightly different speed
-        // "groesse" in a note's frontmatter makes a hand-picked star bigger.
-        r: 4 + Math.min(16, Math.sqrt(n.degree || 0) * 2.6) + (parseFloat(n.groesse) || 0)
+        // "size" in a note's frontmatter makes a hand-picked star bigger.
+        r: 4 + Math.min(16, Math.sqrt(n.degree || 0) * 2.6) + (parseFloat(n.size) || 0)
       });
     });
     this.byId = new Map(this.nodes.map(function (n) { return [n.id, n]; }));
@@ -143,7 +143,7 @@
 
   MemoryGraph.prototype.visible = function (n) { return !this.hidden.has(n.type); };
 
-  /* { id: {online: bool|null, pegel: 0..1|null} } — kept by id, so a vault
+  /* { id: {online: bool|null, level: 0..1|null} } — kept by id, so a vault
      reload doesn't wipe it. */
   MemoryGraph.prototype.setLive = function (map) { this.live = map || {}; };
 
@@ -312,17 +312,17 @@
       var alpha = (isTrace ? 1 : (isLit ? 1 : 0.16)) * (isTrace || this.focus === nd.id ? 1 : nd.fade);
       var r = nd.r * nd.f;
       var lv = this.live[nd.id], off = lv && lv.online === false;
-      var hasLvl = lv && lv.pegel !== null && lv.pegel !== undefined;
+      var hasLvl = lv && lv.level !== null && lv.level !== undefined;
       if (off) alpha *= 0.32;                    // device not in the network right now
       // Level stars stand out in traffic-light colours: green full, amber half, red low.
-      var col = hasLvl ? (lv.pegel >= 0.5 ? '#39ff88' : lv.pegel >= 0.2 ? '#ffb340' : '#ff4d4d') : nd.colour;
+      var col = hasLvl ? (lv.level >= 0.5 ? '#39ff88' : lv.level >= 0.2 ? '#ffb340' : '#ff4d4d') : nd.colour;
       ctx.globalAlpha = alpha;
       if ((isTrace || (this.focus === nd.id)) || (nd.r > 9 && !lit)) {
         ctx.shadowColor = col; ctx.shadowBlur = (isTrace ? 22 : 14) * nd.f;
       } else { ctx.shadowBlur = 0; }
       if (hasLvl && !off) {                      // fuller battery, brighter star
         ctx.shadowColor = col;
-        ctx.shadowBlur = (10 + 30 * lv.pegel) * nd.f * (1 + Math.sin(this.t * 0.04) * 0.15);
+        ctx.shadowBlur = (10 + 30 * lv.level) * nd.f * (1 + Math.sin(this.t * 0.04) * 0.15);
       }
       ctx.beginPath();
       ctx.arc(nd.sx, nd.sy, r, 0, Math.PI * 2);
@@ -336,7 +336,7 @@
         ctx.strokeStyle = hexA(col, 0.18);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(nd.sx, nd.sy, r + 4 * nd.f, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * lv.pegel);
+        ctx.arc(nd.sx, nd.sy, r + 4 * nd.f, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * lv.level);
         ctx.strokeStyle = col;
         ctx.stroke();
       }
@@ -359,7 +359,7 @@
         ctx.font = Math.round(9 + nd.f * 2) + 'px "SF Mono", ui-monospace, Menlo, monospace';
         ctx.fillStyle = isTrace ? '#ffd79a' : '#cfe3f2';
         ctx.textAlign = 'center';
-        ctx.fillText(nd.title + (hasLvl ? ' · ' + Math.round(lv.pegel * 100) + ' %' : '') + (off ? ' · offline' : ''),
+        ctx.fillText(nd.title + (hasLvl ? ' · ' + Math.round(lv.level * 100) + ' %' : '') + (off ? ' · offline' : ''),
                      nd.sx, nd.sy - r - (hasLvl ? 10 : 6));
       }
       ctx.globalAlpha = 1;

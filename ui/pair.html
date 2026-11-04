@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,7 +12,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<title>JARVIS · Gerät koppeln</title>
+<title>JARVIS · Pair device</title>
 <style>
   :root{--bg:#04070c;--cy:#5fe4ff;--cy-dim:#2b8ba8;--ink:#dbe9f5;--ink-dim:#6f8aa3;--pink:#ff6ba6;--amber:#ffb340;
     --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
@@ -44,16 +44,16 @@
 <main>
   <div class="core"></div>
   <h1>JARVIS</h1>
-  <p>Dieses Gerät ist noch nicht gekoppelt. Am PC auf <b>📱 Geräte</b> → <b>Neuen Code</b> tippen und den Code hier eingeben.</p>
+  <p>This device is not paired yet. On the PC tap <b>📱 Devices</b> → <b>New code</b> and enter the code here.</p>
   <form id="f">
     <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" required>
-    <input id="name" autocomplete="off" maxlength="40" placeholder="Name, z. B. iPhone">
-    <button id="go">Koppeln</button>
+    <input id="name" autocomplete="off" maxlength="40" placeholder="Name, e.g. iPhone">
+    <button id="go">Pair</button>
   </form>
   <div class="msg" id="msg"></div>
   <div class="tip" id="tip" hidden>
-    Tipp fürs <span id="tipDev">iPhone</span>: Erst <span id="tipWhere">unten</span> auf <b>Teilen</b> → <b>Zum Home-Bildschirm</b>, dann Jarvis vom Home-Bildschirm
-    öffnen und dort koppeln. Die App vom Home-Bildschirm hat ihre eigene Anmeldung, Safari zählt dafür nicht.
+    Tip for the <span id="tipDev">iPhone</span>: first tap <b>Share</b> <span id="tipWhere">at the bottom</span> → <b>Add to Home Screen</b>, then open Jarvis
+    from the Home Screen and pair there. The app from the Home Screen has its own sign-in, Safari does not count for it.
   </div>
 </main>
 <script>
@@ -69,7 +69,7 @@
   devName.value = ipad ? 'iPad' : ios ? 'iPhone' : '';
   if (ipad) {   // on the iPad, Share sits top right in Safari's toolbar
     document.getElementById('tipDev').textContent = 'iPad';
-    document.getElementById('tipWhere').textContent = 'oben rechts';
+    document.getElementById('tipWhere').textContent = 'at the top right';
   }
   document.getElementById('f').addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -80,8 +80,8 @@
         body: JSON.stringify({ code: document.getElementById('code').value, name: devName.value }) });
       var d = await r.json();
       if (r.ok && d.ok) { location.replace('/'); return; }
-      msg.textContent = d.error || 'Das hat nicht geklappt.';
-    } catch (err) { msg.textContent = 'Jarvis nicht erreichbar. Läuft der PC?'; }
+      msg.textContent = d.error || 'That did not work.';
+    } catch (err) { msg.textContent = 'Jarvis not reachable. Is the PC running?'; }
     btn.disabled = false;
   });
 })();

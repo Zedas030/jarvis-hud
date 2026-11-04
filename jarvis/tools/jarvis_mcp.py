@@ -111,10 +111,10 @@ TOOLS += [
         "description": ("Run one shell command on the user's Raspberry Pi / home server over ssh (e.g. "
                         "'docker ps', 'sudo systemctl restart pihole-FTL', 'tail -n 50 /var/log/syslog'). Shows a "
                         "confirmation card with the command; explain in German first what you are about to do and why, "
-                        "`begruendung` = that explanation. Prefer harmless, reversible commands; output is truncated."),
+                        "`reason` = that explanation. Prefer harmless, reversible commands; output is truncated."),
         "inputSchema": {"type": "object",
-                        "properties": {"command": {"type": "string"}, "begruendung": {"type": "string"}},
-                        "required": ["command", "begruendung"]},
+                        "properties": {"command": {"type": "string"}, "reason": {"type": "string"}},
+                        "required": ["command", "reason"]},
     },
 ]
 
@@ -122,7 +122,7 @@ TOOLS += [
     {
         "name": "home_states",
         "description": ("Read the user's smart home (Home Assistant): devices with name, entity_id and state. "
-                        "Optional `search` filters by name or entity_id (e.g. 'wohnzimmer', 'light.'). "
+                        "Optional `search` filters by name or entity_id (e.g. 'living room', 'light.'). "
                         "Read-only, no confirmation needed."),
         "inputSchema": {"type": "object", "properties": {"search": {"type": "string"}}},
     },
@@ -197,10 +197,10 @@ TOOLS += [
                         "(phone on the speaker, PC) when the Spotify login is set up, else the PC's media keys. "
                         "`action`: play, pause, play_pause, next, previous, volume_up, volume_down, mute, search "
                         "(opens Spotify with `query` searched — he picks/plays from there), or transfer "
-                        "(`room` = Wohnzimmer, Schlafzimmer, ... or a Spotify device name such as PC: the "
-                        "music moves to that room's speaker and plays on there — 'Musik vom Schlafzimmer ins "
-                        "Wohnzimmer', 'mach die Musik im Wohnzimmer an'; without `room`: the room the presence "
-                        "sensors see the user in, 'hol die Musik zu mir'). Starts Spotify first if it is not "
+                        "(`room` = Living Room, Bedroom, ... or a Spotify device name such as PC: the "
+                        "music moves to that room's speaker and plays on there — 'move the music from the bedroom to "
+                        "the living room', 'put the music on in the living room'; without `room`: the room the presence "
+                        "sensors see the user in, 'bring the music to me'). Starts Spotify first if it is not "
                         "running. Harmless, no confirmation needed."),
         "inputSchema": {
             "type": "object",
@@ -242,20 +242,20 @@ TOOLS += [
     },
     {
         "name": "memory_read",
-        "description": "Read one note in full, by title (e.g. 'Golf', 'Smart Home', 'Gespräch 2026-10-13').",
+        "description": "Read one note in full, by title (e.g. 'Golf', 'Smart Home', 'Conversation 2026-10-13').",
         "inputSchema": {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]},
     },
     {
         "name": "memory_save",
-        "description": ("Remember something lasting about the user. `note`: Profil, Befehle, Vorlieben, Websites, "
-                        "Termine, Wissen, Personen/<Name> or Projekte/<Name>. `text`: one short bullet. "
+        "description": ("Remember something lasting about the user. `note`: Profile, Commands, Preferences, Websites, "
+                        "Appointments, Knowledge, People/<Name> or Projects/<Name>. `text`: one short bullet. "
                         "`replace` (optional): an existing bullet text to replace instead of appending (to correct). "
-                        "`quelle`: 'gesagt' (the user said it), 'abgeleitet' (you concluded it), 'vermutet' (a guess). "
-                        "`bis` (optional, YYYY-MM-DD): the fact expires then. A save that contradicts an existing "
+                        "`source`: 'said' (the user said it), 'inferred' (you concluded it), 'guessed' (a guess). "
+                        "`until` (optional, YYYY-MM-DD): the fact expires then. A save that contradicts an existing "
                         "entry is refused — ask the user what is right, then save with `replace`."),
         "inputSchema": {"type": "object", "properties": {
             "note": {"type": "string"}, "text": {"type": "string"}, "replace": {"type": "string"},
-            "quelle": {"type": "string", "enum": ["gesagt", "abgeleitet", "vermutet"]}, "bis": {"type": "string"}},
+            "source": {"type": "string", "enum": ["said", "inferred", "guessed"]}, "until": {"type": "string"}},
             "required": ["note", "text"]},
     },
 ]
@@ -282,12 +282,12 @@ TOOLS += [
     },
     {
         "name": "list_read",
-        "description": "Read the shopping list (`list`='einkauf') or the to-do list (`list`='todo').",
+        "description": "Read the shopping list (`list`='shopping') or the to-do list (`list`='todo').",
         "inputSchema": {"type": "object", "properties": {"list": {"type": "string"}}, "required": ["list"]},
     },
     {
         "name": "list_add",
-        "description": "Add entries to the shopping list ('einkauf') or the to-do list ('todo'). `items`: short entries.",
+        "description": "Add entries to the shopping list ('shopping') or the to-do list ('todo'). `items`: short entries.",
         "inputSchema": {"type": "object", "properties": {
             "list": {"type": "string"}, "items": {"type": "array", "items": {"type": "string"}}},
             "required": ["list", "items"]},
@@ -309,13 +309,13 @@ TOOLS += [
             "Create or replace a routine: when the user says one of `triggers`, the steps run without the LLM. "
             "Steps, in order, each an object with exactly one of: "
             "{\"say\": text Jarvis speaks}, "
-            "{\"do\": a short German command the local router understands, answer not spoken — e.g. "
-            "'Licht Wohnzimmer aus', 'Steckdose Ventilator an', 'Wecker morgen um 7', 'Timer 10 Minuten'}, "
-            "{\"tell\": a German question whose answer is spoken — e.g. 'Wann klingelt mein Wecker?', "
-            "'Wie wird das Wetter morgen?', 'Was steht auf der Einkaufsliste?'}, "
+            "{\"do\": a short English command the local router understands, answer not spoken — e.g. "
+            "'living room light off', 'fan socket on', 'alarm tomorrow at 7', 'timer 10 minutes'}, "
+            "{\"tell\": an English question whose answer is spoken — e.g. 'When does my alarm ring?', "
+            "'What will the weather be like tomorrow?', 'What is on the shopping list?'}, "
             "{\"ha\": 'domain.service', \"entity_id\": ..., \"data\": {...}} for light/switch/fan/media_player/scene "
             "(entity_id 'all' only for light and media_player; look up ids with home_states), "
-            "{\"wait\": seconds}. Triggers: short phrases in lower case, e.g. 'gute nacht'."),
+            "{\"wait\": seconds}. Triggers: short phrases in lower case, e.g. 'good night'."),
         "inputSchema": {"type": "object", "properties": {
             "name": {"type": "string"},
             "triggers": {"type": "array", "items": {"type": "string"}},
@@ -344,10 +344,10 @@ TOOLS += [
     {
         "name": "memory_forget",
         "description": ("Forget one stored fact (moves it to the trash). `text`: words from the fact, `note` optional. "
-                        "Shows a confirmation card; explain in German first, `begruendung` = that explanation."),
+                        "Shows a confirmation card; explain in German first, `reason` = that explanation."),
         "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}, "note": {"type": "string"},
-                                                         "begruendung": {"type": "string"}},
-                        "required": ["text", "begruendung"]},
+                                                         "reason": {"type": "string"}},
+                        "required": ["text", "reason"]},
     },
     {
         "name": "memory_review",
@@ -371,11 +371,11 @@ TOOLS += [
         "name": "screen_describe",
         "description": ("Describe the screen with an image model (layout, windows, where a button is) — only when the "
                         "user asks and when screen_read (local text recognition) is not enough. Sends ONE screenshot "
-                        "to Claude after a confirmation card; explain first, `begruendung` = that explanation. "
-                        "`frage`: what to look for; `ganz`: whole screen instead of the active window."),
-        "inputSchema": {"type": "object", "properties": {"frage": {"type": "string"}, "ganz": {"type": "boolean"},
-                                                         "begruendung": {"type": "string"}},
-                        "required": ["begruendung"]},
+                        "to Claude after a confirmation card; explain first, `reason` = that explanation. "
+                        "`question`: what to look for; `full`: whole screen instead of the active window."),
+        "inputSchema": {"type": "object", "properties": {"question": {"type": "string"}, "full": {"type": "boolean"},
+                                                         "reason": {"type": "string"}},
+                        "required": ["reason"]},
     },
 ]
 
@@ -406,9 +406,9 @@ TOOLS += [
     {
         "name": "task_run",
         "description": ("Start a step-by-step check with a report (read-only, runs in the background, result is "
-                        "spoken when done): `recipe` nas, pi, netz, pc, haus or system. Use for 'prüf …' requests."),
+                        "spoken when done): `recipe` nas, pi, network, pc, house or system. Use for 'check …' requests."),
         "inputSchema": {"type": "object", "properties": {"recipe": {"type": "string",
-                                                                    "enum": ["nas", "pi", "netz", "pc", "haus", "system"]}},
+                                                                    "enum": ["nas", "pi", "network", "pc", "house", "system"]}},
                         "required": ["recipe"]},
     },
     {
@@ -426,8 +426,8 @@ TOOLS += [
 TOOLS += [
     {
         "name": "context_snapshot",
-        "description": ("Current context with age and trust per source: zeit, kalender, wetter, timer, plaene, "
-                        "warnungen, pc, haus. `sources` optional list; stale or missing sources are marked."),
+        "description": ("Current context with age and trust per source: time, calendar, weather, timers, plans, "
+                        "warnings, pc, house. `sources` optional list; stale or missing sources are marked."),
         "inputSchema": {"type": "object", "properties": {"sources": {"type": "array", "items": {"type": "string"}}}},
     },
 ]
@@ -441,9 +441,9 @@ TOOLS += [
     {
         "name": "skill_undo",
         "description": ("Undo a learned router rule: back to its previous version, or remove it. `text`: words of the "
-                        "wording. Shows a confirmation card; explain first, `begruendung` = that explanation."),
-        "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}, "begruendung": {"type": "string"}},
-                        "required": ["text", "begruendung"]},
+                        "wording. Shows a confirmation card; explain first, `reason` = that explanation."),
+        "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}, "reason": {"type": "string"}},
+                        "required": ["text", "reason"]},
     },
 ]
 
@@ -460,13 +460,13 @@ TOOLS += [
     {
         "name": "mail_draft",
         "description": ("Create an email DRAFT in the user's mailbox (Drafts folder) — never sends. `to`, `subject`, "
-                        "`body` (German unless asked otherwise). Shows a confirmation card; explain first, "
-                        "`begruendung` = that explanation. `account`: which mailbox when there are several "
+                        "`body` (English unless asked otherwise). Shows a confirmation card; explain first, "
+                        "`reason` = that explanation. `account`: which mailbox when there are several "
                         "(name or address; default the first)."),
         "inputSchema": {"type": "object", "properties": {"to": {"type": "string"}, "subject": {"type": "string"},
                                                          "body": {"type": "string"}, "account": {"type": "string"},
-                                                         "begruendung": {"type": "string"}},
-                        "required": ["to", "subject", "body", "begruendung"]},
+                                                         "reason": {"type": "string"}},
+                        "required": ["to", "subject", "body", "reason"]},
     },
     {
         "name": "day_prep",
@@ -501,7 +501,7 @@ TOOLS += [
     {
         "name": "plan_create",
         "description": ("Plan something over several days: `title`, `steps` = [{text, date 'YYYY-MM-DD'}]. Creates a "
-                        "note Projekte/<title> with a checklist and a reminder per step."),
+                        "note Projects/<title> with a checklist and a reminder per step."),
         "inputSchema": {"type": "object", "properties": {
             "title": {"type": "string"},
             "steps": {"type": "array", "items": {"type": "object", "properties": {
@@ -533,23 +533,23 @@ TOOLS += [
     {
         "name": "shipments_status",
         "description": ("Orders on their way, from the shipping mails of every account: shop, carrier, expected "
-                        "day (from the mail or DHL), status (unterwegs, heute, abholbereit, zugestellt)."),
+                        "day (from the mail or DHL), status (on the way, today, ready for pickup, delivered)."),
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "mail_events_undo",
         "description": ("Take what Jarvis entered automatically from mail (bookings of trusted senders, "
-                        "expected deliveries) out of the calendar again — the user said 'rückgängig'. "
+                        "expected deliveries) out of the calendar again — the user said 'undo'. "
                         "`hours`: how far back, default 24."),
         "inputSchema": {"type": "object", "properties": {"hours": {"type": "number"}}},
     },
     {
         "name": "mail_events_add",
-        "description": ("Enter events from mail_events_scan in the calendar: `ids` = list of ids, or \"alle\". "
-                        "One confirmation card lists them all; explain in German first, `begruendung`."),
+        "description": ("Enter events from mail_events_scan in the calendar: `ids` = list of ids, or \"all\". "
+                        "One confirmation card lists them all; explain in English first, `reason`."),
         "inputSchema": {"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "string"}},
-                                                         "begruendung": {"type": "string"}},
-                        "required": ["ids", "begruendung"]},
+                                                         "reason": {"type": "string"}},
+                        "required": ["ids", "reason"]},
     },
 ]
 
@@ -558,14 +558,14 @@ TOOLS += [
         "name": "homelab_status",
         "description": ("Live figures from Prometheus (what Grafana shows): `topic` internet (throughput now, "
                         "today's volume and peak, line rate, FRITZ!Box uptime), wlan (devices per band), pi "
-                        "(temperature, CPU, RAM, disk), pc (CPU, RAM, free disk), or alles."),
+                        "(temperature, CPU, RAM, disk), pc (CPU, RAM, free disk), or all."),
         "inputSchema": {"type": "object", "properties": {"topic": {"type": "string",
-                                                                   "enum": ["internet", "wlan", "pi", "pc", "alles"]}}},
+                                                                   "enum": ["internet", "wlan", "pi", "pc", "all"]}}},
     },
     {
         "name": "metrics_query",
-        "description": ("Free PromQL against Prometheus, read only, for questions over time ('wann war die Last "
-                        "heute am höchsten'). `expr` PromQL; `hours` > 0 = the last hours as ~8 points per series. "
+        "description": ("Free PromQL against Prometheus, read only, for questions over time ('when was the load "
+                        "highest today'). `expr` PromQL; `hours` > 0 = the last hours as ~8 points per series. "
                         "Metrics: node_* (Pi), windows_* (this PC), fritz_* (FRITZ!Box: fritz_wan_datarate_bytes "
                         "{direction=rx|tx} in bytes/s — not the wrapping byte counter), homeassistant_*."),
         "inputSchema": {"type": "object", "properties": {"expr": {"type": "string"}, "hours": {"type": "number"}},
@@ -585,12 +585,12 @@ TOOLS += [
     {
         "name": "security_accept",
         "description": ("Accept one open finding as a reasoned exception (always a confirmation card): `id` from "
-                        "security_findings, `grund` = one German sentence why it is acceptable, `tage` 30, 90 or 365. "
-                        "Explain in German first, `begruendung`. Prefer 30 days for findings that cover a whole device."),
-        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "grund": {"type": "string"},
-                                                         "tage": {"type": "integer", "enum": [30, 90, 365]},
-                                                         "begruendung": {"type": "string"}},
-                        "required": ["id", "grund", "tage", "begruendung"]},
+                        "security_findings, `why` = one English sentence why it is acceptable, `days` 30, 90 or 365. "
+                        "Explain in English first, `reason`. Prefer 30 days for findings that cover a whole device."),
+        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "why": {"type": "string"},
+                                                         "days": {"type": "integer", "enum": [30, 90, 365]},
+                                                         "reason": {"type": "string"}},
+                        "required": ["id", "why", "days", "reason"]},
     },
     {
         "name": "security_scan",
@@ -599,12 +599,12 @@ TOOLS += [
     },
     {
         "name": "homelab_report",
-        "description": ("Lagebericht from the Pi: Uptime Kuma (which services are down, since when), the ORBIT "
+        "description": ("Status report from the Pi: Uptime Kuma (which services are down, since when), the ORBIT "
                         "security centre (score, open findings by severity) and the zero-feed-in energy loop "
-                        "(automations and data in Home Assistant). `topic` alles | kuma | sicherheit | energie; "
+                        "(automations and data in Home Assistant). `topic` all | kuma | security | energy; "
                         "`detail` true lists more findings."),
         "inputSchema": {"type": "object", "properties": {
-            "topic": {"type": "string", "enum": ["alles", "kuma", "sicherheit", "energie"]},
+            "topic": {"type": "string", "enum": ["all", "kuma", "security", "energy"]},
             "detail": {"type": "boolean"}}},
     },
 ]
@@ -616,16 +616,16 @@ TOOLS += [
                         "add-ons, firmware), the Synology NAS (DSM, packages), the Raspberry Pi (apt, Pi-hole, "
                         "Docker images incl. Home Assistant itself), FRITZ! repeaters, and smart-home devices whose "
                         "firmware is older than the same model elsewhere in the house. Lists one id per update; "
-                        "rows marked 'nur Anzeige' cannot be installed by Jarvis."),
+                        "rows marked 'display only' cannot be installed by Jarvis."),
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "update_install",
         "description": ("Install ONE update by `target` = an id from updates_check (e.g. ha:update.fritz_box, "
-                        "nas:pkg:CMS, pi:apt, pi:pihole). Shows a confirmation card; explain in German first what "
-                        "restarts, `begruendung` = that explanation. One call per device."),
-        "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}, "begruendung": {"type": "string"}},
-                        "required": ["target", "begruendung"]},
+                        "nas:pkg:CMS, pi:apt, pi:pihole). Shows a confirmation card; explain in English first what "
+                        "restarts, `reason` = that explanation. One call per device."),
+        "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}, "reason": {"type": "string"}},
+                        "required": ["target", "reason"]},
     },
     {
         "name": "update_status",
@@ -664,34 +664,34 @@ TOOLS += [
     },
     {
         "name": "announce",
-        "description": ("Speak an announcement in a room (\"Sag im Wohnzimmer: Essen ist fertig\"): `raum` = room "
-                        "name from config/home.json speakers, `text` = what to say, in German. Without `raum` "
-                        "(or `raum` = hier) the room the presence sensors see the user in."),
-        "inputSchema": {"type": "object", "properties": {"raum": {"type": "string"}, "text": {"type": "string"}},
+        "description": ("Speak an announcement in a room (\"Say in the living room: dinner is ready\"): `room` = room "
+                        "name from config/home.json speakers, `text` = what to say, in English. Without `room` "
+                        "(or `room` = here) the room the presence sensors see the user in."),
+        "inputSchema": {"type": "object", "properties": {"room": {"type": "string"}, "text": {"type": "string"}},
                         "required": ["text"]},
     },
     {
         "name": "tv_control",
-        "description": ("Fire TV through Alexa: `befehl` an, aus, pause, weiter, lauter, leiser, stumm, laut, zurueck, "
-                        "home, or app with `app` = the app's name (e.g. Netflix, YouTube, ARD Mediathek)."),
+        "description": ("Fire TV through Alexa: `command` on, off, pause, resume, louder, quieter, mute, unmute, back, "
+                        "home, or app with `app` = the app's name (e.g. Netflix, YouTube, BBC iPlayer)."),
         "inputSchema": {"type": "object", "properties": {
-            "befehl": {"type": "string", "enum": ["an", "aus", "pause", "weiter", "lauter", "leiser", "stumm", "laut",
-                                                  "zurueck", "home", "app"]},
-            "app": {"type": "string"}}, "required": ["befehl"]},
+            "command": {"type": "string", "enum": ["on", "off", "pause", "resume", "louder", "quieter", "mute", "unmute",
+                                                   "back", "home", "app"]},
+            "app": {"type": "string"}}, "required": ["command"]},
     },
     {
         "name": "power_costs",
         "description": ("Electricity costs: the house and the biggest plugs this month with the projection for the "
-                        "whole month; `geraet` = one plug (e.g. 'PC'); `standby` true = which plugs draw power while "
+                        "whole month; `device` = one plug (e.g. 'PC'); `standby` true = which plugs draw power while "
                         "idle and what that costs a year. Price from JARVIS_POWER_PRICE."),
-        "inputSchema": {"type": "object", "properties": {"geraet": {"type": "string"}, "standby": {"type": "boolean"}}},
+        "inputSchema": {"type": "object", "properties": {"device": {"type": "string"}, "standby": {"type": "boolean"}}},
     },
     {
         "name": "energy_device_usage",
-        "description": ("Remember how often the user uses a plug, for the energy coach: `geraet` = plug name "
-                        "(e.g. 'Boiler'), `oft` = true (suggest it again) or false (rarely used, never suggest)."),
-        "inputSchema": {"type": "object", "properties": {"geraet": {"type": "string"}, "oft": {"type": "boolean"}},
-                        "required": ["geraet", "oft"]},
+        "description": ("Remember how often the user uses a plug, for the energy coach: `device` = plug name "
+                        "(e.g. 'Boiler'), `often` = true (suggest it again) or false (rarely used, never suggest)."),
+        "inputSchema": {"type": "object", "properties": {"device": {"type": "string"}, "often": {"type": "boolean"}},
+                        "required": ["device", "often"]},
     },
     {
         "name": "phone_notify",
@@ -703,8 +703,8 @@ TOOLS += [
 TOOLS += [
     {
         "name": "window_arrange",
-        "description": ("Move an app's window: `app` (e.g. spotify, chrome, code, discord), `position`: links, "
-                        "rechts, oben links, oben rechts, unten links, unten rechts, mitte, voll; `monitor` 1, 2, ..."),
+        "description": ("Move an app's window: `app` (e.g. spotify, chrome, code, discord), `position`: left, "
+                        "right, top left, top right, bottom left, bottom right, centre, full; `monitor` 1, 2, ..."),
         "inputSchema": {"type": "object", "properties": {"app": {"type": "string"}, "position": {"type": "string"},
                                                          "monitor": {"type": "integer"}}, "required": ["app", "position"]},
     },
@@ -726,8 +726,8 @@ TOOLS += [
     {
         "name": "screen_read",
         "description": ("Read the text on the user's screen via local OCR (only when they ask): the active window, "
-                        "or the whole screen with `ganz`=true. Refused while a password, banking or chat window is visible."),
-        "inputSchema": {"type": "object", "properties": {"ganz": {"type": "boolean"}}},
+                        "or the whole screen with `full`=true. Refused while a password, banking or chat window is visible."),
+        "inputSchema": {"type": "object", "properties": {"full": {"type": "boolean"}}},
     },
     {
         "name": "script_list",
@@ -737,9 +737,9 @@ TOOLS += [
     {
         "name": "script_run",
         "description": ("Run one allowed script by `name` (from script_list). Shows a confirmation card; explain in "
-                        "German first, `begruendung` = that explanation."),
-        "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "begruendung": {"type": "string"}},
-                        "required": ["name", "begruendung"]},
+                        "English first, `reason` = that explanation."),
+        "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "reason": {"type": "string"}},
+                        "required": ["name", "reason"]},
     },
 ]
 
@@ -747,7 +747,7 @@ TOOLS += [
     {
         "name": "health_log",
         "description": ("Note what Garmin cannot know, for the weekly review: a meal, alcohol, coffee, training. "
-                        "`what`: short German text ('Abendessen', 'zwei Bier'); `at`: 'HH:MM', 'gestern HH:MM' or "
+                        "`what`: short English text ('dinner', 'two beers'); `at`: 'HH:MM', 'yesterday HH:MM' or "
                         "'YYYY-MM-DD HH:MM' (empty = now). No confirmation needed."),
         "inputSchema": {"type": "object", "properties": {"what": {"type": "string"}, "at": {"type": "string"}},
                         "required": ["what"]},
@@ -760,10 +760,10 @@ TOOLS += [
     {
         "name": "proposal_accept",
         "description": ("Carry out an open proposal after the user said yes. Shows a confirmation card. Before "
-                        "calling, explain in German what will happen and why. `begruendung`: that explanation "
-                        "in one or two German sentences (shown on the card)."),
-        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "begruendung": {"type": "string"}},
-                        "required": ["id", "begruendung"]},
+                        "calling, explain in English what will happen and why. `reason`: that explanation "
+                        "in one or two English sentences (shown on the card)."),
+        "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "reason": {"type": "string"}},
+                        "required": ["id", "reason"]},
     },
     {
         "name": "proposal_decline",
@@ -772,10 +772,10 @@ TOOLS += [
     },
     {
         "name": "rule_remove",
-        "description": ("Remove a learned rule from the note Vorlieben (section 'Gelernte Regeln'). `text`: words "
-                        "from the rule. Shows a confirmation card; explain in German first. `begruendung` as above."),
-        "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}, "begruendung": {"type": "string"}},
-                        "required": ["text", "begruendung"]},
+        "description": ("Remove a learned rule from the note Preferences (section 'Learned rules'). `text`: words "
+                        "from the rule. Shows a confirmation card; explain in English first. `reason` as above."),
+        "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}, "reason": {"type": "string"}},
+                        "required": ["text", "reason"]},
     },
 ]
 
@@ -787,7 +787,7 @@ TOOLS += [
                         "(what the user asked and what Jarvis answered), Garmin (sleep, steps, stress, Body Battery, "
                         "logged meals), Jarvis' own notices, homelab incidents, storage levels. `start`/`end` as "
                         "YYYY-MM-DD (default: the last `days`, 7), `query`: words that the conversation must mention "
-                        "('Drucker', 'krank'). Use for 'letzte Woche', 'neulich', 'als ich … war'. Read-only."),
+                        "('printer', 'ill'). Use for 'last week', 'the other day', 'when I was …'. Read-only."),
         "inputSchema": {"type": "object", "properties": {"start": {"type": "string"}, "end": {"type": "string"},
                                                          "query": {"type": "string"}, "days": {"type": "integer"}}},
     },
@@ -812,8 +812,8 @@ TOOLS += [
     {
         "name": "unifi_status",
         "description": ("UniFi network controller, read-only: `topic` clients (who is connected, per WLAN, weak "
-                        "signals), geraete (access points, switches, gateway: online or not) or alles."),
-        "inputSchema": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["clients", "geraete", "alles"]}}},
+                        "signals), devices (access points, switches, gateway: online or not) or all."),
+        "inputSchema": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["clients", "devices", "all"]}}},
     },
     {
         "name": "media_recent",
@@ -895,17 +895,17 @@ def _web_fetch(url):
     import re as _re
     url = (url or "").strip()
     if not url.lower().startswith(("http://", "https://")):
-        return "Nur http(s)-Adressen."
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 JARVIS", "Accept-Language": "de,en"})
+        return "Only http(s) addresses."
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 JARVIS", "Accept-Language": "en,de"})
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             raw = r.read(600_000)
             ctype = r.headers.get("content-type", "")
             charset = r.headers.get_content_charset() or "utf-8"
     except urllib.error.HTTPError as e:
-        return f"HTTP {e.code} bei {url}"
+        return f"HTTP {e.code} at {url}"
     except Exception as e:  # noqa: BLE001
-        return f"Nicht erreichbar: {e}"
+        return f"Not reachable: {e}"
     text = raw.decode(charset, "replace")
     if "json" in ctype or text.lstrip()[:1] in "{[":
         try:
@@ -924,7 +924,7 @@ def _memory(name, args):
         # Full-text, word-wise: return the matching lines, not whole notes.
         words = [w for w in _re.split(r"[\W_]+", (args.get("query") or "").lower()) if len(w) > 2]
         if not words:
-            return "Suchbegriff fehlt."
+            return "Search term missing."
         scored = []
         for path in memory._notes():
             try:
@@ -932,7 +932,7 @@ def _memory(name, args):
             except OSError:
                 continue
             low = text.lower()
-            pats = [_re.compile(r"\b" + _re.escape(w)) for w in words]   # word starts, not "auto" in "Automatisch"
+            pats = [_re.compile(r"\b" + _re.escape(w)) for w in words]   # word starts, not "matic" in "Automatic"
             whole = [_re.compile(r"\b" + _re.escape(w) + r"\b") for w in words]
             # capped per word: a long note must not win just by repeating a word
             score = (sum(min(len(p.findall(low)), 2) for p in pats)
@@ -940,45 +940,45 @@ def _memory(name, args):
                      + 3 * sum(w in path.stem.lower() for w in words))
             if not score:
                 continue
-            if "Gespraeche" in path.parts:
+            if "Conversations" in path.parts:
                 score *= 0.2          # facts before chat logs (they are long and match everything)
             lines = [ln.strip() for ln in text.splitlines()
                      if any(p.search(ln.lower()) for p in pats) and not ln.startswith(("type:", "updated:"))]
             scored.append((score, path.stem, lines[:3]))
         scored.sort(key=lambda x: -x[0])
         out = [f"· {t}: " + " | ".join(ln[:160] for ln in lines) for _, t, lines in scored[:6]]
-        return "\n".join(out) or "Nichts gefunden."
+        return "\n".join(out) or "Nothing found."
     if name == "memory_read":
         title = (args.get("title") or "").strip().lower()
         for path in memory._notes():
             if path.stem.lower() == title:
                 _, body = memory._parse_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
                 return body.strip()
-        return f"Keine Notiz '{args.get('title')}'. memory_search hilft beim Finden."
+        return f"No note '{args.get('title')}'. memory_search helps to find it."
     # memory_save
     note = (args.get("note") or "").strip().strip("/\\")
     text = " ".join((args.get("text") or "").split())
-    if not note or not text or ".." in note or not _re.fullmatch(r"[\w äöüÄÖÜß.\-/!]+", note):
-        return "Ungültige Notiz oder leerer Text."
+    if not note or not text or ".." in note or not _re.fullmatch(r"[\w .\-/!]+", note):
+        return "Invalid note or empty text."
     import privacy
     if privacy.is_work(note, text):
-        return "Nicht gespeichert: Arbeitsthemen merke ich mir nicht."
+        return "Not saved: I do not remember work topics."
     import memory_tools as mt
     import memory_intel as mi
     path = memory.note_path(note)
     path.parent.mkdir(parents=True, exist_ok=True)
     text = mi.link_entities(text, note)
-    stamp = mt.tag(args.get("quelle"), until=args.get("bis"))
+    stamp = mt.tag(args.get("source"), until=args.get("until"))
     related = None
     if path.exists() and not (args.get("replace") or "").strip():
         hit = mi.compare(text, mt._bullets(path))
         if hit and hit[0] == "duplicate":
-            return f"Steht so schon drin: „{mt.split_tag(hit[1])[0]}“."
+            return f"Already in there: “{mt.split_tag(hit[1])[0]}”."
         if hit and hit[0] == "conflict":
             old_text, old_src, old_day = mt.split_tag(hit[1])
-            return (f"Nicht gespeichert — möglicher Widerspruch ({hit[2]}) zu „{old_text}“"
-                    + (f" ({old_src}, {old_day})" if old_src else "") + ". Frag den User, was stimmt; "
-                    "dann memory_save mit replace.")
+            return (f"Not saved — possible contradiction ({hit[2]}) with “{old_text}”"
+                    + (f" ({old_src}, {old_day})" if old_src else "") + ". Ask the user what is right; "
+                    "then memory_save with replace.")
         if hit and hit[0] == "related":
             related = mt.split_tag(hit[1])[0]
     import time as _t
@@ -994,16 +994,16 @@ def _memory(name, args):
             else:
                 body = body.replace(old, text + stamp, 1)
         elif text in body:
-            return "Steht schon drin."
+            return "Already in there."
         else:
             body = body.rstrip() + f"\n- {text}{stamp}\n"
         body = _re.sub(r"(?m)^updated: .*$", f"updated: {today}", body, count=1)
     else:
-        body = (f"---\ntype: {'person' if note.lower().startswith('personen/') else 'erinnerung'}\n"
-                f"wichtigkeit: mittel\nupdated: {today}\n---\n\n# {note.split('/')[-1]}\n\n"
-                f"Gehört zu [[Profil]].\n\n- {text}{stamp}\n")
+        body = (f"---\ntype: {'person' if note.lower().startswith('people/') else 'memory'}\n"
+                f"importance: medium\nupdated: {today}\n---\n\n# {note.split('/')[-1]}\n\n"
+                f"Belongs to [[Profile]].\n\n- {text}{stamp}\n")
     path.write_text(body, encoding="utf-8")
-    return "Gespeichert." + (f" (ergänzt „{related}“)" if related else "")
+    return "Saved." + (f" (adds to “{related}”)" if related else "")
 
 
 # Virtual-key codes of the media keys — they reach whatever player is active.
@@ -1030,36 +1030,35 @@ def _music_room(room):
         import whereabouts
         room = whereabouts.room()
     if not room:
-        return "In welchen Raum soll die Musik?"
+        return "Which room should the music go to?"
     if not spotify.configured():
-        return "Dafür brauche ich das Spotify-Login (docs/installation.md → Konfiguration → Spotify), die Medientasten erreichen nur den PC."
+        return "For that I need the Spotify login (docs/installation.md → Configuration → Spotify), the media keys only reach the PC."
     name, device, player = speakers.spotify_device(room)
     ok, text = spotify.transfer(device or room)     # an unknown room may still be a device name ("PC")
     fallback = speakers.spotify_fallback(room) if name else ""
     for _ in range(MUSIC_ROOM_TRIES - 1):
         # the soundbar drops out of Spotify's list now and then and is back a moment later: ask again
-        # before settling for the worse speaker (same rule as the HA automation "Musik wandert mit")
-        if ok or not fallback or not text.startswith("Spotify kennt kein Gerät"):
+        # before settling for the worse speaker (same rule as the HA automation "Music follows me")
+        if ok or not fallback or not text.startswith("Spotify knows no device"):
             break
         time.sleep(MUSIC_ROOM_PAUSE_S)
         ok, text = spotify.transfer(device)
-    if not ok and fallback and text.startswith("Spotify kennt kein Gerät"):
+    if not ok and fallback and text.startswith("Spotify knows no device"):
         ok, text = spotify.transfer(fallback)
         if ok:
-            return (f"„{device}“ ist für Spotify gerade nicht erreichbar, die Musik läuft ersatzweise auf "
-                    f"„{text}“ im {name}.")
+            return (f"“{device}” cannot be reached by Spotify right now, the music plays instead on "
+                    f"“{text}” in the {name}.")
     via_ha = False
-    if not ok and player and text.startswith("Spotify kennt kein Gerät"):
+    if not ok and player and text.startswith("Spotify knows no device"):
         ok, text, via_ha = _music_room_ha(player), "", True
         if not ok:
-            return f"Der Lautsprecher im {name} ist für Spotify gerade nicht erreichbar, und auch über Home Assistant hat es nicht geklappt."
+            return f"The speaker in the {name} cannot be reached by Spotify right now, and it did not work through Home Assistant either."
     if not ok:
         return text
     where = name or text
-    article = "in der" if where.lower().endswith("e") else "im"    # Küche, Diele / Wohnzimmer, Bad, Flur
     if not name:
-        return f"Die Musik läuft jetzt auf „{text}“."
-    return f"Die Musik läuft jetzt {article} {where}." + (" Dort fängt die Playlist von vorne an." if via_ha else "")
+        return f"The music is now playing on “{text}”."
+    return f"The music is now playing in the {where}." + (" The playlist starts from the beginning there." if via_ha else "")
 
 
 def _music_room_ha(player):
@@ -1087,20 +1086,20 @@ def _music(args):
     if action == "search":
         q = (args.get("query") or "").strip()
         if not q:
-            return "Wonach soll ich suchen?"
+            return "What should I search for?"
         hostos.open_target("spotify:search:" + urllib.parse.quote(q))
-        return f"Spotify zeigt die Suche nach „{q}“."
+        return f"Spotify shows the search for “{q}”."
     import spotify
     room = " ".join(str(args.get("room") or "").split())
     if action in ("transfer", "move", "room") or (room and action in ("play", "play_pause")):
         return _music_room(room)
     if action in ("play", "pause", "play_pause", "next", "previous"):
         if spotify.control(action):
-            return f"Erledigt: {action}."
+            return f"Done: {action}."
         spotify.forget()                  # the keys below decide; the wake word hold must not undo them
         action = "play_pause" if action in ("play", "pause") else action
     if action not in MEDIA_KEYS:
-        return f"Unbekannte Aktion. Möglich: play, pause, {', '.join(MEDIA_KEYS)}, search."
+        return f"Unknown action. Possible: play, pause, {', '.join(MEDIA_KEYS)}, search."
     if action == "play_pause" and not _spotify_running():
         hostos.open_target("spotify:")
         time.sleep(4)   # let the app come up before it gets the key
@@ -1108,7 +1107,7 @@ def _music(args):
     for _ in range(times):
         ctypes.windll.user32.keybd_event(MEDIA_KEYS[action], 0, 1, 0)   # KEYEVENTF_EXTENDEDKEY
         ctypes.windll.user32.keybd_event(MEDIA_KEYS[action], 0, 3, 0)   # ... | KEYUP
-    return f"Erledigt: {action}."
+    return f"Done: {action}."
 
 
 MAIL_HOST = os.environ.get("MAIL_IMAP_HOST", "").strip()
@@ -1122,8 +1121,8 @@ def _mail(args):
     import email.utils
     import mailboxes
     if not mailboxes.configured():
-        return ("Postfach noch nicht verbunden: In .env fehlen MAIL_USER und MAIL_PASSWORD (weitere Konten als "
-                "MAIL2_…), und beim Mail-Anbieter muss der IMAP-Zugriff aktiviert sein. Das trägt der User selbst ein.")
+        return ("Mailbox not connected yet: MAIL_USER and MAIL_PASSWORD are missing in .env (more accounts as "
+                "MAIL2_…), and IMAP access must be enabled at the mail provider. The user enters that himself.")
 
     def dec(v):
         return str(email.header.make_header(email.header.decode_header(v or ""))).strip()
@@ -1154,18 +1153,18 @@ def _mail(args):
             sent = email.utils.parsedate_to_datetime(msg.get("Date")) if msg.get("Date") else None
             tag = f"[{acc['name']}] " if many else ""
             rows.append((sent.timestamp() if sent else 0,
-                         f"{tag}{sent.strftime('%d.%m. %H:%M') if sent else '?'} · {frm}\n  {subj}\n  {preview(msg)}"))
+                         f"{tag}{sent.strftime('%Y-%m-%d %H:%M') if sent else '?'} · {frm}\n  {subj}\n  {preview(msg)}"))
         return acc["name"], len(ids), rows
 
     results, errors = mailboxes.each(read, timeout=20)
     if not results:
-        return "Postfach nicht erreichbar: " + "; ".join(errors)
-    kind = "ungelesene " if unread_only else ""
+        return "Mailbox not reachable: " + "; ".join(errors)
+    kind = "unread " if unread_only else ""
     head = ", ".join(f"{n}: {c}" for n, c, _ in results) if many else str(results[0][1])
-    head = (f"{head} {kind}Mails der letzten {mailboxes.LOOKBACK_H} Stunden im Posteingang."
-            + (f" Nicht erreichbar: {'; '.join(errors)}." if errors else "") + "\n")
+    head = (f"{head} {kind}mails of the last {mailboxes.LOOKBACK_H} hours in the inbox."
+            + (f" Not reachable: {'; '.join(errors)}." if errors else "") + "\n")
     rows = sorted((r for _, _, rs in results for r in rs), key=lambda r: -r[0])[:limit]
-    return (head + "\n".join(text for _, text in rows))[:6000] if rows else head + "Keine passenden Mails."
+    return (head + "\n".join(text for _, text in rows))[:6000] if rows else head + "No matching mails."
 
 
 def _mail_mark(args):
@@ -1176,7 +1175,7 @@ def _mail_mark(args):
         return _mail({})
     q = (args.get("search") or "").strip().lower()
     if not q and not args.get("all"):
-        return "Welche Mails? `search` (Absender/Betreff) oder `all`=true angeben."
+        return "Which mails? Give `search` (sender/subject) or `all`=true."
     unread = bool(args.get("unread"))
 
     def dec(v):
@@ -1192,33 +1191,33 @@ def _mail_mark(args):
             msg = email.message_from_bytes(raw)
             frm, subj = dec(msg.get("From")), dec(msg.get("Subject"))
             if not q or q in frm.lower() or q in subj.lower():
-                hit.append((uid, subj or "(ohne Betreff)"))
+                hit.append((uid, subj or "(no subject)"))
         if unread and not args.get("all"):
-            hit = hit[-5:]              # "wieder ungelesen" means the latest few, not the whole archive
+            hit = hit[-5:]              # "unread again" means the latest few, not the whole archive
         if hit:
             box.uid("STORE", b",".join(u for u, _ in hit).decode(), "-FLAGS" if unread else "+FLAGS", "(\\Seen)")
         return hit
 
     results, errors = mailboxes.each(mark, readonly=False, timeout=20)
     hit = [h for r in results for h in r]
-    note = f" Nicht erreichbar: {'; '.join(errors)}." if errors else ""
+    note = f" Not reachable: {'; '.join(errors)}." if errors else ""
     if not hit:
-        return "Keine passenden " + ("gelesenen" if unread else "ungelesenen") + " Mails gefunden." + note
-    what = "als ungelesen" if unread else "als gelesen"
-    return (f"{len(hit)} Mails {what} markiert: " + "; ".join(s for _, s in hit[:10]))[:1500] + note
+        return "No matching " + ("read" if unread else "unread") + " mails found." + note
+    what = "as unread" if unread else "as read"
+    return (f"{len(hit)} mails marked {what}: " + "; ".join(s for _, s in hit[:10]))[:1500] + note
 
 def _weather(args):
     import datetime as dt
     import urllib.parse
     import briefing
     import jarvis_profile as profile
-    lat, lon, where = briefing.LAT, briefing.LON, profile.place_suffix().strip(" ()") or "zu Hause"
+    lat, lon, where = briefing.LAT, briefing.LON, profile.place_suffix().strip(" ()") or "at home"
     place = (args.get("place") or "").strip()
     if place:
-        hits = briefing._get("https://geocoding-api.open-meteo.com/v1/search?count=1&language=de&name="
+        hits = briefing._get("https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name="
                              + urllib.parse.quote(place)).get("results") or []
         if not hits:
-            return f"Ort '{place}' nicht gefunden."
+            return f"Place '{place}' not found."
         lat, lon = hits[0]["latitude"], hits[0]["longitude"]
         where = ", ".join(x for x in (hits[0].get("name"), hits[0].get("country")) if x)
     days = max(1, min(int(args.get("days") or 2), 14))
@@ -1230,25 +1229,25 @@ def _weather(args):
         "&hourly=temperature_2m,precipitation_probability,weather_code"
         % (lat, lon, briefing.TZ_Q, max(days, 2)), timeout=15)
     sky = briefing.WEATHER_CODES
-    wd = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+    wd = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     c = d.get("current") or {}
-    out = [f"Wetter {where}. Jetzt: {sky.get(c.get('weather_code'), 'wechselhaft')}, {c.get('temperature_2m')} °C "
-           f"(gefühlt {c.get('apparent_temperature')}), Wind {c.get('wind_speed_10m')} km/h, UV {c.get('uv_index')}."]
+    out = [f"Weather {where}. Now: {sky.get(c.get('weather_code'), 'changeable')}, {c.get('temperature_2m')} °C "
+           f"(feels like {c.get('apparent_temperature')}), wind {c.get('wind_speed_10m')} km/h, UV {c.get('uv_index')}."]
     day = d["daily"]
     for i in range(days):
         date = dt.date.fromisoformat(day["time"][i])
-        out.append(f"{wd[date.weekday()]} {date:%d.%m.}: {sky.get(day['weather_code'][i], 'wechselhaft')}, "
-                   f"{day['temperature_2m_min'][i]:.0f} bis {day['temperature_2m_max'][i]:.0f} °C, "
-                   f"Regen {day['precipitation_probability_max'][i] or 0} % ({day['precipitation_sum'][i] or 0} mm), "
-                   f"Wind bis {day['wind_speed_10m_max'][i] or 0:.0f} km/h, UV {day['uv_index_max'][i] or 0:.0f}, "
-                   f"Sonne {(day['sunshine_duration'][i] or 0) / 3600:.1f} h, "
-                   f"Aufgang {day['sunrise'][i][-5:]}, Untergang {day['sunset'][i][-5:]}.")
+        out.append(f"{wd[date.weekday()]} {date:%m-%d}: {sky.get(day['weather_code'][i], 'changeable')}, "
+                   f"{day['temperature_2m_min'][i]:.0f} to {day['temperature_2m_max'][i]:.0f} °C, "
+                   f"rain {day['precipitation_probability_max'][i] or 0} % ({day['precipitation_sum'][i] or 0} mm), "
+                   f"wind up to {day['wind_speed_10m_max'][i] or 0:.0f} km/h, UV {day['uv_index_max'][i] or 0:.0f}, "
+                   f"sun {(day['sunshine_duration'][i] or 0) / 3600:.1f} h, "
+                   f"sunrise {day['sunrise'][i][-5:]}, sunset {day['sunset'][i][-5:]}.")
     if args.get("hourly"):
         h, now = d["hourly"], dt.datetime.now().strftime("%Y-%m-%dT%H:00")
         start = next((k for k, t in enumerate(h["time"]) if t >= now), 0)
-        out.append("Stündlich: " + "; ".join(
+        out.append("Hourly: " + "; ".join(
             f"{h['time'][k][-5:]} {h['temperature_2m'][k]:.0f}° {h['precipitation_probability'][k] or 0}% "
-            f"{sky.get(h['weather_code'][k], 'wechselhaft')}"
+            f"{sky.get(h['weather_code'][k], 'changeable')}"
             for k in range(start, min(start + 24, len(h["time"])), 2)))
     return "\n".join(out)
 
@@ -1283,7 +1282,7 @@ def _verify(eid, domain, service, data=None, wait=None):
         elif service == "set_hvac_mode":
             key, target = "state", data.get("hvac_mode")
         else:
-            return f"Abgelehnt: {service} ist für dieses Thermostat nicht freigegeben."
+            return f"Refused: {service} is not allowed for this thermostat."
         end = _t.time() + (VERIFY_S if wait is None else wait)
         state = {}
         while True:
@@ -1292,19 +1291,19 @@ def _verify(eid, domain, service, data=None, wait=None):
                 actual = state.get("state") if key == "state" else (state.get("attributes") or {}).get(key)
                 if key == "temperature" and actual is not None and abs(float(actual) - float(target)) <= 0.1:
                     name = (state.get("attributes") or {}).get("friendly_name", eid)
-                    return f"Erledigt: {name} steht auf {target:g} °C."
+                    return f"Done: {name} is set to {target:g} °C."
                 if key == "state" and actual == target:
                     name = (state.get("attributes") or {}).get("friendly_name", eid)
-                    return f"Erledigt: {name} ist auf {target}."
+                    return f"Done: {name} is on {target}."
             except Exception:  # noqa: BLE001
                 pass
             if _t.time() >= end:
                 break
             _t.sleep(0.3)
-        return (f"Gesendet, aber Home Assistant bestätigt {key}={target} für {eid} noch nicht. "
-                "Nicht als erledigt melden.")
+        return (f"Sent, but Home Assistant does not confirm {key}={target} for {eid} yet. "
+                "Do not report it as done.")
     if domain not in ("light", "switch", "fan") or not want:
-        return f"Erledigt: {domain}.{service} für {eid}."
+        return f"Done: {domain}.{service} for {eid}."
     import time as _t
     end, state = _t.time() + (VERIFY_S if wait is None else wait), "?"
     while True:
@@ -1316,15 +1315,15 @@ def _verify(eid, domain, service, data=None, wait=None):
             break
         _t.sleep(0.3)
     if state == want:
-        return f"Erledigt: {eid} ist jetzt {'an' if want == 'on' else 'aus'}."
-    return (f"Gesendet, aber {eid} meldet noch '{state}' statt '{want}' — vielleicht offline oder träge. "
-            "Nicht als erledigt melden.")
+        return f"Done: {eid} is now {want}."
+    return (f"Sent, but {eid} still reports '{state}' instead of '{want}' — maybe offline or slow. "
+            "Do not report it as done.")
 
 
 def _home(name, args):
     if not HA_TOKEN:
-        return ("Home Assistant noch nicht verbunden: In .env fehlt HA_TOKEN (langlebiges Zugriffstoken "
-                "aus dem Home-Assistant-Profil). Das muss der User selbst eintragen.")
+        return ("Home Assistant not connected yet: HA_TOKEN is missing in .env (long-lived access token "
+                "from the Home Assistant profile). The user has to enter that himself.")
     try:
         if name == "home_states":
             q = (args.get("search") or "").lower()
@@ -1343,11 +1342,11 @@ def _home(name, args):
                 detail = f"{s['state']} {unit}".rstrip()
                 if eid.startswith("climate."):
                     if attrs.get("current_temperature") is not None:
-                        detail += f", Raum {attrs['current_temperature']} °C"
+                        detail += f", room {attrs['current_temperature']} °C"
                     if attrs.get("temperature") is not None:
-                        detail += f", Soll {attrs['temperature']} °C"
+                        detail += f", target {attrs['temperature']} °C"
                 rows.append(f"{label} ({eid}): {detail}".rstrip())
-            return "\n".join(sorted(rows))[:6000] or "Nichts gefunden."
+            return "\n".join(sorted(rows))[:6000] or "Nothing found."
         eid = (args.get("entity_id") or "").strip()
         domain, service = eid.split(".")[0], (args.get("service") or "").strip()
         if domain == "climate":
@@ -1361,45 +1360,45 @@ def _home(name, args):
                            if isinstance(row, (list, tuple)) and len(row) >= 2
                            and str(row[0]).startswith("climate.")}
             if eid not in allowed:
-                return "Abgelehnt: Dieses Thermostat ist nicht in config/home.json unter climate_groups freigegeben."
+                return "Refused: this thermostat is not allowed in config/home.json under climate_groups."
             state = _ha(f"/api/states/{eid}") or {}
             attrs = state.get("attributes") or {}
             data = dict(args.get("data") or {})
             if service in {"turn_off", "turn_on"}:
                 if data:
-                    return "Abgelehnt: turn_on/turn_off für Thermostate darf keine Zusatzwerte enthalten."
+                    return "Refused: turn_on/turn_off for thermostats must not carry extra values."
                 service, data = "set_hvac_mode", {"hvac_mode": "off" if service == "turn_off" else "heat"}
             if service == "set_temperature":
                 if set(data) != {"temperature"}:
-                    return "Abgelehnt: Für ein Thermostat ist nur eine einzelne Solltemperatur erlaubt."
+                    return "Refused: for a thermostat only a single target temperature is allowed."
                 try:
                     target = float(data["temperature"])
                     lo = max(5.0, float(attrs.get("min_temp", 5)))
                     hi = min(30.0, float(attrs.get("max_temp", 30)))
                 except (TypeError, ValueError):
-                    return "Abgelehnt: Bitte eine gültige Solltemperatur in °C angeben."
+                    return "Refused: please give a valid target temperature in °C."
                 if not lo <= target <= hi:
-                    return f"Abgelehnt: Die Solltemperatur muss zwischen {lo:g} und {hi:g} °C liegen."
+                    return f"Refused: the target temperature must be between {lo:g} and {hi:g} °C."
             elif service == "set_hvac_mode":
                 if set(data) != {"hvac_mode"} or data.get("hvac_mode") not in {"heat", "off", "auto"}:
-                    return "Abgelehnt: Erlaubt sind nur die Heizmodi heat, off oder auto."
+                    return "Refused: only the heating modes heat, off or auto are allowed."
                 modes = attrs.get("hvac_modes") or []
                 if modes and data["hvac_mode"] not in modes:
-                    return f"Abgelehnt: Home Assistant meldet diese Modi nicht als verfügbar ({', '.join(map(str, modes))})."
+                    return f"Refused: Home Assistant does not report these modes as available ({', '.join(map(str, modes))})."
             else:
-                return "Abgelehnt: Für Thermostate sind nur Solltemperatur und Heizmodus freigegeben."
+                return "Refused: for thermostats only target temperature and heating mode are allowed."
             _ha(f"/api/services/climate/{service}", dict(data, entity_id=eid))
             return _verify(eid, domain, service, data)
         if domain not in HA_DOMAINS:
-            return f"Abgelehnt: {domain} darf ich nicht schalten, nur {', '.join(sorted(HA_DOMAINS))}."
+            return f"Refused: I may not switch {domain}, only {', '.join(sorted(HA_DOMAINS))}."
         if not service.replace("_", "").isalnum():
-            return "Abgelehnt: ungültiger Dienst."
+            return "Refused: invalid service."
         _ha(f"/api/services/{domain}/{service}", dict(args.get("data") or {}, entity_id=eid))
         return _verify(eid, domain, service)
     except urllib.error.HTTPError as e:
-        return f"Home Assistant meldet Fehler {e.code}" + (" (Token ungültig?)" if e.code == 401 else "")
+        return f"Home Assistant reports error {e.code}" + (" (token invalid?)" if e.code == 401 else "")
     except Exception as e:  # noqa: BLE001
-        return f"Home Assistant nicht erreichbar: {e}"
+        return f"Home Assistant not reachable: {e}"
 
 
 SYNO_URL = os.environ.get("SYNOLOGY_URL", "").strip().rstrip("/")
@@ -1415,35 +1414,35 @@ def _syno(params, sid=None):
                                 timeout=20) as r:
         data = json.loads(r.read())
     if not data.get("success"):
-        raise RuntimeError(f"DSM-Fehler {data.get('error', {}).get('code', '?')} bei {params.get('api')}")
+        raise RuntimeError(f"DSM error {data.get('error', {}).get('code', '?')} at {params.get('api')}")
     return data.get("data") or {}
 
 
 def _nas_status():
     if not (SYNO_USER and SYNO_PASSWORD):
-        return ("NAS noch nicht verbunden: In .env fehlen SYNOLOGY_USER und SYNOLOGY_PASSWORD (eigener DSM-Benutzer "
-                "in der Gruppe administrators, ohne Zwei-Faktor). Das trägt der User selbst ein.")
+        return ("NAS not connected yet: SYNOLOGY_USER and SYNOLOGY_PASSWORD are missing in .env (a separate DSM user "
+                "in the administrators group, without two-factor). The user enters that himself.")
     try:
         sid = _syno({"api": "SYNO.API.Auth", "version": 6, "method": "login", "account": SYNO_USER,
                      "passwd": SYNO_PASSWORD, "session": "jarvis", "format": "sid"})["sid"]
     except Exception as e:  # noqa: BLE001
-        return f"NAS-Anmeldung fehlgeschlagen ({e}). 400/401 = Benutzer oder Passwort falsch, 403 = Zwei-Faktor aktiv."
+        return f"NAS login failed ({e}). 400/401 = wrong user or password, 403 = two-factor active."
     gb = lambda b: f"{int(b) / 1e9:.0f} GB" if int(b) < 1e12 else f"{int(b) / 1e12:.1f} TB"  # noqa: E731
     rows = []
     try:
         for label, call in (
             ("system", {"api": "SYNO.Core.System", "version": 1, "method": "info"}),
             ("last", {"api": "SYNO.Core.System.Utilization", "version": 1, "method": "get"}),
-            ("speicher", {"api": "SYNO.Storage.CGI.Storage", "version": 1, "method": "load_info"}),
+            ("storage", {"api": "SYNO.Storage.CGI.Storage", "version": 1, "method": "load_info"}),
         ):
             try:
                 d = _syno(call, sid)
             except Exception as e:  # noqa: BLE001
-                rows.append(f"{label}: nicht lesbar ({e})")
+                rows.append(f"{label}: not readable ({e})")
                 continue
             if label == "system":
-                rows.append(f"modell: {d.get('model', '?')}, {d.get('firmware_ver', '?')}, "
-                            f"temperatur {d.get('sys_temp', '?')} C, laufzeit {d.get('up_time', '?')}")
+                rows.append(f"model: {d.get('model', '?')}, {d.get('firmware_ver', '?')}, "
+                            f"temperature {d.get('sys_temp', '?')} C, uptime {d.get('up_time', '?')}")
             elif label == "last":
                 cpu, mem = d.get("cpu", {}), d.get("memory", {})
                 rows.append(f"cpu: {int(cpu.get('user_load', 0)) + int(cpu.get('system_load', 0))} %, "
@@ -1452,10 +1451,10 @@ def _nas_status():
                 for v in d.get("volumes", []):
                     size = v.get("size", {})
                     used, total = int(size.get("used", 0)), int(size.get("total", 0)) or 1
-                    rows.append(f"volume {v.get('display_name', v.get('id'))}: {gb(used)} von {gb(total)} "
-                                f"belegt ({used * 100 // total} %), status {v.get('status', '?')}")
+                    rows.append(f"volume {v.get('display_name', v.get('id'))}: {gb(used)} of {gb(total)} "
+                                f"used ({used * 100 // total} %), status {v.get('status', '?')}")
                 for k in d.get("disks", []):
-                    rows.append(f"platte {k.get('name', k.get('id'))} ({k.get('model', '').strip()}, "
+                    rows.append(f"disk {k.get('name', k.get('id'))} ({k.get('model', '').strip()}, "
                                 f"{gb(k.get('size_total', 0))}): status {k.get('status', '?')}, "
                                 f"smart {k.get('smart_status', '?')}, {k.get('temp', '?')} C")
     finally:
@@ -1474,20 +1473,20 @@ GARMIN_TOKENS = os.path.join(HERE, ".garmin_tokens")   # login once, then reuse 
 def _garmin(args):
     import datetime as dt
     if not (GARMIN_EMAIL and GARMIN_PASSWORD):
-        return "Garmin noch nicht verbunden: In .env fehlen GARMIN_EMAIL und GARMIN_PASSWORD. Das trägt der User selbst ein."
+        return "Garmin not connected yet: GARMIN_EMAIL and GARMIN_PASSWORD are missing in .env. The user enters that himself."
     try:
         from garminconnect import Garmin
     except ImportError:
-        return "Das Python-Paket garminconnect fehlt noch (pip install garminconnect in der .venv)."
+        return "The Python package garminconnect is missing (pip install garminconnect in the .venv)."
     try:
         g = Garmin(GARMIN_EMAIL, GARMIN_PASSWORD, return_on_mfa=True)
         needs_mfa, _ = g.login(GARMIN_TOKENS)   # reuses stored tokens, else logs in with the password
         if needs_mfa:
-            return "Garmin verlangt Zwei-Faktor-Anmeldung — die kann ich nicht beantworten. Bitte dort abschalten."
+            return "Garmin asks for a two-factor login — I cannot answer that. Please turn it off there."
         os.makedirs(GARMIN_TOKENS, exist_ok=True)
         g.client.dump(GARMIN_TOKENS)
     except Exception as e:  # noqa: BLE001
-        return f"Garmin-Anmeldung fehlgeschlagen ({e}). Passwort richtig, Zwei-Faktor aus?"
+        return f"Garmin login failed ({e}). Password right, two-factor off?"
     hm = lambda s: f"{int(s or 0) // 3600}:{int(s or 0) % 3600 // 60:02d} h"  # noqa: E731
     rows = []
     days = max(1, min(int(args.get("days") or 1), 14))
@@ -1498,18 +1497,18 @@ def _garmin(args):
             s = (g.get_sleep_data(day) or {}).get("dailySleepDTO") or {}
             if s.get("sleepTimeSeconds"):
                 score = ((s.get("sleepScores") or {}).get("overall") or {}).get("value", "?")
-                parts.append(f"schlaf {hm(s['sleepTimeSeconds'])} (tief {hm(s.get('deepSleepSeconds'))}, "
-                             f"REM {hm(s.get('remSleepSeconds'))}, wach {hm(s.get('awakeSleepSeconds'))}), score {score}")
+                parts.append(f"sleep {hm(s['sleepTimeSeconds'])} (deep {hm(s.get('deepSleepSeconds'))}, "
+                             f"REM {hm(s.get('remSleepSeconds'))}, awake {hm(s.get('awakeSleepSeconds'))}), score {score}")
         except Exception as e:  # noqa: BLE001
-            parts.append(f"schlaf nicht lesbar ({e})")
+            parts.append(f"sleep not readable ({e})")
         try:
             st = g.get_stats(day) or {}
-            parts.append(f"schritte {st.get('totalSteps', '?')}, ruhepuls {st.get('restingHeartRate', '?')}, "
+            parts.append(f"steps {st.get('totalSteps', '?')}, resting heart rate {st.get('restingHeartRate', '?')}, "
                          f"stress {st.get('averageStressLevel', '?')}, body battery "
                          f"{st.get('bodyBatteryLowestValue', '?')}–{st.get('bodyBatteryHighestValue', '?')}, "
-                         f"jetzt {st.get('bodyBatteryMostRecentValue', '?')}")
+                         f"now {st.get('bodyBatteryMostRecentValue', '?')}")
         except Exception as e:  # noqa: BLE001
-            parts.append(f"tageswerte nicht lesbar ({e})")
+            parts.append(f"daily values not readable ({e})")
         rows.append(" · ".join(parts))
     return "\n".join(rows)[:5000]
 
@@ -1521,10 +1520,10 @@ PI_STATUS_CMD = (
     "echo host: $(hostname); echo uptime: $(uptime -p); "
     "echo temp: $(awk '{printf \"%.1f C\", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null); "
     "echo load: $(cut -d' ' -f1-3 /proc/loadavg); "
-    "free -m | awk '/Mem:/{print \"ram: \" $3 \" von \" $2 \" MB belegt\"}'; "
-    "df -h / | awk 'NR==2{print \"disk: \" $3 \" von \" $2 \" belegt (\" $5 \")\"}'; "
+    "free -m | awk '/Mem:/{print \"ram: \" $3 \" of \" $2 \" MB used\"}'; "
+    "df -h / | awk 'NR==2{print \"disk: \" $3 \" of \" $2 \" used (\" $5 \")\"}'; "
     "for s in pihole-FTL docker home-assistant@homeassistant hassio-supervisor; do "
-    "st=$(systemctl is-active $s 2>/dev/null); [ \"$st\" != inactive ] && [ -n \"$st\" ] && echo \"dienst $s: $st\"; done; "
+    "st=$(systemctl is-active $s 2>/dev/null); [ \"$st\" != inactive ] && [ -n \"$st\" ] && echo \"service $s: $st\"; done; "
     "command -v docker >/dev/null && docker ps --format 'container {{.Names}}: {{.Status}}' 2>/dev/null | head -12; "
     "true"
 )
@@ -1537,7 +1536,7 @@ def _network_devices():
           "'{0,-16} {1,-18} {2}' -f $_.IPAddress, $_.LinkLayerAddress, $n }")
     out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
                          timeout=60, **hostos.QUIET)
-    return (out.stdout.strip() or out.stderr.strip() or "Keine Geräte gefunden.")[:4000]
+    return (out.stdout.strip() or out.stderr.strip() or "No devices found.")[:4000]
 
 
 def _pi_status():
@@ -1545,7 +1544,7 @@ def _pi_status():
                           PI_STATUS_CMD], capture_output=True, text=True, timeout=40,
                          **hostos.QUIET)
     if out.returncode != 0 and not out.stdout.strip():
-        return f"Pi nicht erreichbar ({PI_USER}@{PI_HOST}): {out.stderr.strip()[:300]}"
+        return f"Pi not reachable ({PI_USER}@{PI_HOST}): {out.stderr.strip()[:300]}"
     return out.stdout.strip()[:4000]
 
 
@@ -1557,28 +1556,28 @@ _PI_RUN_FORBIDDEN = re.compile(r"(rm\s+(-\w*\s+)*-\w*[rR]\w*\s+/(\s|$|\*)|mkfs|d
 def _pi_run(command):
     cmd = " ".join(str(command or "").split())
     if not cmd:
-        return "Kein Befehl angegeben."
+        return "No command given."
     if not PI_HOST:
-        return "Pi nicht konfiguriert: JARVIS_PI_HOST fehlt in .env."
+        return "Pi not configured: JARVIS_PI_HOST is missing in .env."
     if _PI_RUN_FORBIDDEN.search(cmd):
-        return f"Abgelehnt: '{cmd[:80]}' würde den Pi zerstören — das führe ich grundsätzlich nicht aus."
+        return f"Refused: '{cmd[:80]}' would destroy the Pi — I never run that."
     try:
         out = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6", f"{PI_USER}@{PI_HOST}", cmd],
                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
                              **hostos.QUIET)
     except subprocess.TimeoutExpired:
-        return f"Zeitüberschreitung: '{cmd[:80]}' lief länger als 120 s (läuft eventuell noch weiter)."
+        return f"Timeout: '{cmd[:80]}' ran longer than 120 s (it may still be running)."
     text = (out.stdout or "").strip()
     err = (out.stderr or "").strip()
     if out.returncode == 255 and not text:
-        return f"Pi nicht erreichbar ({PI_USER}@{PI_HOST}): {err[:300]}"
+        return f"Pi not reachable ({PI_USER}@{PI_HOST}): {err[:300]}"
     parts = [f"exit {out.returncode}"]
     if text:
         parts.append(text[:3500])
     if err:
         parts.append("stderr: " + err[:800])
     if not text and not err:
-        parts.append("(keine Ausgabe)")
+        parts.append("(no output)")
     return "\n".join(parts)
 
 
@@ -1586,23 +1585,23 @@ def _calendar(name, args):
     import datetime as dt
     import icloud_calendar as cal
     if not cal.configured():
-        return ("Kalender noch nicht eingerichtet: In .env fehlen ICLOUD_USER und ICLOUD_APP_PASSWORD "
-                "(app-spezifisches Passwort von account.apple.com). Das muss der User selbst eintragen.")
+        return ("Calendar not set up yet: ICLOUD_USER and ICLOUD_APP_PASSWORD are missing in .env "
+                "(app-specific password from account.apple.com). The user has to enter that himself.")
     try:
         if name == "calendar_events":
             start = args.get("start")
             day = dt.datetime.strptime(start[:10], "%Y-%m-%d").date() if start else None
             names = ", ".join(n for n, _ in cal.calendars())
-            return f"Kalender: {names}\n" + cal.describe(cal.events(day, args.get("days") or 1))
+            return f"Calendars: {names}\n" + cal.describe(cal.events(day, args.get("days") or 1))
         if _calendar_past(args):
-            return f"Nicht eingetragen — der Termin ({args.get('start')}) liegt in der Vergangenheit."
+            return f"Not entered — the appointment ({args.get('start')}) is in the past."
         same = _calendar_clash(args).get("same")
         if same:
-            return f"Nicht eingetragen — {cal.clash_text({'same': same})}."
+            return f"Not entered — {cal.clash_text({'same': same})}."
         return cal.add_event(args.get("title", ""), args.get("start", ""), args.get("end"),
                              args.get("location", ""), args.get("notes", ""), args.get("calendar", ""))
     except Exception as e:  # noqa: BLE001
-        return f"Kalenderfehler: {e}"
+        return f"Calendar error: {e}"
 
 
 def _internal(op, args):
@@ -1616,7 +1615,7 @@ def _internal(op, args):
         with urllib.request.urlopen(req, timeout=15) as r:
             return json.loads(r.read()).get("text") or "?"
     except (urllib.error.URLError, OSError, ValueError) as e:
-        return f"Jarvis-Server nicht erreichbar ({e})."
+        return f"Jarvis server not reachable ({e})."
 
 
 def _calendar_past(args):
@@ -1649,15 +1648,15 @@ def _approve(tool_name, tool_input):
     if tool_name.endswith("calendar_add"):
         import icloud_calendar as cal
         if _calendar_past(tool_input):   # a booking mail from last week is no reason to fill the past
-            return {"behavior": "deny", "message": f"Nicht vorgeschlagen — der Termin ({tool_input.get('start')}) liegt "
-                                                   "in der Vergangenheit. Dem User nur sagen, dass er schon vorbei ist."}
+            return {"behavior": "deny", "message": f"Not suggested — the appointment ({tool_input.get('start')}) is "
+                                                   "in the past. Only tell the user that it is already over."}
         clash = _calendar_clash(tool_input)
         if clash.get("same"):
-            return {"behavior": "deny", "message": f"Nicht vorgeschlagen — {cal.clash_text(dict(clash, overlap=[]))}. "
-                                                   "Dem User sagen, dass der Termin schon eingetragen ist."}
+            return {"behavior": "deny", "message": f"Not suggested — {cal.clash_text(dict(clash, overlap=[]))}. "
+                                                   "Tell the user that the appointment is already entered."}
         hint = cal.clash_text(clash) if clash else ""
         if hint:
-            verdict = _ask(tool_name, dict(tool_input, _hinweis=hint))
+            verdict = _ask(tool_name, dict(tool_input, _note=hint))
             if verdict.get("behavior") == "allow":
                 verdict["updatedInput"] = tool_input
             return verdict
@@ -1672,10 +1671,10 @@ def _ask(tool_name, tool_input):
         with urllib.request.urlopen(req, timeout=PERM_TIMEOUT + 15) as r:
             allowed = bool(json.loads(r.read()).get("allow"))
     except (urllib.error.URLError, OSError, ValueError) as e:
-        return {"behavior": "deny", "message": f"Bestätigung nicht möglich ({e}). Abgelehnt."}
+        return {"behavior": "deny", "message": f"Confirmation not possible ({e}). Refused."}
     if allowed:
         return {"behavior": "allow", "updatedInput": tool_input}
-    return {"behavior": "deny", "message": "Der User hat diese Aktion nicht bestätigt. Nicht ausführen, keinen Umweg versuchen."}
+    return {"behavior": "deny", "message": "The user did not confirm this action. Do not run it, do not try a way around it."}
 
 
 def _open(url):
@@ -1683,13 +1682,13 @@ def _open(url):
     if not url.lower().startswith(("http://", "https://")):
         url = "https://" + url if url and "://" not in url else ""
     if not url:
-        return "Abgelehnt: nur http(s)-Adressen."
+        return "Refused: only http(s) addresses."
     if BROWSER and os.path.exists(BROWSER):
         subprocess.Popen([BROWSER, url], close_fds=True,
                          **hostos.DETACHED)
     else:
         hostos.open_target(url)      # system default browser
-    return f"Geöffnet: {url}"
+    return f"Opened: {url}"
 
 
 def _reply(mid, result=None, error=None):
@@ -1715,7 +1714,7 @@ def call_tool(name, args):
         try:
             text = _music(args)
         except Exception as e:  # noqa: BLE001
-            text = f"Musik-Fehler: {e}"
+            text = f"Music error: {e}"
     elif name == "mail_inbox":
         text = _mail(args)
     elif name == "mail_mark_read":
@@ -1723,26 +1722,26 @@ def call_tool(name, args):
     elif name in ("announce", "tv_control"):
         try:
             import speakers
-            text = (speakers.announce(args.get("raum"), args.get("text")) if name == "announce"
-                    else speakers.tv(args.get("befehl"), args.get("app") or ""))
+            text = (speakers.announce(args.get("room"), args.get("text")) if name == "announce"
+                    else speakers.tv(args.get("command"), args.get("app") or ""))
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name == "weather_alerts":
         try:
             import weather_alerts
             text = weather_alerts.current()
         except Exception as e:  # noqa: BLE001
-            text = f"Wetterwarnungen-Fehler: {e}"
+            text = f"Weather alerts error: {e}"
     elif name == "weather":
         try:
             text = _weather(args)
         except Exception as e:  # noqa: BLE001
-            text = f"Wetterdienst nicht erreichbar: {e}"
+            text = f"Weather service not reachable: {e}"
     elif name in ("nas_status", "garmin_health"):
         try:
             text = _nas_status() if name == "nas_status" else _garmin(args)
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name in ("home_states", "home_control"):
         text = _home(name, args)
     elif name in ("network_devices", "pi_status", "pi_run"):
@@ -1750,7 +1749,7 @@ def call_tool(name, args):
             text = {"network_devices": _network_devices, "pi_status": _pi_status,
                     "pi_run": lambda: _pi_run(args.get("command"))}[name]()
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name == "web_fetch":
         text = _web_fetch(args.get("url"))
     elif name in ("reminder_add", "reminder_list", "reminder_cancel"):
@@ -1760,13 +1759,13 @@ def call_tool(name, args):
             import lists
             text = lists.tool(name, args)
         except Exception as e:  # noqa: BLE001
-            text = f"Listen-Fehler: {e}"
+            text = f"Lists error: {e}"
     elif name in ("routine_list", "routine_save", "routine_delete"):
         try:
             import routines
             text = routines.tool(name, args)
         except Exception as e:  # noqa: BLE001
-            text = f"Routinen-Fehler: {e}"
+            text = f"Routines error: {e}"
     elif name == "memory_review":
         import memory_intel
         text = memory_intel.review()
@@ -1780,9 +1779,9 @@ def call_tool(name, args):
             elif name == "memory_forget":
                 text = mt.forget(args.get("text"), args.get("note") or "")
             else:
-                text = f"Exportiert: {mt.export()}"
+                text = f"Exported: {mt.export()}"
         except Exception as e:  # noqa: BLE001
-            text = f"Gedächtnis-Fehler: {e}"
+            text = f"Memory error: {e}"
     elif name in ("window_arrange", "file_search", "file_read", "clipboard_read", "screen_read",
                   "script_list", "script_run"):
         try:
@@ -1792,11 +1791,11 @@ def call_tool(name, args):
                     "file_search": lambda: desktop.search(args.get("query")),
                     "file_read": lambda: desktop.read(args.get("path")),
                     "clipboard_read": desktop.clipboard,
-                    "screen_read": lambda: desktop.screen_text(bool(args.get("ganz"))),
+                    "screen_read": lambda: desktop.screen_text(bool(args.get("full"))),
                     "script_list": desktop.script_list,
                     "script_run": lambda: desktop.script_run(args.get("name"))}[name]()
         except Exception as e:  # noqa: BLE001
-            text = f"Windows-Fehler: {e}"
+            text = f"Windows error: {e}"
     elif name in ("mail_draft", "day_prep", "research_save", "watch_add", "watch_list", "watch_remove",
                   "plan_create", "plan_list", "plan_check"):
         try:
@@ -1812,27 +1811,27 @@ def call_tool(name, args):
                     "plan_list": a.plan_list,
                     "plan_check": lambda: a.plan_check(args.get("title"), args.get("step"))}[name]()
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name in ("energy_coach", "energy_device_usage"):
         try:
             import energy_coach
             text = (energy_coach.report() if name == "energy_coach"
-                    else energy_coach.set_usage(args.get("geraet") or "", bool(args.get("oft"))))
+                    else energy_coach.set_usage(args.get("device") or "", bool(args.get("often"))))
         except Exception as e:  # noqa: BLE001
-            text = f"Energie-Coach-Fehler: {e}"
+            text = f"Energy coach error: {e}"
     elif name in ("pc_status", "net_diagnose", "backup_status", "home_check", "phone_notify"):
         try:
             import infra
             text = (infra.phone_notify(args.get("text")) if name == "phone_notify"
                     else getattr(infra, name)())
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name == "shipments_status":
         try:
             import shipments
             text = shipments.status_text()
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name in ("mail_events_scan", "mail_events_add", "mail_events_undo"):
         try:
             import mail_events
@@ -1843,53 +1842,53 @@ def call_tool(name, args):
             else:
                 text = mail_events.undo(args.get("hours") or 24)
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name in ("homelab_status", "metrics_query", "pihole_status"):
         try:
             import homelab
-            text = {"homelab_status": lambda: homelab.describe(args.get("topic") or "alles"),
+            text = {"homelab_status": lambda: homelab.describe(args.get("topic") or "all"),
                     "metrics_query": lambda: homelab.query(args.get("expr"), args.get("hours") or 0),
                     "pihole_status": homelab.pihole}[name]()
         except Exception as e:  # noqa: BLE001
-            text = f"Homelab-Fehler: {e}"
+            text = f"Homelab error: {e}"
     elif name in ("security_findings", "security_accept", "security_scan"):
         try:
             import situation
             text = {"security_findings": situation.open_findings, "security_scan": situation.run_scan,
-                    "security_accept": lambda: situation.accept(args.get("id"), args.get("grund"), args.get("tage"))}[name]()
+                    "security_accept": lambda: situation.accept(args.get("id"), args.get("why"), args.get("days"))}[name]()
         except Exception as e:  # noqa: BLE001
-            text = f"Sicherheitszentrale-Fehler: {e}"
+            text = f"Security centre error: {e}"
     elif name == "power_costs":
         try:
             import power_costs
-            text = power_costs.report(args.get("geraet") or "", bool(args.get("standby")))
+            text = power_costs.report(args.get("device") or "", bool(args.get("standby")))
         except Exception as e:  # noqa: BLE001
-            text = f"Stromkosten-Fehler: {e}"
+            text = f"Power costs error: {e}"
     elif name == "homelab_report":
         try:
             import situation
-            text = situation.report(args.get("topic") or "alles", bool(args.get("detail")))
+            text = situation.report(args.get("topic") or "all", bool(args.get("detail")))
         except Exception as e:  # noqa: BLE001
-            text = f"Lagebericht-Fehler: {e}"
+            text = f"Status report error: {e}"
     elif name in ("updates_check", "update_install", "update_status"):
         try:
             import updates
             text = {"updates_check": updates.check, "update_status": updates.install_status,
                     "update_install": lambda: updates.install(args.get("target"))}[name]()
         except Exception as e:  # noqa: BLE001
-            text = f"Update-Fehler: {e}"
+            text = f"Update error: {e}"
     elif name == "screen_describe":
         try:
             import vision
-            text = vision.describe(args.get("frage") or "", bool(args.get("ganz")))
+            text = vision.describe(args.get("question") or "", bool(args.get("full")))
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name in ("doc_search", "doc_status"):
         try:
             import docsearch
             text = docsearch.search(args.get("query")) if name == "doc_search" else docsearch.status()
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name == "forecast_status":
         import monitoring
         text = monitoring.describe()
@@ -1903,25 +1902,25 @@ def call_tool(name, args):
             else:
                 text = tasks.cancel(args.get("id") or None)
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name == "context_snapshot":
         try:
             import context
             text = context.describe(args.get("sources") or None)
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name in ("skill_list", "skill_undo"):
         try:
             import skill_factory
             text = skill_factory.listing() if name == "skill_list" else skill_factory.undo(args.get("text"))
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name == "resource_status":
         try:
             import resources
             text = resources.describe()
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name == "audit_today":
         import audit
         text = audit.today_summary(args.get("day") or None)
@@ -1930,13 +1929,13 @@ def call_tool(name, args):
             import weekly_review
             text = weekly_review.log_entry(args.get("what"), args.get("at") or "")
         except Exception as e:  # noqa: BLE001
-            text = f"Notiz-Fehler: {e}"
+            text = f"Note error: {e}"
     elif name in ("proposal_list", "proposal_accept", "proposal_decline", "rule_remove"):
         try:
             import proposals
             if name == "proposal_list":
                 text = "\n".join(f"{p['id']}: {p['title']} — {p['why']}\n  {proposals.describe(p)}"
-                                 for p in proposals.pending()) or "Keine offenen Vorschläge."
+                                 for p in proposals.pending()) or "No open proposals."
             elif name == "proposal_accept":
                 text = proposals.accept(args.get("id"), internal=_internal)
             elif name == "proposal_decline":
@@ -1945,36 +1944,36 @@ def call_tool(name, args):
                 import reflection
                 text = reflection.remove_rule(args.get("text"))
         except Exception as e:  # noqa: BLE001
-            text = f"Vorschlags-Fehler: {e}"
+            text = f"Proposal error: {e}"
     elif name in ("memory_search", "memory_read", "memory_save"):
         try:
             text = _memory(name, args)
         except Exception as e:  # noqa: BLE001
-            text = f"Gedächtnis-Fehler: {e}"
+            text = f"Memory error: {e}"
     elif name == "memory_timeline":
         try:
             import episodes
             text = episodes.describe(args.get("start"), args.get("end"), args.get("query") or "", args.get("days"))
         except Exception as e:  # noqa: BLE001
-            text = f"Fehler: {e}"
+            text = f"Error: {e}"
     elif name == "maintenance_status":
         try:
             import maintenance
             text = maintenance.describe()
         except Exception as e:  # noqa: BLE001
-            text = f"Wartungs-Fehler: {e}"
+            text = f"Maintenance error: {e}"
     elif name in ("paperless_search", "paperless_read"):
         try:
             import paperless
             text = paperless.search(args.get("query")) if name == "paperless_search" else paperless.read(args.get("id"))
         except Exception as e:  # noqa: BLE001
-            text = f"Paperless-Fehler: {e}"
+            text = f"Paperless error: {e}"
     elif name == "unifi_status":
         try:
             import unifi
             text = unifi.describe(args.get("topic") or "clients")
         except Exception as e:  # noqa: BLE001
-            text = f"UniFi-Fehler: {e}"
+            text = f"UniFi error: {e}"
     elif name in ("media_recent", "media_search", "media_play"):
         try:
             import jellyfin
@@ -1982,7 +1981,7 @@ def call_tool(name, args):
                     "media_search": lambda: jellyfin.describe_search(args.get("query") or ""),
                     "media_play": lambda: jellyfin.play(args.get("item") or "", args.get("device") or "")}[name]()
         except Exception as e:  # noqa: BLE001
-            text = f"Jellyfin-Fehler: {e}"
+            text = f"Jellyfin error: {e}"
     else:
         return None
     return text
@@ -2005,11 +2004,11 @@ def handle_call(name, args):
         audit.tool(name, args, refused, cls)
         return refused
     if TAINTED["on"] and cls == policy.LIMITED_WRITE:
-        hint = (f"Vorher wurden fremde Inhalte gelesen ({TAINTED['by']}). Deshalb frage ich, bevor ich etwas ändere.")
-        verdict = _ask(f"mcp__jarvis__{name}", dict(args, _hinweis=hint))
+        hint = (f"Third-party content was read before ({TAINTED['by']}). So I ask before I change anything.")
+        verdict = _ask(f"mcp__jarvis__{name}", dict(args, _note=hint))
         if verdict.get("behavior") != "allow":
             audit.write("card", tool=name, allow=False, reason="taint")
-            return "Nicht ausgeführt: nach dem Lesen fremder Inhalte nicht bestätigt."
+            return "Not run: not confirmed after reading third-party content."
     text = call_tool(name, args)
     if text is None:
         return None
@@ -2017,7 +2016,7 @@ def handle_call(name, args):
     if name in policy.UNTRUSTED:
         TAINTED.update(on=True, by=name)
     if len(text) > MAX_RESULT:
-        text = text[:MAX_RESULT] + f" … [gekürzt, {len(text)} Zeichen]"
+        text = text[:MAX_RESULT] + f" … [shortened, {len(text)} characters]"
     if name in policy.UNTRUSTED:
         text = policy.wrap_untrusted(name, text)
     return text
@@ -2049,7 +2048,7 @@ def main():
                 text = handle_call(name, args)
             except Exception as e:  # noqa: BLE001 — before, one broken tool took the whole MCP process down
                 log.exception("tool %s failed: %s", name, str(e)[:200])
-                text = f"Fehler im Werkzeug {name}: {str(e)[:200]}"
+                text = f"Error in tool {name}: {str(e)[:200]}"
             if text is None:
                 _reply(mid, error=f"unknown tool {name}")
                 continue

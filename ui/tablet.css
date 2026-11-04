@@ -101,8 +101,8 @@ body.tablet .tslots .bell{width:44px;height:44px;border-radius:50%;background:va
 .tcap::-webkit-scrollbar{display:none}
 .tcap.stale{opacity:.28}
 .tme{font-size:18px;color:var(--t-dim);line-height:1.4}
-.tme:not(:empty)::before{content:"„";color:var(--t-faint)}
-.tme:not(:empty)::after{content:"“";color:var(--t-faint)}
+.tme:not(:empty)::before{content:"“";color:var(--t-faint)}
+.tme:not(:empty)::after{content:"”";color:var(--t-faint)}
 .tjar{font-size:23px;font-weight:400;line-height:1.42;color:var(--t-ink)}
 .tjar.thinking::after{content:" …";color:var(--cy);animation:blink .9s steps(2) infinite}
 

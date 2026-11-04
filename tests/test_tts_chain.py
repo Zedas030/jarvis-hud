@@ -61,12 +61,12 @@ class Chain(unittest.TestCase):
         self.assertEqual(a["b"].said, ["Hallo."], "tags must be stripped for providers without tag support")
         self.assertAlmostEqual(commands.load()["tts"]["blocked"]["a"]["until"], until, delta=1)
         a["a"].said.clear()
-        tts_chain.speak("Noch einmal.")
+        tts_chain.speak("Once more.")
         self.assertEqual(a["a"].said, [], "a blocked provider must be skipped")
 
     def test_block_ends_after_reset(self):
         a = self.setup()
-        tts_chain._block("a", "leer", time.time() - 1)
+        tts_chain._block("a", "empty", time.time() - 1)
         _, _, name = tts_chain.speak("Test.")
         self.assertEqual(name, "a")
         self.assertNotIn("a", commands.load()["tts"].get("blocked", {}))
@@ -82,7 +82,7 @@ class Chain(unittest.TestCase):
         tts_chain.speak("Eins.")
         a["a"].fail = "exhausted"
         tts_chain.speak("Zwei.")
-        self.assertTrue(a["b"].said[-1].startswith("Wechsle auf"))
+        self.assertTrue(a["b"].said[-1].startswith("Switching to"))
         tts_chain.speak("Drei.")
         self.assertEqual(a["b"].said[-1], "Drei.")
 

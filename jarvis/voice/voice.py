@@ -35,7 +35,7 @@ EL_KEY = os.environ.get("ELEVENLABS_API_KEY", "").strip()
 EL_VOICE = os.environ.get("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb").strip()
 EL_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_v3").strip()
 EL_STT_MODEL = os.environ.get("ELEVENLABS_STT_MODEL", "scribe_v1").strip()
-EL_LANG = os.environ.get("ELEVENLABS_STT_LANG", "deu").strip()
+EL_LANG = os.environ.get("ELEVENLABS_STT_LANG", "eng").strip()
 
 # ── local speech-to-text ────────────────────────────────────────
 # Listening is the one thing Fish Audio charges for, and the browser's own
@@ -200,7 +200,7 @@ def speak_elevenlabs(text):
                "voice_settings": {"stability": float(os.environ.get("ELEVENLABS_STABILITY", "0.4")),
                                   "similarity_boost": 0.8, "style": 0.25, "use_speaker_boost": True}}
     if not model.startswith(("eleven_v3", "eleven_multilingual")):
-        payload["language_code"] = os.environ.get("ELEVENLABS_LANG", "de")
+        payload["language_code"] = os.environ.get("ELEVENLABS_LANG", "en")
     req = urllib.request.Request(
         f"https://api.elevenlabs.io/v1/text-to-speech/{EL_VOICE}?output_format=mp3_44100_128",
         data=json.dumps(payload).encode(), method="POST",
@@ -338,14 +338,14 @@ def transcribe(audio, mime="audio/webm"):
 
 
 # ── free providers: Microsoft neural voices + local Whisper ─────
-# Sprechen über edge-tts (die Vorlese-Stimmen von Microsoft Edge): kostenlos,
-# kein Konto, ~1 s. Hören über faster-whisper lokal auf der CPU: kostenlos,
-# offline, ~1 s für einen kurzen Satz, kein Ton verlässt den Rechner.
+# Speaking through edge-tts (the read-aloud voices of Microsoft Edge): free,
+# no account, ~1 s. Listening through faster-whisper locally on the CPU: free,
+# offline, ~1 s for a short sentence, no sound leaves the computer.
 TTS_CHOICE = os.environ.get("JARVIS_TTS", "auto").strip().lower()      # auto|edge|elevenlabs|fish
-EDGE_VOICE = os.environ.get("EDGE_VOICE", "de-DE-ConradNeural").strip()
+EDGE_VOICE = os.environ.get("EDGE_VOICE", "en-GB-RyanNeural").strip()
 EDGE_RATE = os.environ.get("EDGE_RATE", "+5%").strip()
 LOCAL_STT_MODEL = os.environ.get("WHISPER_LOCAL_MODEL", "small").strip()
-LOCAL_STT_LANG = os.environ.get("WHISPER_LOCAL_LANG", "de").strip() or None
+LOCAL_STT_LANG = os.environ.get("WHISPER_LOCAL_LANG", "en").strip() or None
 # With an NVIDIA card the large model runs faster than "small" on the CPU.
 LOCAL_STT_DEVICE = os.environ.get("WHISPER_LOCAL_DEVICE", "auto").strip().lower()   # auto|cuda|cpu
 LOCAL_STT_GPU_MODEL = os.environ.get("WHISPER_LOCAL_GPU_MODEL", "large-v3-turbo").strip()
@@ -356,19 +356,19 @@ LOCAL_STT_BEAM = int(os.environ.get("WHISPER_LOCAL_BEAM", "5"))
 LOCAL_STT_PROMPT = os.environ.get(
     "WHISPER_LOCAL_PROMPT",
     "Jarvis, Sir, Spotify, Home Assistant, Raspberry Pi, Pi-hole, NAS, ElevenLabs, "
-    "Claude, Briefing, Solaranlage.").strip()
+    "Claude, briefing, solar system.").strip()
 
-# Boosted on every clip, not only primed: with the prompt alone a German "Jarvis" still came
+# Boosted on every clip, not only primed: with the prompt alone a spoken "Jarvis" still came
 # out as another word now and then, and the request was dropped as not meant for him.
 LOCAL_STT_HOTWORDS = os.environ.get("WHISPER_LOCAL_HOTWORDS", "Jarvis").strip()
 
 _WHISPER = {"model": None, "busy": 0, "last_use": 0.0}
 _WHISPER_LOCK = __import__("threading").Lock()
 
-# Whisper "hears" these in silence or noise (German subtitle credits it was trained on).
-_GHOSTS_DE = re.compile(
-    r"untertitel|amara\.org|vielen dank (fürs|für's|für das) zuschauen|bis zum nächsten mal|"
-    r"swr \d{4}|zdf|copyright|^(danke|tschüss|ja|äh|ähm|hm+)\W*$", re.I)
+# Whisper "hears" these in silence or noise (subtitle credits it was trained on).
+_GHOSTS = re.compile(
+    r"subtitles by|amara\.org|thanks? (you )?for watching|please subscribe|see you (in the )?next (time|video)|"
+    r"copyright|^(thank you|thanks|bye|yes|uh|um|hm+)\W*$", re.I)
 
 
 def edge_available():
@@ -414,7 +414,7 @@ def _fw_model():
                     _cuda_dlls()
                     import numpy as np
                     m = WhisperModel(LOCAL_STT_GPU_MODEL, device="cuda", compute_type="float16")
-                    list(m.transcribe(np.zeros(16000, dtype=np.float32), language="de")[0])  # proves cuBLAS loads
+                    list(m.transcribe(np.zeros(16000, dtype=np.float32), language="en")[0])  # proves cuBLAS loads
                     _WHISPER.update(model=m, name=f"{LOCAL_STT_GPU_MODEL}, Grafikkarte")
                     return m
                 except Exception as e:  # noqa: BLE001
@@ -482,7 +482,7 @@ def transcribe_whisper_local(audio):
     finally:
         _WHISPER["busy"] -= 1
         _WHISPER["last_use"] = _t.time()
-    if not text or _GHOSTS_DE.search(text) and len(text) < 60:
+    if not text or _GHOSTS.search(text) and len(text) < 60:
         return ""
     return text if len(re.sub(r"\W", "", text)) >= 2 else ""
 
@@ -512,4 +512,4 @@ def speak_edge(text):
         except Exception as e:  # noqa: BLE001
             last = e
         __import__("time").sleep(0.25 * (attempt + 1))
-    raise RuntimeError(f"Microsoft-Stimme nicht erreichbar: {last}")
+    raise RuntimeError(f"Microsoft voice not reachable: {last}")

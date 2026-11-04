@@ -39,7 +39,7 @@ def load():
         m = ChatterboxMultilingualTTS.from_pretrained(device=device)
         m.prepare_conditionals(REFERENCE, exaggeration=EXAGGERATION)
         STATE.update(model=m, ready=True)
-        print(f"[local-tts] Chatterbox bereit auf {device} ({time.time() - t:.1f} s)", flush=True)
+        print(f"[local-tts] Chatterbox ready on {device} ({time.time() - t:.1f} s)", flush=True)
     except Exception as e:  # noqa: BLE001
         STATE["error"] = str(e)[:300]
         print(f"[local-tts] Laden fehlgeschlagen: {e}", flush=True)
@@ -48,7 +48,7 @@ def load():
 def synth(text):
     import soundfile as sf
     with GPU:
-        wav = STATE["model"].generate(text, language_id="de", exaggeration=EXAGGERATION, cfg_weight=CFG)
+        wav = STATE["model"].generate(text, language_id="en", exaggeration=EXAGGERATION, cfg_weight=CFG)
     buf = io.BytesIO()
     sf.write(buf, wav.squeeze(0).cpu().numpy(), STATE["model"].sr, format="WAV")
     return buf.getvalue()
@@ -88,5 +88,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     threading.Thread(target=load, daemon=True).start()
-    print(f"[local-tts] lauscht auf 127.0.0.1:{PORT}", flush=True)
+    print(f"[local-tts] listening on 127.0.0.1:{PORT}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

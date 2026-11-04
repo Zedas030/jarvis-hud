@@ -10,7 +10,7 @@ confirmed on the way, not only at the HUD.
                                     (audit "card", source phone), JARVIS_NO_<id> declines it;
                                     then the helper is emptied again.
 
-Home Assistant needs one helper and one automation (docs/bedienung.md, "Handy"):
+Home Assistant needs one helper and one automation (docs/usage.md, "Handy"):
   input_text.jarvis_phone_action
   automation: trigger event mobile_app_notification_action →
               input_text.set_value entity jarvis_phone_action value "{{ trigger.event.data.action }}"
@@ -54,16 +54,16 @@ def handle_action(value, stamp):
     verdict, pid = m.group(1), m.group(2)
     p = proposals.get(pid)
     if not p or p["status"] != "open":
-        text = "Dieser Vorschlag ist nicht mehr offen."
+        text = "This proposal is no longer open."
     elif verdict == "NO":
         proposals.decline(pid)
         audit.write("card", tool="proposal_decline", allow=False, reason="phone", proposal=pid)
-        text = f"Verworfen: {p['title']}."
+        text = f"Discarded: {p['title']}."
     else:
         import jarvis_mcp as j
         result = proposals.accept(pid, internal=j._internal)
         audit.write("card", tool="proposal_accept", allow=True, reason="phone", proposal=pid)
-        text = f"Vom Handy bestätigt: {p['title']}. {result}"
+        text = f"Confirmed from the phone: {p['title']}. {result}"
     commands.update_state(lambda d: d.__setitem__("phone_action_seen", stamp))
     events.publish("say", "Sir, " + text[0].lower() + text[1:], kind="phone")
     infra.phone_notify(text, title="Jarvis")

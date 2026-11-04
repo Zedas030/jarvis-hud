@@ -2,14 +2,14 @@
 The voice follows the hour: at night Jarvis whispers, late in the evening he talks softer and
 a little slower, and the model is told to keep it short. Plain clock rules, 0 tokens.
 
-  modes       tag    the normal voice
-              spät   from LATE_FROM o'clock: a bit softer (LATE_VOLUME) and slower (SLOW)
-              nacht  in the whisper hours (WHISPER_HOURS, default = the quiet hours): the voices
+  modes       day    the normal voice
+              late   from LATE_FROM o'clock: a bit softer (LATE_VOLUME) and slower (SLOW)
+              night  in the whisper hours (WHISPER_HOURS, default = the quiet hours): the voices
                      that take delivery tags get "[whispers]", the local one goes slower and softer
-  override    "Flüstermodus an" / "Flüstern aus" / "sprich normal" switch the mode by hand until
+  override    "whisper mode on" / "stop whispering" / "speak normally" switch the mode by hand until
               the next morning (state.json → voice_mode)
 
-  mode(now)          "tag" | "spät" | "nacht"
+  mode(now)          "day" | "late" | "night"
   prepare(text, supports_tags)   the text a provider gets (tag in front when whispering)
   speed_factor()     >1 = slower, for the local voice (Piper length_scale)
   volume_factor()    the HUD multiplies its slider with it (the quiet-hour share is separate)
@@ -33,7 +33,7 @@ ENABLED = os.environ.get("JARVIS_DAYTIME_VOICE", "1").strip() not in ("0", "fals
 
 def _in_hours(spec, now):
     spec = (spec or "").lower()
-    if not spec or spec in ("0", "off", "aus", "none"):
+    if not spec or spec in ("0", "off", "none"):
         return False
     try:
         start, end = (int(x) for x in spec.split("-", 1))
@@ -52,43 +52,43 @@ def override():
 
 def mode(now=None):
     if not ENABLED:
-        return "tag"
+        return "day"
     now = now or dt.datetime.now()
     forced = override()
     if forced:
         return forced
     if _in_hours(WHISPER_HOURS, now):
-        return "nacht"
+        return "night"
     if now.hour >= LATE_FROM:
-        return "spät"
-    return "tag"
+        return "late"
+    return "day"
 
 
 def prepare(text, supports_tags, now=None):
-    if mode(now) == "nacht" and supports_tags and WHISPER_TAG and not re.match(r"^\s*\[", text or ""):
+    if mode(now) == "night" and supports_tags and WHISPER_TAG and not re.match(r"^\s*\[", text or ""):
         return f"{WHISPER_TAG} {text}"
     return text
 
 
 def speed_factor(now=None):
-    return SLOW if mode(now) in ("spät", "nacht") else 1.0
+    return SLOW if mode(now) in ("late", "night") else 1.0
 
 
 def volume_factor(now=None):
     m = mode(now)
-    if m == "spät":
+    if m == "late":
         return LATE_VOLUME
-    if m == "nacht" and override() == "nacht" and not events.quiet_now(now):
+    if m == "night" and override() == "night" and not events.quiet_now(now):
         return LATE_VOLUME                     # whispering by hand outside the quiet hours: softer too
     return 1.0
 
 
 def hint(now=None):
     m = mode(now)
-    if m == "nacht":
-        return "Es ist Nacht: antworte in höchstens zwei kurzen Sätzen, ruhig, ohne Pointe."
-    if m == "spät":
-        return "Später Abend: knapp und ruhig antworten."
+    if m == "night":
+        return "It is night: answer in two short sentences at most, calmly, without a punchline."
+    if m == "late":
+        return "Late evening: answer briefly and calmly."
     return ""
 
 
@@ -106,16 +106,16 @@ def set_mode(m, now=None):
     commands.update_state(lambda d: d.__setitem__("voice_mode", {"mode": m, "until": _until_morning(now)} if m else {}))
 
 
-_ON = re.compile(r"\b(flüster(modus|n)? (an|ein|bitte)|flüster\w*|leise sprechen|sprich leise|nachtmodus (an|ein))\b")
-_OFF = re.compile(r"\b(flüster(modus|n)? aus|nicht mehr flüstern|sprich (wieder )?normal|normal sprechen|"
-                  r"normale lautstärke|nachtmodus aus)\b")
+_ON = re.compile(r"\b(whisper( mode)? (on|please)|whisper\w*|speak (softly|quietly)|talk quietly|night mode on)\b")
+_OFF = re.compile(r"\b(whisper( mode)? off|stop whispering|no more whispering|speak normally( again)?|talk normally|"
+                  r"normal volume|night mode off)\b")
 
 
 def handle(n):
     if _OFF.search(n):
-        set_mode("tag")
-        return "Normale Stimme, Sir."
-    if _ON.search(n) and not re.search(r"\baus\b", n):
-        set_mode("nacht")
-        return "Natürlich, Sir. Ich flüstere bis zum Morgen."
+        set_mode("day")
+        return "Normal voice, Sir."
+    if _ON.search(n) and not re.search(r"\boff\b", n):
+        set_mode("night")
+        return "Of course, Sir. I will whisper until the morning."
     return None

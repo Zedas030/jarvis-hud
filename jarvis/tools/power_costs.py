@@ -2,8 +2,8 @@
 Electricity costs per plug and standby — read-only, 0 tokens.
 
   Home Assistant  every plug with a monthly meter sensor.X<JARVIS_PLUG_MONTH_SUFFIX>
-                  ("der Verbrauch dieses Monats" of the Tapo integration) and the house
-                  meter (JARVIS_HOUSE_MONTH, default sensor.hausverbrauch_diesen_monat)
+                  ("this month's consumption" of the Tapo integration) and the house
+                  meter (JARVIS_HOUSE_MONTH, default sensor.house_consumption_this_month)
   standby         the lowest draw per day while a plug is switched on, learned by
                   energy_coach.py; plugs in "always_on" (config/energy_coach.json) are
                   meant to run day and night and are left out
@@ -21,8 +21,9 @@ import statistics
 PRICE = float(os.environ.get("JARVIS_POWER_PRICE", "0.35").replace(",", "."))
 BUDGET = float(os.environ.get("JARVIS_POWER_BUDGET_EUR", "0").replace(",", ".") or 0)   # € a month, 0 = off
 BUDGET_FROM = 0.15         # no projection before 15 % of the month has passed: too wobbly
-MONTH_SUFFIX = os.environ.get("JARVIS_PLUG_MONTH_SUFFIX", "_der_verbrauch_dieses_monats")
-HOUSE_MONTH = os.environ.get("JARVIS_HOUSE_MONTH", "sensor.hausverbrauch_diesen_monat")
+# entity ids as Home Assistant names them in English (a German HA: _der_verbrauch_dieses_monats)
+MONTH_SUFFIX = os.environ.get("JARVIS_PLUG_MONTH_SUFFIX", "_this_month_s_consumption")
+HOUSE_MONTH = os.environ.get("JARVIS_HOUSE_MONTH", "sensor.house_consumption_this_month")
 STANDBY_W = 2.0            # below this a plug is quiet enough
 STANDBY_DAYS = 3           # days of data before a standby figure counts
 
@@ -35,11 +36,11 @@ def _num(v):
 
 
 def _eur(x):
-    return f"{x:.2f}".replace(".", ",") + " Euro"
+    return f"{x:.2f} euros"
 
 
-def _de(x, digits=0):
-    return f"{x:.{digits}f}".replace(".", ",")
+def _fmt(x, digits=0):
+    return f"{x:.{digits}f}"
 
 
 def month_factor(now):
@@ -75,22 +76,22 @@ def say_month(states, now, device=""):
     if device:
         r = _match(device, found)
         if not r:
-            names = ", ".join(n for n, _, _ in found) or "keine"
-            return f"Zu „{device}“ finde ich keinen Stromzähler. Ich kenne: {names}."
+            names = ", ".join(n for n, _, _ in found) or "none"
+            return f"I cannot find a power meter for “{device}”. I know: {names}."
         name, _, kwh = r
-        return (f"{name}: diesen Monat bisher {_de(kwh, 1)} Kilowattstunden, also {_eur(kwh * PRICE)}. "
-                f"Hochgerechnet auf den ganzen Monat etwa {_eur(kwh / f * PRICE)}.")
+        return (f"{name}: so far this month {_fmt(kwh, 1)} kilowatt hours, that is {_eur(kwh * PRICE)}. "
+                f"Projected to the whole month about {_eur(kwh / f * PRICE)}.")
     if not found:
-        return "Ich finde keine Steckdosen mit Stromzähler."
+        return "I cannot find any sockets with a power meter."
     parts = []
     house = _num((states.get(HOUSE_MONTH) or {}).get("state"))
     if house is not None:
-        parts.append(f"Das Haus hat diesen Monat bisher {_de(house)} Kilowattstunden verbraucht, {_eur(house * PRICE)}; "
-                     f"hochgerechnet etwa {_eur(house / f * PRICE)} für den ganzen Monat.")
+        parts.append(f"The house has used {_fmt(house)} kilowatt hours so far this month, {_eur(house * PRICE)}; "
+                     f"projected about {_eur(house / f * PRICE)} for the whole month.")
     top = [r for r in found if r[2] >= 0.1][:4]
-    parts.append("Die größten Verbraucher an den Steckdosen: "
-                 + ", ".join(f"{n} {_de(k, 1)} kWh ({_eur(k * PRICE)})" for n, _, k in top) + ".")
-    parts.append(f"Gerechnet mit {_de(PRICE * 100)} Cent pro Kilowattstunde.")
+    parts.append("The biggest consumers at the sockets: "
+                 + ", ".join(f"{n} {_fmt(k, 1)} kWh ({_eur(k * PRICE)})" for n, _, k in top) + ".")
+    parts.append(f"Calculated at {_fmt(PRICE * 100)} cents per kilowatt hour.")
     return " ".join(parts)
 
 
@@ -112,12 +113,12 @@ def say_standby(mem, cfg, states):
     found = standby_rows(mem, cfg, states)
     days = max((len((d.get("min_w") or {})) for d in (mem.get("devices") or {}).values()), default=0)
     if days < STANDBY_DAYS:
-        return (f"Für Standby brauche ich mindestens {STANDBY_DAYS} Tage Messwerte, bisher habe ich {days}. "
-                "Ich sammle weiter.")
+        return (f"For standby I need at least {STANDBY_DAYS} days of readings, so far I have {days}. "
+                "I keep collecting.")
     if not found:
-        return "Kein Gerät zieht im Leerlauf nennenswert Strom — nichts zu tun."
-    rows_ = ", ".join(f"{n} mit etwa {_de(w)} Watt ({_eur(c)} im Jahr)" for n, w, c in found[:4])
-    return f"Im Leerlauf ziehen Strom: {rows_}. Eine Steckdose aus spart genau das."
+        return "No device draws noticeable power while idle — nothing to do."
+    rows_ = ", ".join(f"{n} with about {_fmt(w)} watts ({_eur(c)} a year)" for n, w, c in found[:4])
+    return f"Drawing power while idle: {rows_}. Switching the socket off saves exactly that."
 
 
 def budget():
@@ -148,17 +149,17 @@ def budget_status(states, now, limit=None):
 def say_budget(states, now):
     b = budget_status(states, now)
     if b is None:
-        return ("Es ist kein Strombudget gesetzt (JARVIS_POWER_BUDGET_EUR oder budget_eur in config/energy_coach.json)"
-                if not budget() else "Ohne Hauszähler kann ich das Budget nicht prüfen.")
+        return ("No power budget is set (JARVIS_POWER_BUDGET_EUR or budget_eur in config/energy_coach.json)"
+                if not budget() else "Without a house meter I cannot check the budget.")
     if b["early"]:
-        return f"Der Monat ist noch jung: bisher {_eur(b['so_far'])}, Budget {_eur(b['budget'])}. Eine Hochrechnung wage ich ab dem fünften Tag."
-    head = f"Hochgerechnet {_eur(b['projected'])} bei {_eur(b['budget'])} Budget"
+        return f"The month is still young: so far {_eur(b['so_far'])}, budget {_eur(b['budget'])}. I will risk a projection from the fifth day on."
+    head = f"Projected {_eur(b['projected'])} against a budget of {_eur(b['budget'])}"
     if b["over"] > 1:
-        tail = f" — etwa {_eur(b['over'])} drüber."
+        tail = f" — about {_eur(b['over'])} over."
         if b["top"]:
-            tail += f" Größter Verursacher an den Steckdosen: {b['top'][0]} mit etwa {_eur(b['top'][1])} im Monat."
+            tail += f" Biggest cause at the sockets: {b['top'][0]} with about {_eur(b['top'][1])} a month."
         return head + tail
-    return head + f" — im Rahmen, {_eur(-b['over'])} Luft."
+    return head + f" — within budget, {_eur(-b['over'])} to spare."
 
 
 def budget_notice(states, now=None):
@@ -166,9 +167,9 @@ def budget_notice(states, now=None):
     b = budget_status(states, now or dt.datetime.now())
     if not b or b["early"] or b["over"] <= 1:
         return None
-    top = f" Größter Posten: {b['top'][0]}." if b["top"] else ""
-    return (f"Sir, der Strom liegt über Budget: hochgerechnet {_eur(b['projected'])} statt {_eur(b['budget'])} "
-            f"diesen Monat.{top}")
+    top = f" Biggest item: {b['top'][0]}." if b["top"] else ""
+    return (f"Sir, electricity is over budget: projected {_eur(b['projected'])} instead of {_eur(b['budget'])} "
+            f"this month.{top}")
 
 
 def _states():
@@ -179,7 +180,7 @@ def _states():
 def report(device="", standby=False, budget=False):
     states = _states()
     if not states:
-        return "Ohne Home Assistant kann ich die Stromkosten gerade nicht lesen."
+        return "Without Home Assistant I cannot read the power costs right now."
     if standby:
         import energy_coach
         return say_standby(energy_coach.load(), energy_coach.config(), states)
