@@ -238,6 +238,36 @@ Alle Einstellungen stehen kommentiert in [`.env.example`](.env.example); persön
 
 ---
 
+## Zugangsdaten und eigene Werte
+
+Im Repo stehen keine echten Schlüssel, Passwörter oder Adressen. Alle Zugänge sind optional und gehören in
+`.env` (Vorlage [`.env.example`](.env.example)), alle Geräte in `config/*.json` (Vorlagen
+`config/*.example.json`). Beide sind in `.gitignore`. Die vollständige Tabelle aller Einstellungen steht in
+[Installation und Konfiguration](docs/installation.md#konfiguration).
+
+| Was | Wo der echte Wert hingehört |
+|---|---|
+| Stimme: `FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY`, `GOOGLE_TTS_API_KEY` | `.env` |
+| Notbetrieb: `GROQ_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_URL` | `.env` |
+| Home Assistant: `HA_URL`, `HA_TOKEN`, `HA_MCP_URL` | `.env`; Entitäten für Dashboard, Räume und Geräte in `config/home.json` |
+| Mail und Kalender: `ICLOUD_USER`, `ICLOUD_APP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_USER`, `MAIL_PASSWORD` | `.env`, bei iCloud ein App-spezifisches Passwort |
+| Heimnetz: `PIHOLE_URL`, `PIHOLE_PASSWORD`, `PROMETHEUS_URL`, `KUMA_URL`, `SYNOLOGY_*`, `UNIFI_*`, `JELLYFIN_*`, `PAPERLESS_*`, `JARVIS_PI_HOST`, `JARVIS_PI_USER` | `.env` |
+| Sonstiges: `DHL_API_KEY`, `GARMIN_EMAIL`, `GARMIN_PASSWORD`, `JARVIS_SPOTIFY_CLIENT_ID` | `.env`; Spotify danach einmal mit `scripts\spotify_login.py` anmelden |
+
+Für die Veröffentlichung wurden persönliche Werte so ersetzt:
+
+| Anonymisiert | Im Repo | Eigener Wert |
+|---|---|---|
+| Name | „Nutzer“ | `JARVIS_USER_NAME` in `.env` |
+| Wohnort, Koordinaten, Warnzelle | „Musterort“, „Musterstadt“, `000000000` | `JARVIS_PLACE`, `JARVIS_WEATHER_LAT`, `JARVIS_WEATHER_LON` in `.env` |
+| Adressen im Heimnetz | `10.0.0.x` als Beispiel in Kommentaren und Standardwerten | die passende `*_URL`- bzw. `*_HOST`-Variable in `.env`. Die Links zu Monitoring und Doku stehen fest in `ui/index.html` und werden dort angepasst. |
+| Tailscale-Namen | `…tailxxxx.ts.net` | `JARVIS_REMOTE_HOSTS` in `.env` |
+| Spotify-Konto, Client-ID | `nutzer`, `xxxxxxxx` | eigene App auf developer.spotify.com, ID in `.env` |
+| Geräte- und Raumnamen | Beispiele in `config/*.example.json` | eigene Kopien ohne `.example` |
+
+Der Ordner `pi/` ist ein Schnappschuss von Monitoring-Seite und Pi-Doku mit denselben Platzhaltern. Er
+dient als Anschauung und wird nicht automatisch ausgeliefert.
+
 ## Unterwegs: iPhone, iPad, Handy
 
 Der PC bleibt das Gehirn. iPhone und iPad greifen über **Tailscale** per HTTPS zu, von überall und ohne offenen Port im Router: `JARVIS_REMOTE=1`, einmal `tailscale serve --bg 8721`, dann die Adresse auf dem Gerät zum Home-Bildschirm legen und mit einem sechsstelligen Code koppeln. Das iPad zeigt ein eigenes Raum-Display mit Kacheln (Wetter, Haus, Energie, Tokens), das iPhone das HUD im Hochformat; Tippen auf das Mikrofon schaltet Live, Gedrückthalten ist Push-to-Talk. Vorschläge beim Verlassen der Wohnung und vor dem Losfahren kommen mit **Ja/Nein-Knöpfen** aufs Handy (Home-Assistant-App), die Antwort zählt wie die Karte. Einrichtung Schritt für Schritt: [Bedienung → Unterwegs](docs/bedienung.md#unterwegs-iphone-und-ipad).
