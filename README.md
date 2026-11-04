@@ -26,6 +26,23 @@ Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine AP
 
 </div>
 
+## Inhalt
+
+- [Highlights](#highlights)
+- [Was alles möglich ist](#was-alles-möglich-ist)
+- [Bedienung](#bedienung)
+- [Stimme: Anbieter-Kette, Sprach-Engine, Notbetrieb](#stimme-anbieter-kette-sprach-engine-notbetrieb)
+- [Gedächtnis und Lernen](#gedächtnis-und-lernen)
+- [Sicherheitsmodell](#sicherheitsmodell)
+- [Architektur](#architektur)
+- [Schnellstart](#schnellstart)
+- [Unterwegs: iPhone, iPad, Handy](#unterwegs-iphone-ipad-handy)
+- [Projektstruktur](#projektstruktur)
+- [Dokumentation](#dokumentation)
+- [Raspberry Pi: Monitoring und Doku](#raspberry-pi-monitoring-und-doku)
+
+---
+
 ## Highlights
 
 <table>
@@ -45,9 +62,107 @@ Das Sprachmodell ist die **Claude-Code-CLI** im Abo-Modus. Es gibt also keine AP
 <td valign="top">🛟 <b>Notbetrieb</b><br>Fällt Claude aus, übernimmt eine kostenlose Kette Groq → Gemini → Ollama mit denselben Werkzeugen. Die Stimme hat ihre eigene Kette aus Cloud-, GPU- und Gratis-Anbietern.</td>
 <td valign="top">🛡️ <b>Kontrolliert und ehrlich</b><br>Aktionsklassen im Code statt im Prompt, Bestätigungskarten, Schutz vor fremden Anweisungen in Mails und Webseiten, Audit-Log, Not-Aus, nur <code>localhost</code>.</td>
 </tr>
+<tr>
+<td valign="top">🖥️ <b>PC und Windows</b><br>Lautstärke, Apps, Bildschirmsperre, Fenster anordnen, Dateien und Zwischenablage, Bildschirmtext per lokaler OCR. Spotify wird leiser, solange Jarvis zuhört oder spricht.</td>
+<td valign="top">🛰️ <b>Heimnetz</b><br>Pi, NAS, FRITZ!Box, UniFi, Updates mit Freigabe-Karte, Wächter für neue Geräte. <i>„Lagebericht“</i> fasst Uptime Kuma, Sicherheitszentrale und Energie-Kreislauf zusammen.</td>
+</tr>
 </table>
 
-Die vollständige Liste steht unter [Funktionen](docs/funktionen.md).
+---
+
+## Was alles möglich ist
+
+Die Architektur trennt **Router** (Regeln), **Werkzeuge** (MCP-Server) und **Gedächtnis** (Markdown). Neue Fähigkeiten lassen sich deshalb meist mit wenigen Zeilen ergänzen. Eine Auswahl, die vollständige Liste steht unter [Funktionen](docs/funktionen.md):
+
+**Im Alltag**
+- *„Guten Morgen“* liefert ein Tagesbriefing mit Wetter, Terminen, Energie, fast leeren Batterien und neuen Mails.
+- *„Kann ich heute noch eine Runde laufen / golfen?“* ergibt eine Ampel aus Wetter, Wind, Tageslicht und Arbeitszeit.
+- *„Trag mir Freitag um zehn den Zahnarzt ein“* (mit Bestätigung), *„Hab ich wichtige Mails?“*, *„Wann muss ich los?“* (Fahrzeit zum nächsten Termin), *„Kommt heute ein Paket?“*
+- *„Timer 8 Minuten für die Pizza“*, *„Weck mich um 6:45“*, *„Erinnere mich morgen um 9 daran, Anna anzurufen“*, *„Setz Milch auf die Einkaufsliste“*. Lokal, ohne Tokens, übersteht Neustarts.
+- *„Wenn ich Gute Nacht sage, mach alle Lichter aus und sag mir, wann der Wecker klingelt“* legt eine Routine an. Danach läuft *„Gute Nacht“* ohne LLM.
+
+**Zuhause**
+- *„Mach das Licht im Wohnzimmer auf 40 Prozent“*, *„Ist die Waschmaschine noch an?“*, *„Szene Kino“*, danach zwei Minuten lang *„heller“*, *„wieder aus“*, *„und im Schlafzimmer auch“*.
+- Jarvis weiß über Präsenzmelder, in welchem Raum du bist: Antworten kommen aus dem Lautsprecher dort, *„hol die Musik zu mir“* schiebt Spotify auf den Lautsprecher des Raums, die Heizung folgt dir, nachts sagt der Sonos gute Nacht.
+- *„Sag im Wohnzimmer: Essen ist fertig“* spricht über den Echo Dot, im Schlafzimmer über den Sonos. Antworten wahlweise aus dem Echo, mit Alexas Stimme.
+- *„Wie viel liefert die Solaranlage?“*, *„Was kostet mich der PC im Monat?“*, *„Wer zieht Standby-Strom?“*, *„Wann soll ich die Spülmaschine anmachen?“* (Energie-Coach aus Akkustand, Verbrauch und Sonnenvorhersage).
+- Verlässt du die Wohnung und es läuft noch etwas, kommt ein Vorschlag „Ausschalten“ aufs Handy. Kommst du heim: *„Willkommen zurück. Während du weg warst: …“*
+- Unwetterwarnungen des DWD von selbst, Routinen-Vorschläge aus deinen Gewohnheiten, *„Öffne Netflix auf dem Fernseher“* über Alexa am Fire TV.
+
+**Technik und Netzwerk**
+- *„Wie geht es dem Pi / dem NAS?“*, *„Ist ein unbekanntes Gerät im WLAN?“*, *„Wer ist gerade im WLAN?“* (UniFi), *„Gibt es Updates?“* (FRITZ!Box, NAS, Pi; installiert nur mit Karte).
+- *„Lagebericht“*, *„Läuft die Nulleinspeisung?“*, *„Welche Sicherheitsbefunde sind offen?“* lokal aus Uptime Kuma, der ORBIT-Sicherheitszentrale und Home Assistant.
+- *„Starte die Container auf dem Pi neu“* (ein Befehl per SSH, immer mit Bestätigungskarte), *„Wie weit ist der Drucker?“* (Bambu Lab), *„Was steht im Wartungskalender?“*
+
+**Smarter im Alltag**
+- *„Was habe ich dich letzte Woche zum Drucker gefragt?“* beantwortet der Router aus dem Gesprächsprotokoll. *„Wie war mein Schlaf, als ich das letzte Mal krank war?“* aus dem episodischen Gedächtnis.
+- Fragst du an mehreren Tagen zur gleichen Zeit dasselbe, schlägt Jarvis samstags vor, es dir von selbst zu sagen. Schlechter Schlaf-Score oder hoher Stress (Garmin) machen den Vormittag „schonend“.
+- *„Fokus 45 Minuten“* sammelt Meldungen statt sie zu sprechen. *„Was zahle ich für die Haftpflicht?“* sucht in der gescannten Post (Paperless). *„Serie auf dem Fernseher weiterschauen“* (Jellyfin).
+- Ab 21 Uhr spricht er leiser und langsamer, in den Ruhezeiten flüstert er. Bei *„Mach Wohnzimmer an“* mit Lampe und Steckdose fragt er einmal nach und merkt sich die Antwort.
+
+---
+
+## Bedienung
+
+| Aktion | So geht’s |
+|---|---|
+| Live-Modus | Klick auf **Live**. Der Button zeigt den Zustand: *Hört zu*, *Höre dich*, *Denkt*, *Spricht*. Mit Aktivierungswort: *Sag „Jarvis“*. |
+| Push-to-Talk | Live-Button halten, sprechen, loslassen. |
+| Unterbrechen | Einfach reinreden: Nach 150 ms hält er an und hört zu. Sagst du etwas, ist das die neue Frage; „Stopp“ beendet die Antwort. Sagst du nichts oder nur „mhm“, macht er mit dem angefangenen Satz weiter. |
+| Timer und Wecker | Countdown oben in der Leiste. Es klingelt, dann spricht er. Reinreden, `Esc` oder **Stop** beendet das Klingeln, *„Schlummern“* gibt 9 Minuten. |
+| Meldungen | Erscheinen mit gelbem Rand im Gespräch und werden vorgelesen; in den Ruhezeiten nur angezeigt. |
+| Bestätigen | Karte anklicken oder „bestätigt“ / „nein“ sagen. Ein bloßes „ja“ zählt bewusst nicht. |
+| Mini-Fenster | Verlässt du den Jarvis-Tab, steht unten rechts auf dem Desktop ein kleiner Roboter-Panda mit Zustand, letzter Zeile, **■ Stopp** und Mikrofon. |
+| Ausgabe wählen | 🔈 **Ton hier**, 🔊 **Wo ich bin**, **Echo Wohnzimmer** oder **Sonos Schlafzimmer**: pro Gerät, wo die Antworten zu hören sind. |
+| Tippen und Befehle | Eingabefeld, `Enter`. `/new`, `/status`, `/recall <Begriff>`, `/graph`, `/help` |
+| Nachschlagen | Weiß Jarvis etwas nicht und steht es weder in den Notizen noch in den Werkzeugen, sucht er im Web. Private Daten kommen nie in die Suche. |
+
+Mehr dazu, inklusive Persönlichkeitsprofilen, Windows-Steuerung, 3D-Drucker, Updates, Pakete und Postfächer: [Bedienung](docs/bedienung.md).
+
+---
+
+## Stimme: Anbieter-Kette, Sprach-Engine, Notbetrieb
+
+```
+Fish Audio ─▶ ElevenLabs ─▶ Lokal (Chatterbox GPU · Piper CPU) ─▶ Azure ─▶ Google ─▶ Edge
+```
+
+- **Ausfallsichere Stimme:** Jeder Anbieter ist ein Adapter. Ist einer erschöpft (Guthaben, Quota, ungültiger Key), wird er bis zum Reset übersprungen, auch über Neustarts hinweg. Bei einem vorübergehenden Fehler wechselt nur der aktuelle Satz den Anbieter, ohne hörbaren Abbruch. Das HUD zeigt den aktiven Anbieter mit Restguthaben.
+- **Sprach-Engine auf dem Server:** Silero VAD, adaptives Satzende mit Teilergebnissen von Whisper, Unterbrechen in 150 ms, Weitersprechen am Satzanfang, wenn nur „mhm“ kam. Metriken je Durchgang für Grafana, Tuning in `config/voice.yaml`.
+- **Lokal zuerst:** Spracherkennung mit Whisper (`large-v3-turbo` auf der GPU) und die GPU-Stimme laufen offline. Ab 21 Uhr leiser, in den Ruhezeiten geflüstert.
+- **Notbetrieb:** Ist das Claude-Kontingent erschöpft oder bricht ein Aufruf ab, antwortet die erste verfügbare Stufe aus **Groq → Gemini → Ollama**, mit denselben Jarvis-Werkzeugen und Bestätigungskarten. Gemini sieht nie Mail, Kalender oder Gesundheit.
+
+Details, Messwerte und das Tuning-Protokoll: [Stimme und Sprach-Engine](docs/sprache.md).
+
+---
+
+## Gedächtnis und Lernen
+
+Der Vault ist ein Obsidian-Ordner mit Markdown-Notizen nach Themen (`Personen/Anna`, `Projekte/…`, `Geräte/…`), einem automatischen Gesprächsprotokoll und Episoden je Tag (Gespräche, Garmin, Meldungen, Ausfälle). Jarvis merkt und vergisst selbstständig (Ablaufdaten, Papierkorb), speichert nichts doppelt und überschreibt einen Widerspruch nie, sondern fragt nach. Jede Erinnerung hat eine prüfbare Herkunft.
+
+- **Lernt dazu:** Formulierungen, die Claude einmal auflösen musste („Leselampe aus“), schaltet er danach selbst. Gleiche Fragen innerhalb von 5 Minuten kommen aus dem Zwischenspeicher. *„Verbrauchsbericht“* sagt, wie viel lokal lief.
+- **Lernschleife:** Bewertet seine Gespräche selbst, schlägt sonntags feste Regeln vor, macht einen Wochenrückblick mit Mustern aus Schlaf, Schritten, Stress und Golf und schlägt zweimal pro Woche eine neue Fähigkeit vor.
+- **Keine Arbeitsthemen:** Was nach Arbeit aussieht, wird weder protokolliert noch gespeichert (`privacy.py`).
+- **Änderungen nur mit Karte:** Hintergrundjobs ändern nichts selbst. Sie legen einen Vorschlag ab, Jarvis erklärt ihn, und erst die Karte setzt ihn um.
+
+Resource Manager, Context Engine, Task Engine, Dokumentensuche und die lernfähigen Module im Einzelnen: [Gedächtnis und Lernen](docs/gedaechtnis.md).
+
+---
+
+## Sicherheitsmodell
+
+- **Nur lokal:** Der Server bindet an `127.0.0.1`. Jede Anfrage braucht ein pro Start erzeugtes Token, Host und Origin werden geprüft.
+- **Fernzugriff nur gekoppelt:** Der Geräte-Port ist nur über `tailscale serve` erreichbar und zeigt ohne gekoppeltes Gerät nur die Kopplungsseite.
+- **Aktionsklassen im Code:** Jedes Werkzeug hat eine Klasse (lesen, begrenzt schreiben, bestätigen, gesperrt); der Test schlägt fehl, wenn eins fehlt. Karten werden im Code erzwungen, nie nur im Prompt.
+- **Bestätigungskarten:** Shell-Befehle, Kalender-Einträge, Schreiben außerhalb des Vaults. Ohne Antwort nach 75 s abgelehnt.
+- **Fremde Inhalte:** Mail, Web, Kalender, Dateien, Zwischenablage und Bildschirm sind markierte, nicht vertrauenswürdige Daten und können keine Anweisungen geben.
+- **Geschützte Geräte:** Router, PC, Server und Kühlschrank schaltet der Router nie selbst aus. Fragen schalten nie.
+- **Kein Selbstumbau:** Zur Laufzeit gibt es keine Werkzeuge zum Bearbeiten von Code. Audit-Log und Not-Aus.
+- **Daten bleiben lokal:** `.env`, `config/*.json`, `vault/`, `logs/`, `state.json` und Modelle stehen in `.gitignore`.
+
+Die Regeln im Detail: [Sicherheitsmodell](docs/sicherheit.md) und [SECURITY.md](SECURITY.md).
+
+---
 
 ## Architektur
 
@@ -74,7 +189,23 @@ flowchart LR
     SPEAK --> SPK
 ```
 
-Der Browser hört zu und spricht, der Server (nur `127.0.0.1`) erkennt lokal mit Whisper, der Router beantwortet einfache Befehle selbst, alles andere geht als schlanker `claude -p`-Aufruf mit nur den passenden Werkzeugen an Claude. Die Komponenten im Einzelnen: [Architektur und Effizienz](docs/architektur.md).
+| Komponente | Aufgabe |
+|---|---|
+| `server.py` | HTTP-Server (nur `127.0.0.1`), HUD, API-Endpunkte, Bestätigungskarten, Verbrauchsprotokoll, Selbst-Neustart bei Codeänderungen |
+| `router.py` | Intent-Router: lokale Handler, Wahl der Werkzeuggruppen und des Modells |
+| `runtime.py` | Startet `claude -p` schlank (`--system-prompt`, `--tools`, `--strict-mcp-config`, `--no-session-persistence`) mit vorgewärmtem Prozess-Pool |
+| `jarvis_mcp.py` | MCP-Server mit allen Werkzeugen in Gruppen, Bestätigungs-Schranke, Ergebnis-Obergrenze |
+| `memory.py` · `episodes.py` | Vault → Wissensgraph, Kern-Erinnerungen, Protokoll, Episoden, Aufräumen |
+| `voice_engine.py` · `voice_ws.py` | Full-Duplex-Sprach-Engine: Zustandsmaschine, Silero VAD, Satzende, Barge-in, Fortsetzen; WebSocket für Browser und Satelliten |
+| `tts_chain.py` · `local_tts_server.py` | Sprachausgabe-Kette mit Adaptern, lokale GPU-Stimme in eigener Umgebung |
+| `scheduler.py` · `watchers.py` · `events.py` | Timer, Wecker, Erinnerungen; Regeln für Meldungen von selbst; Push-Kanal zum HUD |
+| `fallback_llm.py` | Notbetrieb: Ersatz-Kette Groq → Gemini → Ollama mit Jarvis-Werkzeugen |
+| `policy.py` · `privacy.py` · `proposals.py` | Aktionsklassen, Arbeitsthemen-Filter, Vorschläge mit Karte |
+| `ui/` | HUD (Vanilla JS, 3D-Wissensgraph ohne Abhängigkeiten), 19 Layouts pro Gerät |
+
+**Effizienz:** Eigener Kurz-Prompt statt Claude-Code-Standard, Werkzeuggruppen nach Bedarf, automatische Modellwahl (Haiku/Sonnet), Antwort-Cache, Prozess-Pool. In Messungen braucht ein Aufruf **über 25× weniger Tokens** als ein Standard-Aufruf; was der Router kann, kostet nichts. Alle Komponenten und die Messung: [Architektur und Effizienz](docs/architektur.md).
+
+---
 
 ## Schnellstart
 
@@ -99,21 +230,58 @@ mkdir vault\Erinnerungen
 start-jarvis.bat
 ```
 
-Autostart, lokale Stimmen (Piper, Chatterbox auf der GPU) und alle Einstellungen: [Installation und Konfiguration](docs/installation.md).
+Alle Einstellungen stehen kommentiert in [`.env.example`](.env.example); persönliche Daten gehören ausschließlich in `.env` und `config/*.json`, beide in `.gitignore`. Autostart, lokale Stimmen (Piper, Chatterbox auf der GPU), die Tabelle der Einstellungen sowie Entwicklung und Diagnose: [Installation und Konfiguration](docs/installation.md).
+
+```powershell
+.venv\Scripts\python.exe -m unittest discover -s tests      # alle Tests: ohne Haus, Claude, Netz und Ton
+```
+
+---
+
+## Unterwegs: iPhone, iPad, Handy
+
+Der PC bleibt das Gehirn. iPhone und iPad greifen über **Tailscale** per HTTPS zu, von überall und ohne offenen Port im Router: `JARVIS_REMOTE=1`, einmal `tailscale serve --bg 8721`, dann die Adresse auf dem Gerät zum Home-Bildschirm legen und mit einem sechsstelligen Code koppeln. Das iPad zeigt ein eigenes Raum-Display mit Kacheln (Wetter, Haus, Energie, Tokens), das iPhone das HUD im Hochformat; Tippen auf das Mikrofon schaltet Live, Gedrückthalten ist Push-to-Talk. Vorschläge beim Verlassen der Wohnung und vor dem Losfahren kommen mit **Ja/Nein-Knöpfen** aufs Handy (Home-Assistant-App), die Antwort zählt wie die Karte. Einrichtung Schritt für Schritt: [Bedienung → Unterwegs](docs/bedienung.md#unterwegs-iphone-und-ipad).
+
+---
+
+## Projektstruktur
+
+```
+├─ server.py           Start (Supervisor + HTTP-Server), lädt paths.py
+├─ jarvis/
+│  ├─ core/            router · runtime · commands · events · scheduler · context · tasks · focus · whereabouts
+│  ├─ safety/          policy · privacy · audit · emergency · proposals
+│  ├─ tools/           jarvis_mcp (Werkzeug-Server) · desktop · infra · pc · lists · routines · devices ·
+│  │                   commute · parcels · icloud_calendar · spotify · speakers · paperless · unifi · jellyfin …
+│  ├─ memory/          memory · memory_intel · learning · skill_factory · answer_cache · episodes · docsearch
+│  ├─ voice/           voice_engine · voice_ws · voice_vad · tts_chain · local_tts_server · wakeword · sonos · alexa_voice
+│  ├─ llm/             fallback_llm · resources
+│  └─ watch/           watchers · briefing · weekly_review · energy_coach · departure · weather_alerts · wellbeing …
+├─ ui/                 HUD: index.html · app.js · voice-client.js · graph.js · styles.css · pair.html
+├─ config/             *.example.json (eigene Dateien bleiben lokal) · voice.yaml
+├─ docs/               Handbuch in Kapiteln · screenshots/
+├─ pi/                 Monitoring und Doku des Raspberry Pi (anonymisierte Kopien)
+├─ tests/              ein Testmodul pro Bereich, isolate.py zuerst
+└─ scripts/            measure_tokens · router_report · fetch_voice_models · install-ha-remote.ps1 …
+```
+
+---
 
 ## Dokumentation
 
 | Seite | Inhalt |
 |---|---|
-| [Funktionen](docs/funktionen.md) | Highlights, alles was möglich ist, Funktionsliste |
-| [Installation und Konfiguration](docs/installation.md) | Schnellstart, lokale Stimmen, `.env`, Entwicklung und Diagnose |
-| [Bedienung](docs/bedienung.md) | Sprechen und tippen, Karten, Persönlichkeit, Alltag, iPhone/iPad, Handy |
-| [Stimme und Sprach-Engine](docs/sprache.md) | Anbieter-Kette, Zuhören/Unterbrechen/Weitersprechen, Notbetrieb |
+| [Funktionen](docs/funktionen.md) | Alle Highlights, alles was möglich ist, Funktionsliste |
+| [Installation und Konfiguration](docs/installation.md) | Schnellstart, lokale Stimmen, alle `.env`-Einstellungen, Entwicklung und Diagnose |
+| [Bedienung](docs/bedienung.md) | Sprechen und tippen, Karten, Persönlichkeit, Alltag, Windows, iPhone/iPad, Handy |
+| [Stimme und Sprach-Engine](docs/sprache.md) | Anbieter-Kette, Zuhören/Unterbrechen/Weitersprechen mit Messwerten, Notbetrieb |
 | [Gedächtnis und Lernen](docs/gedaechtnis.md) | Ressourcen, Kontext, Aufgaben, lernfähige Module, Vault |
-| [Architektur und Effizienz](docs/architektur.md) | Komponenten, Router und schlanker Modus, Projektstruktur |
+| [Architektur und Effizienz](docs/architektur.md) | Alle Komponenten, Router und schlanker Modus, Projektstruktur |
 | [Sicherheitsmodell](docs/sicherheit.md) | Die Regeln im Code; Details in [SECURITY.md](SECURITY.md) |
 | [ARCHITECTURE.md](ARCHITECTURE.md) · [SECURITY.md](SECURITY.md) · [ROADMAP.md](ROADMAP.md) | Modulkarte, Sicherheitsregeln und Ausbauplan für die Arbeit am Code |
 | [pi/](pi/README.md) | Monitoring und Doku des Raspberry Pi, der Jarvis das Haus, das Netz und DNS liefert |
+
+---
 
 ## Raspberry Pi: Monitoring und Doku
 
