@@ -98,7 +98,6 @@ Every request lands in `logs/usage.jsonl` (route, model, groups, input/cache/out
 ├─ config/             *.example.json (your own files stay local) · voice.yaml (voice engine)
 ├─ docs/               handbook in chapters (features · installation · usage · voice · memory ·
 │                      architecture · security) · screenshots/
-├─ pi/                 monitoring and docs of the Raspberry Pi (anonymised copies in the published state)
 ├─ CLAUDE.md · ARCHITECTURE.md · SECURITY.md · ROADMAP.md · INVENTORY.md
 ├─ requirements.txt · requirements-gpu.txt · requirements-windows.txt · requirements-tts.txt · requirements-dev.txt
 └─ start-jarvis.bat

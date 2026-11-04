@@ -292,8 +292,8 @@ For publication, personal values were replaced like this:
 | Spotify account, client id | `user`, `xxxxxxxx` | your own app on developer.spotify.com, id in `.env` |
 | Device and room names | examples in `config/*.example.json` | your own copies without `.example` |
 
-The `pi/` folder is a snapshot of the monitoring page and the Pi docs with the same placeholders. It is there
-for illustration and is not deployed automatically.
+A snapshot of the monitoring page and the Pi docs (German, with the same placeholders) is in the German edition under
+[`jarvis-hud-de/pi/`](https://github.com/Zedas030/jarvis-hud-de/tree/main/pi). It is there for illustration and is not deployed automatically.
 
 ## On the go: iPhone, iPad, phone
 
@@ -317,7 +317,6 @@ The PC stays the brain. iPhone and iPad connect through **Tailscale** over HTTPS
 ├─ ui/                 HUD: index.html · app.js · voice-client.js · graph.js · styles.css · pair.html
 ├─ config/             *.example.json (your own files stay local) · voice.yaml
 ├─ docs/               handbook in chapters · screenshots/
-├─ pi/                 monitoring and docs of the Raspberry Pi (anonymised copies)
 ├─ tests/              one test module per area, isolate.py first
 └─ scripts/            measure_tokens · router_report · fetch_voice_models · install-ha-remote.ps1 …
 ```
@@ -337,13 +336,13 @@ The PC stays the brain. iPhone and iPad connect through **Tailscale** over HTTPS
 | [Security model](docs/security.md) | The rules in code; details in [SECURITY.md](SECURITY.md) |
 | [ARCHITECTURE.md](ARCHITECTURE.md) · [SECURITY.md](SECURITY.md) · [ROADMAP.md](ROADMAP.md) | Module map, security rules and the build-out plan for working on the code |
 | [INVENTORY.md](INVENTORY.md) · [SERVER-REBUILD.md](SERVER-REBUILD.md) · [VOICE-ANALYSIS.md](VOICE-ANALYSIS.md) · [PORTING.md](PORTING.md) | Inventory, the server rebuild, the voice analysis and porting notes |
-| [pi/](pi/README.md) | Monitoring and docs of the Raspberry Pi that gives Jarvis the house, the network and DNS |
+| [jarvis-hud-de/pi/](https://github.com/Zedas030/jarvis-hud-de/tree/main/pi) | Monitoring and docs of the Raspberry Pi that gives Jarvis the house, the network and DNS (German snapshot) |
 
 ---
 
 ## Raspberry Pi: monitoring and docs
 
-The Pi in the home network gives Jarvis Home Assistant, DNS and the monitoring; the HUD links both pages at the top right. The copies under [`pi/`](pi/README.md) are anonymised.
+The Pi in the home network gives Jarvis Home Assistant, DNS and the monitoring; the HUD links both pages at the top right. Anonymised copies of both pages (German) are in the German edition under [`jarvis-hud-de/pi/`](https://github.com/Zedas030/jarvis-hud-de/tree/main/pi).
 
 <table>
 <tr>
