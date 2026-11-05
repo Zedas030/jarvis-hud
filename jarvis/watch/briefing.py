@@ -115,6 +115,12 @@ def _mail_count():
     split = f" ({', '.join(f'{a}: {c}' for a, c in results)})" if len(results) > 1 else ""
     return f"Mailbox: {n} unread mails{split} (details with mail_inbox when needed)."
 
+def _pi_tools():
+    """Only findings (failed backup test, held update, open power finding); silence when all is well."""
+    import pi_reports
+    return pi_reports.briefing_line()
+
+
 def morning_block():
     """Briefing data on the day's first turn, once. Empty string otherwise."""
     today = time.strftime("%Y-%m-%d")
@@ -128,7 +134,7 @@ def morning_block():
         states = _ha_states()
     except Exception:  # noqa: BLE001
         pass
-    for part in (_weather, lambda: _energy(states), _coach, lambda: _batteries(states), _mail_count):
+    for part in (_weather, lambda: _energy(states), _coach, lambda: _batteries(states), _mail_count, _pi_tools):
         try:
             text = part()
         except Exception:  # noqa: BLE001 — a dead source must not block the conversation
@@ -142,7 +148,7 @@ def morning_block():
                "a punchline and without suggestions. " + gentle if gentle else
                "Start your answer with a short spoken morning briefing (three to four sentences): "
                "appointments, weather with a verdict on whether it is fit for golf, the storage charge, unread mails, "
-               "and nearly empty batteries if any are reported. ")
+               "nearly empty batteries and findings of the Pi tools in one sentence, if any are reported. ")
             + "Then respond to the user's message.\n" + "\n".join(lines))
 
 
@@ -272,7 +278,7 @@ def briefing_facts():
         states = _ha_states()
     except Exception:  # noqa: BLE001
         pass
-    for part in (_weather, lambda: _energy(states), _coach, lambda: _batteries(states), _mail_count):
+    for part in (_weather, lambda: _energy(states), _coach, lambda: _batteries(states), _mail_count, _pi_tools):
         try:
             text = part()
         except Exception:  # noqa: BLE001 — a dead source must not block the briefing

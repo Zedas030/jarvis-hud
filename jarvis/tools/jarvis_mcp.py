@@ -555,6 +555,24 @@ TOOLS += [
 
 TOOLS += [
     {
+        "name": "outage_impact",
+        "description": ("What fails if a device or service fails, from Blast-Radius (dependency map of Pi, network "
+                        "and smart home, read only). `question` in plain English, e.g. 'What happens if the "
+                        "FRITZ!Box fails?'. Returns the functions that stop working or are degraded."),
+        "inputSchema": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]},
+    },
+    {
+        "name": "pi_reports",
+        "description": ("Status of the homelab tools on the Pi, read only: `topic` backups (Restore Probe: were last "
+                        "night's backups really restorable), updates (update airlock: container updates waiting, "
+                        "held back for breaking changes, failed), power (power hog detective: open findings on "
+                        "the power plugs, e.g. standby too high, plug sends no values), zigbee (placement advisor: "
+                        "where a new Zigbee router would help, channel overlap with WLAN), or all."),
+        "inputSchema": {"type": "object", "properties": {"topic": {"type": "string",
+                                                                   "enum": ["backups", "updates", "power", "zigbee",
+                                                                            "all"]}}},
+    },
+    {
         "name": "homelab_status",
         "description": ("Live figures from Prometheus (what Grafana shows): `topic` internet (throughput now, "
                         "today's volume and peak, line rate, FRITZ!Box uptime), wlan (devices per band), pi "
@@ -873,7 +891,7 @@ GROUPS = {
     "screen": {"screen_read", "screen_describe"},
     "scripts": {"script_list", "script_run"},
     "updates": {"updates_check", "update_install", "update_status"},
-    "homelab": {"homelab_status", "metrics_query", "pihole_status", "homelab_report", "security_findings",
+    "homelab": {"homelab_status", "outage_impact", "pi_reports", "metrics_query", "pihole_status", "homelab_report", "security_findings",
                 "security_accept", "security_scan", "maintenance_status"},
 }
 ACTIVE_GROUPS = [g.strip() for g in os.environ.get("JARVIS_TOOL_GROUPS", "").split(",") if g.strip()]
@@ -1843,6 +1861,18 @@ def call_tool(name, args):
                 text = mail_events.undo(args.get("hours") or 24)
         except Exception as e:  # noqa: BLE001
             text = f"Error: {e}"
+    elif name == "outage_impact":
+        try:
+            import outage_map
+            text = outage_map.describe(args.get("question") or "")
+        except Exception as e:  # noqa: BLE001
+            text = f"Blast-Radius error: {e}"
+    elif name == "pi_reports":
+        try:
+            import pi_reports
+            text = pi_reports.describe(args.get("topic") or "all")
+        except Exception as e:  # noqa: BLE001
+            text = f"Pi tools error: {e}"
     elif name in ("homelab_status", "metrics_query", "pihole_status"):
         try:
             import homelab

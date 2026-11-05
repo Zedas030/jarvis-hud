@@ -329,7 +329,9 @@ LEAN_GROUP_RULES = {
                "(one command, always with a confirmation card; say in one sentence what and why first). Warn when disks are not 'normal' or a volume is above 85 percent. pc_status: this PC (CPU, RAM, "
                "GPU, VRAM, disks); net_diagnose: narrow down internet problems; backup_status: Hyper Backup on the NAS; "
                "forecast_status: when NAS, PC disk or Pi card would be full (always name the data basis).",
-    "homelab": "Homelab: homelab_status gives live values from Prometheus (internet, wlan, pi, pc), "
+    "homelab": "Homelab: outage_impact answers 'What fails if X fails?' from the dependency map "
+               "(Blast-Radius). pi_reports: tools on the Pi – backups (really restorable?), updates "
+               "(update airlock), power (power hog detective), zigbee (placement advisor). homelab_status gives live values from Prometheus (internet, wlan, pi, pc), "
                "pihole_status the Pi-hole numbers, metrics_query free PromQL for history (hours = time span). "
                "homelab_report: status report from Uptime Kuma, the security centre and the energy loop. "
                "security_findings lists open findings with id; security_accept records one as an exception (card, "

@@ -93,6 +93,8 @@ via `Path(__file__).resolve().parents[2]`, never via their own folder.
 | Learning | `reflection.py`, `weekly_review.py`, `suggestions.py`, `background.py` |
 | Music | `spotify.py` (Web API on every device of the account: pause on the wake word, play on after; music tool) |
 | Windows | `pc.py` (volume, apps, ducking), `desktop.py` (windows, files, clipboard, OCR, scripts) |
+| Outages | `outage_map.py` ("what fails if X fails?" from Blast-Radius on the Pi, `/api/ask`; local router handler `_outage` + LLM tool `outage_impact`, read only) |
+| Pi tools | `pi_reports.py` (status of Restore Probe :8096, update airlock :8100, power hog detective :8101, Zigbee placement advisor :8099; local router handler `_pi_reports` + LLM tool `pi_reports`, read only; only findings go into the morning briefing) |
 | Infrastructure | `infra.py`, `dashboard.py`, `jarvis_profile.py`, `situation.py` (Lagebericht, security findings), `power_costs.py` (costs per plug, standby), `speakers.py` (announcements on Echo/Sonos, Fire TV commands) |
 | Organisation | `assistant.py` (drafts, day prep, research, watched topics, plans), `lists.py`, `routines.py`, `commute.py`, `parcels.py`, `printer.py` (3D printer from Home Assistant), `icloud_calendar.py` |
 | Stand-ins | `fallback_llm.py` |

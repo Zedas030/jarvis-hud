@@ -71,6 +71,9 @@ GROUP_RULES = [
                 r"highest|the most)"),
     ("homelab", r"\b(status report|situation report|uptime|kuma|security cent|security finding|security situation|zero export|"
                 r"energy ?loop)"),
+    ("homelab", r"\b(fails|failed|goes down|crashes|depends|dependenc|single point|spof|blast.?radius|what fails)"),
+    ("homelab", r"\b(restore[ -]?probe|restore test|backup[ -]?test|update[ -]?airlock|container[ -]?update|"
+                r"detective|unusual|placement advisor|zigbee|homelab tools?|pi tools?)"),
     ("health", r"\b(sleep|slept|steps|pulse|heart rate|garmin|body ?battery|stress|fitness|training|run\b|running|"
                r"ate\b|eaten|dinner|alcohol|beer\b|wine\b|review|weekly review)"),
     ("music", r"\b(music|spotify|song|track|playlist|album|play\b)"),
@@ -737,6 +740,49 @@ def _printer(n):
     return printer.handle(n, _raw())
 
 
+# "What happens if the Pi crashes?" — Blast-Radius on the Pi knows the dependencies. Unknown device or
+# Blast-Radius unreachable: None, and the question goes to Claude (who has the outage_impact tool).
+OUTAGE = re.compile(r"\b(what (happens|breaks|fails|stops working|stops|goes down|still works)\b.{0,40}\b(if|when|once)\b"
+                    r".{0,60}\b(fails|failed|goes down|went down|crashes|crashed|dies|breaks|is broken|is offline|is down|"
+                    r"loses power|has no power|goes out|is gone)|what (else |all )?(fails|stops working)\b.{0,30}\b"
+                    r"(if|when|without)|what (all |else )?depends on)")
+
+
+def _outage(n):
+    if not OUTAGE.search(n):
+        return None
+    import outage_map
+    try:
+        return outage_map.spoken(outage_map.ask(_raw() or n.strip()))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+# Status of the homelab tools on the Pi (Restore Probe, update airlock, power hog detective, Zigbee placement advisor).
+# Narrow on purpose: plain "power hogs" stays with power_costs' standby report, "any updates?" with updates_check.
+PI_REPORTS = (
+    ("backups", re.compile(r"\b(restore[ -]?probe|restore test|(are|is|were|was) (the |my )?backups?\b.{0,25}\b"
+                           r"(ok|okay|fine|good|alright|restorable|intact|usable|clean)|backup[ -]?test|"
+                           r"can (the )?backups be restored)")),
+    ("updates", re.compile(r"\b(update[ -]?airlock|update[ -]?schleuse|container[ -]?updates?|"
+                           r"what does the airlock say)")),
+    ("power", re.compile(r"\b(power[ -]?hog detective|stromfresser|detective|anything (unusual|odd|strange) "
+                         r"(about|with) (the )?(power|electricity)|(power|electricity) .{0,15}(anomal|unusual)|"
+                         r"(plugs?|devices?) .{0,20}(no values|unusual))")),
+    ("zigbee", re.compile(r"\b(placement advisor|platzberater|zigbee[ -]?(router|network|reception|connection|channel|"
+                          r"signal)|where (should|could|can) .{0,40}zigbee|zigbee .{0,30}(stable|weak|good))")),
+    ("all", re.compile(r"\b(homelab tools|pi tools|what do (the )?tools say|tools on the pi)")),
+)
+
+
+def _pi_reports(n):
+    topic = next((t for t, rx in PI_REPORTS if rx.search(n)), None)
+    if not topic or _has(n, "why", "explain", "how do i fix", "repair"):
+        return None                                # why/fix questions need Claude (he has pi_reports too)
+    import pi_reports
+    return pi_reports.spoken(topic)
+
+
 def _report(n):
     if not re.search(r"\b(usage report|token report|what have you learn(ed|t)|"
                      r"how many tokens?|how much have i used)\b", n):
@@ -916,7 +962,7 @@ def _habits(n):
 
 
 LOCAL_HANDLERS = [_emergency, _choice, _personality, _focus, _daytime, _context, _tasks, _desktop, _routine, _timers, _lists, _pronounce,
-                  _report, _selfcheck, _habits, _episodes, _wellbeing, _maintenance, _situation, _coach, _costs, _announce, _tv, _alerts,
+                  _outage, _pi_reports, _report, _selfcheck, _habits, _episodes, _wellbeing, _maintenance, _situation, _coach, _costs, _announce, _tv, _alerts,
                   _unifi, _media, _pc, _commute, _parcels, _printer, _followup, _home_state, _climate, _home,
                   _music, _time, _date, _sun, _weather, _solar, _nas, _pi]
 
