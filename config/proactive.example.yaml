@@ -1,0 +1,109 @@
+# Proactive mode – Jarvis speaks up by himself (jarvis/watch/proactive.py)
+#
+# Template: copy to config/proactive.yaml and adapt the entities to your own Home Assistant.
+# config/proactive.yaml is private (not in the repo), like config/home.json.
+#
+# This file only sets the behaviour. Credentials live in .env (HA_TOKEN, ICLOUD_*).
+# A value missing here falls back to the default in jarvis/watch/proactive_config.py. Changes apply without a
+# restart: the file is read again on the next round. Different path: JARVIS_PROACTIVE_CONFIG.
+
+# Main switch (feature flag). false = Jarvis behaves exactly as before the proactive mode.
+# The environment variable JARVIS_PROACTIVE_MODE (1/0) overrides this value, e.g. in a Docker container.
+enabled: true
+
+# Switches in Home Assistant. Leave empty = the switch is not used.
+ha:
+  switch_proactive: input_boolean.jarvis_proactive   # off = Jarvis only speaks what is critical
+  switch_guests: input_boolean.jarvis_guest_mode     # on = visitors here, only critical
+  switch_quiet: input_boolean.jarvis_quiet           # on = quiet; "Jarvis, quiet for an hour" switches it too
+
+# Where Jarvis speaks: in the room the presence sensors see the user in (room awareness).
+# default_room: a room from config/home.json → speakers when nobody is seen. "" = the PC (HUD).
+output:
+  default_room: ""
+  max_seconds: 25            # a spoken briefing is at most this long; the rest only appears on the iPad
+  words_per_second: 2.5      # speaking rate for the length estimate
+  formulate_with_llm: true   # Claude words the briefing; false = fixed text without a model
+  llm_timeout_s: 25          # if the model does not answer in time, the fixed text is used
+
+# Quiet rules. In all these cases Jarvis only speaks what is critical (water, smoke, severe weather …);
+# important notices are said later while they are still valid, "nice to know" only appears on the iPad.
+quiet:
+  hours: "22-7"              # quiet hours; "" = none. The morning briefing ends the night.
+  today_until_hour: 5        # "no announcements today" lasts until this hour the next morning
+  critical_always_speaks: true
+
+# Detect a phone or video call.
+calls:
+  windows_mic: true          # Windows only: a program is using the PC microphone right now
+  # Programs that keep the microphone open without a call (the browser with the HUD listens for
+  # "Jarvis"). A video call in the browser is not noticed this way – use the iPhone focus signal for that.
+  mic_ignore: [opera.exe, chrome.exe, msedge.exe, firefox.exe, python.exe, pythonw.exe]
+  # HA entities that mean "do not disturb" when they are "on". On a Linux server without the PC
+  # microphone, add e.g. a HASS.Agent sensor of the PC here.
+  entities: [binary_sensor.phone_focus]
+
+# Triggers (events, not fixed times)
+triggers:
+  arrival:
+    enabled: true
+    min_away_minutes: 20     # an arrival briefing only after being away this long
+    room_wait_minutes: 3     # Jarvis waits this long for a presence sensor to know the room
+  morning:
+    enabled: true
+    sensors: [binary_sensor.bathroom_occupancy]   # first entry after the night
+    from_hour: 5
+    until_hour: 11
+  instant:
+    enabled: true            # critical and important news from HA at once
+  evening:
+    enabled: true
+    routine: Good night      # appended to your routine; without a routine "Jarvis, good night" is enough
+
+# Learning by feedback: "Jarvis, not important" refers to the last notice.
+feedback:
+  threshold: 3               # this many times "not important" …
+  window_days: 30            # … within these days lowers the level of that kind of notice by one
+
+# Information sources – each can be switched off. If one fails, it is skipped (once in the log).
+sources:
+  calendar: {enabled: true}                # iCloud calendar (ICLOUD_* in .env)
+  weather: {enabled: true}                 # open-meteo (JARVIS_WEATHER_LAT/LON in .env)
+  dwd: {enabled: true}                     # DWD weather warnings through Bright Sky
+  parcels: {enabled: true}                 # parcels today (calendar entries "📦" from shipments.py)
+  energy: {enabled: true}                  # energy coach: sun, battery
+  noah:                                    # battery difference master/slave – the HA automation sets the switch
+    enabled: true
+    switch: input_boolean.noah_diff_warning
+    master: sensor.noah_bat0_soc
+    slave: sensor.noah_bat1_soc
+  devices_offline:                         # sockets without a cloud connection
+    enabled: true
+    pattern: "_cloud_connection$"
+    minutes: 15
+    ignore: []
+  safety:                                  # water, smoke, gas – as soon as such sensors are in HA
+    enabled: true
+    device_classes: [moisture, smoke, gas, carbon_monoxide]
+  devices_on: {enabled: true}              # in the evening: what is still running (as when leaving)
+  windows:                                 # in the evening: open windows/doors, as soon as contacts are in HA
+    enabled: true
+    device_classes: [window, door, opening, garage_door]
+  missed: {enabled: true}                  # coming home: what Jarvis announced in the meantime
+
+# Level per kind of notice (critical / important / nice). Feedback can lower "important" and "nice".
+priorities:
+  safety: critical
+  dwd_severe: critical
+  dwd: important
+  noah: important
+  device_offline: important
+  calendar_soon: important
+  calendar: nice
+  calendar_tomorrow_early: important
+  parcel: nice
+  weather: nice
+  energy: nice
+  devices_on: important
+  window_open: important
+  missed: nice

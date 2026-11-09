@@ -35,6 +35,7 @@ The language model is the **Claude Code CLI** in subscription mode, so there is 
 - [Usage](#usage)
 - [Voice: provider chain, voice engine, fallback mode](#voice-provider-chain-voice-engine-fallback-mode)
 - [Language and voice settings](#language-and-voice-settings)
+- [Proactive mode](#proactive-mode)
 - [Memory and learning](#memory-and-learning)
 - [Security model](#security-model)
 - [Architecture](#architecture)
@@ -59,7 +60,7 @@ The language model is the **Claude Code CLI** in subscription mode, so there is 
 <td valign="top">🧠 <b>Real memory</b><br>Obsidian vault with topic notes, conversation log, episodes per day, expiry dates and a trash folder. Every memory with a source you can check.</td>
 </tr>
 <tr>
-<td valign="top">🏠 <b>Knows where you are</b><br>Presence sensors per room: the answer comes from that room's speaker, music moves with you, the heating follows, the morning briefing starts on the first trip to the bathroom.</td>
+<td valign="top">🏠 <b>Knows where you are</b><br>Presence sensors per room: the answer comes from that room's speaker, "light on" and "warmer" mean that room, music moves with you, the heating follows, the morning briefing starts on the first trip to the bathroom.</td>
 <td valign="top">📣 <b>Speaks up by himself</b><br>Washing machine done, time to leave, parcel arriving, battery full, severe weather, new device on the WiFi. With quiet hours, never without a card.</td>
 </tr>
 <tr>
@@ -87,7 +88,7 @@ The architecture separates the **router** (rules), the **tools** (MCP server) an
 
 **At home**
 - *"Set the living room light to 40 percent"*, *"Is the washing machine still on?"*, *"Cinema scene"*, then for two minutes *"brighter"*, *"off again"*, *"and in the bedroom too"*.
-- Jarvis knows from presence sensors which room you are in: answers come from the speaker there, *"bring the music to me"* moves Spotify to the room's speaker, the heating follows you, at night the Sonos says good night.
+- Jarvis knows from presence sensors which room you are in: answers come from the speaker there, *"light on"*, *"TV on"* and *"warmer"* without a room mean that room (when it is unclear he asks *"Living room or Bedroom?"*), *"bring the music to me"* moves Spotify to the room's speaker, the heating follows you, at night the Sonos says good night.
 - *"Say in the living room: dinner is ready"* speaks through the Echo Dot, in the bedroom through the Sonos. Answers optionally from the Echo, in Alexa's voice.
 - *"How much is the solar system delivering?"*, *"What does the PC cost me per month?"*, *"Who is drawing standby power?"*, *"When should I turn on the dishwasher?"* (energy coach from battery level, consumption and the solar forecast).
 - If you leave the flat and something is still running, a "switch off" suggestion comes to your phone. When you come home: *"Welcome back. While you were out: …"*
@@ -159,6 +160,29 @@ This repository is the English edition: Jarvis understands and speaks English, a
 | Default Home Assistant entity ids (e.g. `sensor.house_consumption`, plug suffix `_current_consumption`) | German entity names | English entity names; the old German suffixes can still be set through the `JARVIS_PLUG_*` variables |
 
 The voice test clips in `tests/fixtures/voice/` were spoken anew in English. Carrier and booking mails from German shops are still parsed in both languages, since they arrive in German regardless of the assistant's language.
+
+---
+
+## Proactive mode
+
+Jarvis speaks up by himself – triggered by events, not by fixed times:
+
+- **Coming home:** a short briefing in the room the presence sensors see you in – with what happened while you
+  were away.
+- **Morning:** on the first entry into the bathroom after the night (weather, warnings, appointments, parcels).
+- **Instant:** water, smoke, severe weather, NOAH batteries drifting apart, a device offline.
+- **"Jarvis, good night":** devices still on, open windows, an early appointment tomorrow.
+
+Every notice is *critical*, *important* or *nice to know*. A briefing is at most 25 seconds long, the iPad shows
+the rest. He repeats what was already said only when something changes; "Jarvis, tell me more" gives details.
+
+**He keeps quiet** – only critical notices get through – during the quiet hours, after "quiet for an hour" or "no
+announcements today", in guest mode, during a phone or video call (PC microphone, iPhone focus) and when you are
+not at home. Say "not important" a few times and that kind of notice drops a level; this can be seen and reset in
+the bell. Home Assistant gets the switches *Jarvis Proactive*, *Jarvis Guest Mode* and *Jarvis Quiet*.
+
+Setup, all rules, sources and secrets: [Proactive mode](docs/proactive.md). On and off:
+`config/proactive.yaml` → `enabled` (template `config/proactive.example.yaml`).
 
 ---
 
@@ -274,7 +298,7 @@ The repo contains no real keys, passwords or addresses. All access is optional. 
 |---|---|
 | Voice: `FISH_AUDIO_API_KEY`, `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY`, `GOOGLE_TTS_API_KEY` | `.env` |
 | Fallback mode: `GROQ_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_URL` | `.env` |
-| Home Assistant: `HA_URL`, `HA_TOKEN`, `HA_MCP_URL` | `.env`; entities for dashboard, rooms and devices in `config/home.json` |
+| Home Assistant: `HA_URL`, `HA_TOKEN`, `HA_MCP_URL` | `.env`; entities for dashboard, rooms and devices in `config/home.json`, the proactive mode's switches and sources in `config/proactive.yaml` (no secrets there) |
 | Mail and calendar: `ICLOUD_USER`, `ICLOUD_APP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_USER`, `MAIL_PASSWORD` | `.env`, for iCloud an app-specific password |
 | Home network: `PIHOLE_URL`, `PIHOLE_PASSWORD`, `PROMETHEUS_URL`, `KUMA_URL`, `SYNOLOGY_*`, `UNIFI_*`, `JELLYFIN_*`, `PAPERLESS_*`, `JARVIS_PI_HOST`, `JARVIS_PI_USER` | `.env` |
 | Other: `DHL_API_KEY`, `GARMIN_EMAIL`, `GARMIN_PASSWORD`, `JARVIS_SPOTIFY_CLIENT_ID` | `.env`; then sign in to Spotify once with `scripts\spotify_login.py` |
@@ -331,6 +355,7 @@ The PC stays the brain. iPhone and iPad connect through **Tailscale** over HTTPS
 | [Installation and configuration](docs/installation.md) | Quick start, local voices, all `.env` settings, development and diagnosis |
 | [Usage](docs/usage.md) | Speaking and typing, cards, personality, everyday life, Windows, iPhone/iPad, phone |
 | [Voice and voice engine](docs/voice.md) | Provider chain, listening/interrupting/resuming with measurements, fallback mode |
+| [Proactive mode](docs/proactive.md) | Triggers, quiet rules, sources, voice commands, feedback, secrets, Linux |
 | [Memory and learning](docs/memory.md) | Resources, context, tasks, learning modules, vault |
 | [Architecture and efficiency](docs/architecture.md) | All components, router and lean mode, project structure |
 | [Security model](docs/security.md) | The rules in code; details in [SECURITY.md](SECURITY.md) |

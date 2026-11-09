@@ -681,7 +681,11 @@ class MusicRooms(Base):
         self.local("Move the music from the bedroom to the living room", "music")
         self.local("Put the music from the living room on in the bedroom", "music")
         self.local("Music to the bedroom", "music")
-        self.assertEqual(self.moved, ["Living Room", "Living Room", "Bedroom", "Bedroom"])
+        self.local("The music is playing in the bedroom and I'm sitting in the living room", "music")
+        self.local("The music is still playing in the living room, bring it to the bedroom", "music")
+        self.local("I'm in the living room, the music is playing in the bedroom", "music")
+        self.assertEqual(self.moved, ["Living Room", "Living Room", "Bedroom", "Bedroom",
+                                      "Living Room", "Bedroom", "Living Room"])
 
     def test_plain_music_commands_and_lights_stay_as_they_were(self):
         route("Music quieter")

@@ -198,6 +198,19 @@ def _next_event():
     return {"title": "", "when": "no appointments"}
 
 
+def _where():
+    """The room the presence sensors see the user in, for the tablet's "Room" tile; None when off."""
+    try:
+        import room_scope
+        cur = room_scope.current()
+    except Exception:  # noqa: BLE001
+        return None
+    if cur["status"] == "off":
+        return None
+    return dict(room=cur["room"], sure=cur["sure"], offline=cur["status"] == "offline",
+                candidates=cur["candidates"])
+
+
 def _house():
     states = briefing._ha_states()
     by = {s["entity_id"]: s for s in states}
@@ -216,6 +229,7 @@ def _house():
     pm = val(profile.ha("air_pm25"))
     rt = profile.ha("router", {})
     return dict(
+        where=_where(),
         solar_w=round(total(profile.ha("solar_power"))),
         soc=val(profile.ha("storage_soc")), bats=[b for _, b in bats if b is not None],
         gen_kwh=round(total(profile.ha("generation_today")), 1),

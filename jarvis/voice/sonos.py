@@ -91,13 +91,60 @@ def chosen(device):
     return eid if label(eid) else ""
 
 
+# "Where I am" without a working source: the device answers itself and says why, once per outage.
+_NOTE = {"why": "", "told": ""}
+_PLAYER = {}             # entity -> (checked at, available)
+PLAYER_TTL_S = 15
+
+
+def _available(eid):
+    """A Sonos HA lists as unavailable takes the announcement without a sound — check before using it."""
+    if not eid.startswith("media_player."):
+        return True                                # an Echo (notify.*) reports its own failures
+    at, ok = _PLAYER.get(eid, (0.0, True))
+    if time.time() - at < PLAYER_TTL_S:
+        return ok
+    try:
+        ok = (json.loads(_ha(f"/api/states/{eid}") or b"{}") or {}).get("state") not in ("unavailable", None)
+    except Exception:  # noqa: BLE001
+        ok = False
+    _PLAYER[eid] = (time.time(), ok)
+    return ok
+
+
 def resolve(eid):
     """AUTO -> the speaker of the room the user is in right now ("" when nobody is seen or the room has no
     speaker); any other entity unchanged."""
     if eid != AUTO:
         return eid
-    target = whereabouts.speaker(whereabouts.room())
-    return target if target != AUTO and label(target) else ""
+    room = whereabouts.room()
+    if whereabouts.offline():
+        _NOTE["why"] = "I cannot see which room you are in right now, so I am answering here."
+        return ""
+    target = whereabouts.speaker(room)
+    target = target if target != AUTO and label(target) else ""
+    if target and not _available(target):
+        _NOTE["why"] = f"The speaker {label(target)} cannot be reached right now, so I am answering here."
+        return ""
+    _NOTE.update(why="", told="")                  # all well again: the next outage is told again
+    return target
+
+
+def fallback_note():
+    """The sentence to put before an answer the device speaks itself because "Where I am" failed,
+    once per outage; "" otherwise."""
+    why = _NOTE["why"]
+    if not why or why == _NOTE["told"]:
+        return ""
+    _NOTE["told"] = why
+    return why
+
+
+def failed(eid):
+    """The announcement on eid did not start (sonos.Fallback): remember it, -> the sentence to say once."""
+    _PLAYER[eid] = (time.time(), False)
+    _NOTE["why"] = f"The speaker {label(eid) or 'in the room'} does not answer, so I am answering here."
+    return fallback_note()
 
 
 def output_for(device):

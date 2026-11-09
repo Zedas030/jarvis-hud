@@ -14,7 +14,7 @@ Legend: ✅ done · 🔄 in progress · ⏸ waiting for approval · ⬜ open
 | 2 Agent core | ⬜ | Present: router, Haiku/Sonnet, fallback mode, action classes, audit, personality, vault, episodes. Missing: plugin registry, YAML configuration, SQLite memory, short-term summary, speaker recognition, separation of private and work |
 | 3 Server & operations | ⬜ | Plan and hardware in `SERVER-REBUILD.md`; `hostos.py` started. Missing: Linux test run, PC agent, systemd, secrets, backups to the NAS, watchdog, self-monitoring |
 | 4 HA & energy | ⬜ | Present: rooms/aliases, climate groups, own routines, energy coach, electricity costs, budget. Missing: HA automations by voice, PV forecast, Noah SOC, PromQL from speech with a chart |
-| 5 Proactivity | ⬜ | Present: watchers, quiet hours, priorities, suggestions, morning briefing, phone push, severe weather. Missing: event engine (HA WebSocket, Alertmanager), bundling, output by presence, adjusting notices by voice |
+| 5 Proactivity | 🔄 | 2026-11-05: proactive mode (docs/proactive.md): triggers arrival/morning/instant/good night, levels, output by presence, quiet rules, feedback by voice, history. Missing: event engine (HA WebSocket instead of the 30-s poll, Alertmanager) |
 | 6 Presence & multiroom | ⬜ | Present: speaker per room, Sonos announcements, moving music. Missing: mmWave/CSI fusion, arbitration of several mics, volume per room and time of day |
 | 7 Work assistant | ⬜ | Present: reading IMAP, drafts, CalDAV, research, plans. Missing: M365 Graph, deadline watcher, dictation → document, work memory (decision 1 needed) |
 | 8 HUD | ⬜ | Present: 13 layouts, iPad pairing, state display, graph. Missing: camera streams, Prometheus charts, splitting `app.js` |
@@ -40,6 +40,7 @@ Legend: ✅ done · 🔄 in progress · ⏸ waiting for approval · ⬜ open
 
 ## History
 
+- 2026-11-05 Proactive mode built and accepted (`docs/acceptance-proactive.md`); room-aware commands (`docs/acceptance-room-commands.md`).
 - 2026-11-04 English edition: speech, prompts, intents, UI, docs and tests translated; German edition split off.
 - 2026-11-02 Phase 0 approved, P0 foundation built (logging, metrics, dependencies, tests).
 - 2026-11-02 Phase 0 report written; phase 1 core done (voice engine on the server).
