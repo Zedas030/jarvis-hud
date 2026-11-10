@@ -8,30 +8,28 @@ Everything Jarvis can do: the highlights, the long list of small checkmarks and 
 
 | | |
 |---|---|
-| 🎙️ **Hands-free talking** | Live microphone with pause and end-of-sentence detection, push-to-talk, interrupting by talking over him: he stops, listens and carries on if nothing comes. Optionally with a wake word ("Jarvis …" or locally with openWakeWord); without "Jarvis" nothing is processed or logged. |
+| **Hands-free talking** | Live microphone with pause and end-of-sentence detection, push-to-talk, interrupting by talking over him: he stops, listens and carries on if nothing comes. Optionally with a wake word ("Jarvis …" or locally with openWakeWord); without "Jarvis" nothing is processed or logged. |
 | ⏰ **Timers, alarms, reminders** | *"Timer 10 minutes for the pasta"*, *"Wake me tomorrow at half past six"*, *"Remind me about the laundry in 20 minutes"*, *"Turn off the light in an hour"*. Local, no tokens, survives restarts. |
-| 📣 **Speaks up by himself** | Washing machine done, appointment in 15 minutes or "time to leave" (with travel time), parcel arriving today, battery full, NAS problem, new device on the WiFi. With quiet hours. |
-| 📦 **On the road and post** | *"When do I have to leave?"* (travel time to the next appointment through OpenStreetMap), *"Is a parcel coming today?"* (from the shipping mails). Local, no tokens. |
-| 🖥️ **PC control** | *"Volume to 30 percent"*, *"Mute"*, *"Open Spotify"*, *"Lock the screen"*. Spotify gets quieter while Jarvis listens or speaks, on every device of the account; at night he speaks more quietly. |
-| 📉 **Gets more economical** | Remembers wordings that Claude had to resolve once ("reading lamp off") and switches them himself from then on. The same questions within 5 minutes come from the cache. *"Usage report"* tells how much ran locally. |
-| 🗣️ **Pronunciation** | NAS, Pi, kWh & co. are spoken correctly; own words with *"Pronounce Tuya as Too-ya"*. |
-| 🛒 **Lists and routines** | Shopping and to-do list by voice (Home Assistant or a vault note). Routines like "Good night": one sentence, several actions, created by voice. |
-| 🛡️ **Controlled and honest** | Fixed rules in code instead of the prompt, protection against third-party instructions in mails and web pages, audit log, emergency stop, a checkable source for every memory, honest feedback when switching. |
-| 🎭 **Personality** | Standard, professional, technical, casual on request; typed questions get detailed answers, spoken ones short answers. |
-| 🪟 **Windows** | Arranging windows, workspaces, files and clipboard, screen text through local OCR, approved scripts. |
-| 🎓 **Learns** | Rates his own conversations, suggests fixed rules on Sundays, does a weekly review with patterns from sleep, steps, stress and golf, reports homelab outages only when they matter and suggests a new ability twice a week. Without work topics, changes only with a card. |
-| 🛟 **Fallback mode** | If Claude fails or the limit is reached, a free chain takes over: Groq → Gemini → Ollama, with the same tools and confirmation cards. |
-| 🧠 **Real memory** | Notes by topic, an automatic conversation log, remembering and forgetting on his own (expiry dates, trash folder). |
-| ⚡ **Local intent router** | Lights, sockets, music, time, weather, energy and system status without an LLM, with an answer in milliseconds. |
-| 🪶 **Lean LLM calls** | Own prompt instead of the Claude Code default, tools as needed, automatic model choice (Haiku/Sonnet). Measured at **over 25× fewer tokens** than a standard call. |
-| 🔊 **Fail-safe voice** | A chain of cloud, local GPU and free voices. Used-up providers are skipped until their reset, without an audible break. |
-| 🏠 **Smart home** | Home Assistant: switching, querying states, energy (solar/battery), room climate, air quality. Optionally the full HA MCP server for automations and history. |
-| 🛰️ **Home network** | Status of the Raspberry Pi and Synology NAS, device list, watcher for new devices on the WiFi. *"Situation report"* sums up Uptime Kuma, the security centre on the Pi and the energy loop, and reports outages, urgent security findings and a stuck zero export by itself. |
-| 📅 **Everyday life** | Calendar (CalDAV/iCloud), mailbox (IMAP, read only), Garmin health data, Spotify, web search. |
-| 🖥️ **HUD** | Dashboard with a weather and activity traffic light, house, health, systems, mail, 3D knowledge graph and usage display. |
-| 🔐 **Controlled** | `localhost` only, confirmation cards for system actions, protected devices, no self-modification at runtime. |
-
----
+| **Speaks up by himself** | Washing machine done, appointment in 15 minutes or "time to leave" (with travel time), parcel arriving today, battery full, NAS problem, new device on the WiFi. With quiet hours. |
+| **On the road and post** | *"When do I have to leave?"* (travel time to the next appointment through OpenStreetMap), *"Is a parcel coming today?"* (from the shipping mails). Local, no tokens. |
+| **PC control** | *"Volume to 30 percent"*, *"Mute"*, *"Open Spotify"*, *"Lock the screen"*. Spotify gets quieter while Jarvis listens or speaks, on every device of the account; at night he speaks more quietly. |
+| **Gets more economical** | Remembers wordings that Claude had to resolve once ("reading lamp off") and switches them himself from then on. The same questions within 5 minutes come from the cache. *"Usage report"* tells how much ran locally. |
+| **Pronunciation** | NAS, Pi, kWh & co. are spoken correctly; own words with *"Pronounce Tuya as Too-ya"*. |
+| **Lists and routines** | Shopping and to-do list by voice (Home Assistant or a vault note). Routines like "Good night": one sentence, several actions, created by voice. |
+| **Controlled and honest** | Fixed rules in code instead of the prompt, protection against third-party instructions in mails and web pages, audit log, emergency stop, a checkable source for every memory, honest feedback when switching. |
+| **Personality** | Standard, professional, technical, casual on request; typed questions get detailed answers, spoken ones short answers. |
+| **Windows** | Arranging windows, workspaces, files and clipboard, screen text through local OCR, approved scripts. |
+| **Learns** | Rates his own conversations, suggests fixed rules on Sundays, does a weekly review with patterns from sleep, steps, stress and golf, reports homelab outages only when they matter and suggests a new ability twice a week. Without work topics, changes only with a card. |
+| **Fallback mode** | If Claude fails or the limit is reached, a free chain takes over: Groq → Gemini → Ollama, with the same tools and confirmation cards. |
+| **Real memory** | Notes by topic, an automatic conversation log, remembering and forgetting on his own (expiry dates, trash folder). |
+| **Local intent router** | Lights, sockets, music, time, weather, energy and system status without an LLM, with an answer in milliseconds. |
+| **Lean LLM calls** | Own prompt instead of the Claude Code default, tools as needed, automatic model choice (Haiku/Sonnet). Measured at **over 25× fewer tokens** than a standard call. |
+| **Fail-safe voice** | A chain of cloud, local GPU and free voices. Used-up providers are skipped until their reset, without an audible break. |
+| **Smart home** | Home Assistant: switching, querying states, energy (solar/battery), room climate, air quality. Optionally the full HA MCP server for automations and history. |
+| **Home network** | Status of the Raspberry Pi and Synology NAS, device list, watcher for new devices on the WiFi. *"Situation report"* sums up Uptime Kuma, the security centre on the Pi and the energy loop, and reports outages, urgent security findings and a stuck zero export by itself. |
+| **Everyday life** | Calendar (CalDAV/iCloud), mailbox (IMAP, read only), Garmin health data, Spotify, web search. |
+| **HUD** | Dashboard with a weather and activity traffic light, house, health, systems, mail, 3D knowledge graph and usage display. |
+| **Controlled** | `localhost` only, confirmation cards for system actions, protected devices, no self-modification at runtime. |
 
 ## What it can do
 
@@ -98,8 +96,6 @@ The architecture separates the **router** (rules), the **tools** (MCP server) an
 - More tool groups: Proxmox, vehicle APIs, fitness platforms
 - An own voice from a voice sample (local), several languages at once
 
----
-
 ## Feature list
 
 The plan per build-out phase is in `ROADMAP.md`, the inventory from 2026-11-02 in `INVENTORY.md`. Here is the feature list:
@@ -138,7 +134,5 @@ The plan per build-out phase is in `ROADMAP.md`, the inventory from 2026-11-02 i
 - [x] Answers through the Echo, morning briefing in the living room, follow-ups when switching (brighter, off again, in the bedroom too)
 - [x] Automated tests for the voice chain
 - [x] English edition (speech, prompts, intents, UI, docs); German edition in [jarvis-hud-de](https://github.com/Zedas030/jarvis-hud-de)
-
----
 
 <sub>Originally inspired by <a href="https://github.com/Itsme23476/jarvis-claude-code">jarvis-claude-code</a>. Before passing it on independently, clarify the licence situation of the original.</sub>

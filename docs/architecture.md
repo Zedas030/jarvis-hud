@@ -33,8 +33,6 @@ The diagram is in the [README](../README.md#architecture). Here are the componen
 | `spotify.py` | Spotify Web API: pause on the wake word, then on; play/pause/next on every device |
 | `ui/` | HUD (vanilla JS, 3D knowledge graph without dependencies) |
 
----
-
 ## Efficiency: router and lean mode
 
 A standard Claude Code call sends a base load of ~35,000 tokens with every request:
@@ -68,8 +66,6 @@ On top of that every tool adds an extra round trip.
 - **Background jobs without an LLM:** dashboard, network watcher, briefing facts.
 
 Every request lands in `logs/usage.jsonl` (route, model, groups, input/cache/output, API calls).
-
----
 
 ## Project structure
 

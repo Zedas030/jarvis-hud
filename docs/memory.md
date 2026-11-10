@@ -35,8 +35,6 @@ Further build-out stages on the existing architecture. All of them run without a
 
 Local data (in `.gitignore`): `logs/tasks.json`, `logs/metrics_daily.json`, `logs/docindex.sqlite`, `config/learned.history.jsonl`.
 
----
-
 ## Learning modules
 
 Four modules run in the background, each in its own file. For all of them:
@@ -64,8 +62,6 @@ Background jobs use Claude Haiku (`JARVIS_BACKGROUND_MODEL`) as their own short 
 | `JARVIS_BACKGROUND_MODEL`, `JARVIS_PROPOSAL_DAYS` | `haiku`, `7` | Model of the background jobs, expiry of open suggestions |
 
 Local data (all in `.gitignore`): `logs/health_daily.json`, `logs/proposals.json`, `logs/homelab_baseline.json`, `config/homelab.json`.
-
----
 
 ## Memory
 

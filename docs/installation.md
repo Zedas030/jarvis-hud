@@ -47,8 +47,6 @@ py -3.12 -m venv .venv-tts
 
 The server starts the GPU voice automatically as soon as `.venv-tts` exists. Chatterbox speaks English (`language_id` `en`).
 
----
-
 ## Configuration
 
 All settings are commented in [`.env.example`](../.env.example). Personal data belongs only in `.env` and `config/home.json`; both are in `.gitignore`. Where to enter API keys, passwords and tokens and how to rotate them: README, section [Secrets](../README.md#secrets).
@@ -75,8 +73,6 @@ All settings are commented in [`.env.example`](../.env.example). Personal data b
 | Routines | `config/routines.json` | Created by voice; format in `config/routines.example.json` |
 
 > **Important:** never set `ANTHROPIC_API_KEY`. Claude Code would then bill through the API instead of the subscription. As a precaution the server removes the variable from the environment of its child processes.
-
----
 
 ## Development and diagnosis
 

@@ -30,8 +30,6 @@ Speaking, typing, cards, personality, everyday life and access from iPhone, iPad
 | Commands | `/new`, `/status`, `/recall <term>`, `/graph`, `/help` |
 | API credit | ✎ in the usage field: enter the balance, spending is deducted through the Cost API |
 
----
-
 ## Control, personality and everyday life
 
 Six build-out stages, each with its own tests. The rules behind them are in [SECURITY.md](../SECURITY.md), the structure in [ARCHITECTURE.md](../ARCHITECTURE.md).
@@ -86,8 +84,6 @@ Six build-out stages, each with its own tests. The rules behind them are in [SEC
 | `JARVIS_WATCH_MAX`, `JARVIS_WATCH_PER_DAY` | `5`, `2` | Watched topics and checks per day |
 | `JARVIS_PLAN_REMIND` | `09:00` | Time of the reminders in plans |
 | `config/profiles.json`, `config/scripts.json`, `config/homelab.json` | — | Own profiles, approved scripts, important devices (templates `*.example.json`) |
-
----
 
 ## On the go: iPhone and iPad
 

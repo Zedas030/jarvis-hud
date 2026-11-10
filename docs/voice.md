@@ -18,8 +18,6 @@ Fish Audio ─▶ ElevenLabs ─▶ local (Chatterbox GPU · Piper CPU) ─▶ A
 - The chain is plain code, it uses no LLM tokens.
 - **English voices:** the defaults are `en-GB-RyanNeural` (Edge, Azure), `en-GB-Chirp3-HD-Charon` (Google), Piper `en_GB-alan-medium` and Chatterbox with `language_id` `en`; for Fish Audio and ElevenLabs the voice id decides (pick an English voice). The overview of what changed from the German edition is in the README under [Language and voice settings](../README.md#language-and-voice-settings).
 
----
-
 ## Voice engine: listening, interrupting, resuming
 
 Since 2026-11-02 the conversation no longer runs in the browser but in a **full-duplex engine on the
@@ -122,8 +120,6 @@ conversation), speak ten sentences.
 | First sound comes late | `tts.first_chunk_max_chars` | 70 → 50; check the voice in `TTS_CHAIN` (Piper streams, Fish streams, Chatterbox does not) |
 | Gets technical terms wrong | `stt.vocabulary` | add the term (or `WHISPER_LOCAL_PROMPT`) |
 | Starts talking without "Jarvis" while the TV is on | `wake.barge_needs_name_with_ambience` | leave it true; `JARVIS_WAKE=Jarvis` |
-
----
 
 ## Fallback mode: replacement chain
 

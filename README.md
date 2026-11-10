@@ -1,32 +1,20 @@
-> 🇩🇪 German version: [jarvis-hud-de](https://github.com/Zedas030/jarvis-hud-de)
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Jarvis: a self-hosted voice assistant with memory and smart home control, powered by Claude Code" width="100%">
+</p>
 
-<div align="center">
+<p align="center">
+  <a href="docs/installation.md">Install</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="docs/features.md">Features</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="docs/architecture.md">Architecture</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="SECURITY.md">Security</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="https://github.com/Zedas030/jarvis-hud-de">Deutsch</a>
+</p>
 
-# J.A.R.V.I.S.
-
-**Personal voice assistant with memory, smart home control and a HUD — powered by Claude Code**
-
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Windows%2011-0078D6?logo=windows&logoColor=white)
-![Claude Code](https://img.shields.io/badge/Brain-Claude%20Code%20CLI-D97757)
-![Home Assistant](https://img.shields.io/badge/Smart%20Home-Home%20Assistant-41BDF5?logo=homeassistant&logoColor=white)
-![Local first](https://img.shields.io/badge/Voice-local%20(Whisper%20%2B%20GPU--TTS)-2ea44f)
-
-</div>
-
----
-
-JARVIS is a self-hosted voice assistant in the style of the Iron Man computer. You talk freely in the browser, he answers with a natural voice, controls the smart home, knows your calendar, mailbox and home network, and builds up a **lasting memory** in an Obsidian vault.
+Jarvis is a self-hosted voice assistant in the style of the Iron Man computer. You talk freely in the browser, he answers with a natural voice, controls the smart home, knows your calendar, mailbox and home network, and builds up a **lasting memory** in an Obsidian vault.
 
 The language model is the **Claude Code CLI** in subscription mode, so there is no API billing per token. To make the allowance last, a **local intent router** answers simple commands entirely without an LLM. Everything else runs as a **lean, stateless call** with its own short prompt and only the tools the request really needs.
 
-<div align="center">
-
-![Jarvis HUD, "Sun path" view](docs/screenshots/hud.png)
-
-<sub>HUD on the PC, "Sun path" view · instance with the example configuration, no personal data</sub>
-
-</div>
+<p align="center">
+  <img src="docs/screenshots/hud.png" alt="Jarvis HUD, Sun path view" width="100%">
+  <br>
+  <sub>The HUD on the PC, "Sun path" view. Example configuration, no personal data.</sub>
+</p>
 
 ## Contents
 
@@ -46,34 +34,30 @@ The language model is the **Claude Code CLI** in subscription mode, so there is 
 - [Documentation](#documentation)
 - [Raspberry Pi: monitoring and docs](#raspberry-pi-monitoring-and-docs)
 
----
-
 ## Highlights
 
 <table>
 <tr>
-<td width="50%" valign="top">🎙️ <b>Hands-free talking</b><br>Live microphone, end-of-sentence detection, talking over him interrupts him. Wake word "Jarvis", optionally local with openWakeWord.</td>
-<td width="50%" valign="top">⚡ <b>0 tokens for everyday things</b><br>Lights, sockets, music, timers, alarms, time, weather: a local intent router answers in milliseconds, without an LLM.</td>
+<td width="50%" valign="top"><img src="docs/assets/icons/mic.svg" width="24" height="24" alt=""><br><b>Hands-free talking</b><br>Live microphone, end-of-sentence detection, talking over him interrupts him. Wake word "Jarvis", optionally local with openWakeWord.</td>
+<td width="50%" valign="top"><img src="docs/assets/icons/bolt.svg" width="24" height="24" alt=""><br><b>0 tokens for everyday things</b><br>Lights, sockets, music, timers, alarms, time, weather: a local intent router answers in milliseconds, without an LLM.</td>
 </tr>
 <tr>
-<td valign="top">🪶 <b>Lean Claude calls</b><br>Its own short prompt, only the tools needed, automatic model choice. Measured at over 25× fewer tokens than a standard call.</td>
-<td valign="top">🧠 <b>Real memory</b><br>Obsidian vault with topic notes, conversation log, episodes per day, expiry dates and a trash folder. Every memory with a source you can check.</td>
+<td valign="top"><img src="docs/assets/icons/feather.svg" width="24" height="24" alt=""><br><b>Lean Claude calls</b><br>Its own short prompt, only the tools needed, automatic model choice. Measured at over 25× fewer tokens than a standard call.</td>
+<td valign="top"><img src="docs/assets/icons/memory.svg" width="24" height="24" alt=""><br><b>Real memory</b><br>Obsidian vault with topic notes, conversation log, episodes per day, expiry dates and a trash folder. Every memory with a source you can check.</td>
 </tr>
 <tr>
-<td valign="top">🏠 <b>Knows where you are</b><br>Presence sensors per room: the answer comes from that room's speaker, "light on" and "warmer" mean that room, music moves with you, the heating follows, the morning briefing starts on the first trip to the bathroom.</td>
-<td valign="top">📣 <b>Speaks up by himself</b><br>Washing machine done, time to leave, parcel arriving, battery full, severe weather, new device on the WiFi. With quiet hours, never without a card.</td>
+<td valign="top"><img src="docs/assets/icons/location.svg" width="24" height="24" alt=""><br><b>Knows where you are</b><br>Presence sensors per room: the answer comes from that room's speaker, "light on" and "warmer" mean that room, music moves with you, the heating follows, the morning briefing starts on the first trip to the bathroom.</td>
+<td valign="top"><img src="docs/assets/icons/bell.svg" width="24" height="24" alt=""><br><b>Speaks up by himself</b><br>Washing machine done, time to leave, parcel arriving, battery full, severe weather, new device on the WiFi. With quiet hours, never without a card.</td>
 </tr>
 <tr>
-<td valign="top">🛟 <b>Fallback mode</b><br>If Claude is down, a free chain Groq → Gemini → Ollama takes over with the same tools. The voice has its own chain of cloud, GPU and free providers.</td>
-<td valign="top">🛡️ <b>Controlled and honest</b><br>Action classes in code instead of the prompt, confirmation cards, protection against third-party instructions in mails and web pages, audit log, emergency stop, <code>localhost</code> only.</td>
+<td valign="top"><img src="docs/assets/icons/fallback.svg" width="24" height="24" alt=""><br><b>Fallback mode</b><br>If Claude is down, a free chain Groq → Gemini → Ollama takes over with the same tools. The voice has its own chain of cloud, GPU and free providers.</td>
+<td valign="top"><img src="docs/assets/icons/shield.svg" width="24" height="24" alt=""><br><b>Controlled and honest</b><br>Action classes in code instead of the prompt, confirmation cards, protection against third-party instructions in mails and web pages, audit log, emergency stop, <code>localhost</code> only.</td>
 </tr>
 <tr>
-<td valign="top">🖥️ <b>PC and Windows</b><br>Volume, apps, screen lock, window arranging, files and clipboard, screen text through local OCR. Spotify gets quieter while Jarvis listens or speaks.</td>
-<td valign="top">🛰️ <b>Home network</b><br>Pi, NAS, FRITZ!Box, UniFi, updates with an approval card, a watcher for new devices. <i>"Situation report"</i> sums up Uptime Kuma, the security centre and the energy loop.</td>
+<td valign="top"><img src="docs/assets/icons/desktop.svg" width="24" height="24" alt=""><br><b>PC and Windows</b><br>Volume, apps, screen lock, window arranging, files and clipboard, screen text through local OCR. Spotify gets quieter while Jarvis listens or speaks.</td>
+<td valign="top"><img src="docs/assets/icons/network.svg" width="24" height="24" alt=""><br><b>Home network</b><br>Pi, NAS, FRITZ!Box, UniFi, updates with an approval card, a watcher for new devices. <i>"Situation report"</i> sums up Uptime Kuma, the security centre and the energy loop.</td>
 </tr>
 </table>
-
----
 
 ## What it can do
 
@@ -105,8 +89,6 @@ The architecture separates the **router** (rules), the **tools** (MCP server) an
 - *"Focus 45 minutes"* collects notices instead of speaking them. *"What do I pay for liability insurance?"* searches the scanned post (Paperless). *"Continue watching the series on the TV"* (Jellyfin).
 - From 9 pm he speaks more quietly and slowly, during quiet hours he whispers. With *"Turn on the living room"* and both a lamp and a socket, he asks once and remembers the answer.
 
----
-
 ## Usage
 
 | Action | How |
@@ -118,19 +100,18 @@ The architecture separates the **router** (rules), the **tools** (MCP server) an
 | Notices | Appear with a yellow border in the conversation and are read out; during quiet hours they are only shown. |
 | Confirming | Click the card or say "confirmed" / "no". A plain "yes" deliberately does not count. |
 | Mini window | When you leave the Jarvis tab, a small robot panda sits at the bottom right of the desktop with the state, the last line, **■ Stop** and the microphone. |
-| Choosing the output | 🔈 **Sound here**, 🔊 **Where I am**, **Echo living room** or **Sonos bedroom**: per device, where the answers can be heard. |
+| Choosing the output | **Sound here**, **Where I am**, **Echo living room** or **Sonos bedroom**: per device, where the answers can be heard. |
 | Typing and commands | Input field, `Enter`. `/new`, `/status`, `/recall <term>`, `/graph`, `/help` |
 | Looking things up | If Jarvis does not know something and it is neither in the notes nor in the tools, he searches the web. Private data never goes into the search. |
 
 More, including personality profiles, Windows control, 3D printer, updates, parcels and mailboxes: [Usage](docs/usage.md).
 
----
-
 ## Voice: provider chain, voice engine, fallback mode
 
-```
-Fish Audio ─▶ ElevenLabs ─▶ local (Chatterbox GPU · Piper CPU) ─▶ Azure ─▶ Google ─▶ Edge
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/voice-chain-dark.svg">
+  <img src="docs/assets/voice-chain-light.svg" alt="Voice provider chain: Fish Audio, ElevenLabs, local, Azure, Google, Edge" width="100%">
+</picture>
 
 - **Fail-safe voice:** every provider is an adapter. If one is used up (credit, quota, invalid key), it is skipped until its reset, across restarts too. On a temporary error only the current sentence switches provider, without an audible break. The HUD shows the active provider with its remaining credit.
 - **Voice engine on the server:** Silero VAD, adaptive end of sentence with Whisper partial results, interrupting in 150 ms, carrying on at the start of the sentence when only "mhm" came. Metrics per turn for Grafana, tuning in `config/voice.yaml`.
@@ -138,8 +119,6 @@ Fish Audio ─▶ ElevenLabs ─▶ local (Chatterbox GPU · Piper CPU) ─▶ A
 - **Fallback mode:** if the Claude allowance is used up or a call breaks off, the first available stage of **Groq → Gemini → Ollama** answers, with the same Jarvis tools and confirmation cards. Gemini never sees mail, calendar or health.
 
 Details, measurements and the tuning log: [Voice and voice engine](docs/voice.md).
-
----
 
 ## Language and voice settings
 
@@ -160,8 +139,6 @@ This repository is the English edition: Jarvis understands and speaks English, a
 | Default Home Assistant entity ids (e.g. `sensor.house_consumption`, plug suffix `_current_consumption`) | German entity names | English entity names; the old German suffixes can still be set through the `JARVIS_PLUG_*` variables |
 
 The voice test clips in `tests/fixtures/voice/` were spoken anew in English. Carrier and booking mails from German shops are still parsed in both languages, since they arrive in German regardless of the assistant's language.
-
----
 
 ## Proactive mode
 
@@ -184,8 +161,6 @@ the bell. Home Assistant gets the switches *Jarvis Proactive*, *Jarvis Guest Mod
 Setup, all rules, sources and secrets: [Proactive mode](docs/proactive.md). On and off:
 `config/proactive.yaml` → `enabled` (template `config/proactive.example.yaml`).
 
----
-
 ## Memory and learning
 
 The vault is an Obsidian folder with Markdown notes by topic (`People/Anna`, `Projects/…`, `Devices/…`), an automatic conversation log and episodes per day (conversations, Garmin, notices, outages). Jarvis remembers and forgets on his own (expiry dates, trash folder), stores nothing twice and never overwrites a contradiction — he asks instead. Every memory has a source you can check.
@@ -196,8 +171,6 @@ The vault is an Obsidian folder with Markdown notes by topic (`People/Anna`, `Pr
 - **Changes only with a card:** background jobs change nothing themselves. They file a suggestion, Jarvis explains it, and only the card puts it into effect.
 
 Resource manager, context engine, task engine, document search and the learning modules in detail: [Memory and learning](docs/memory.md).
-
----
 
 ## Security model
 
@@ -212,32 +185,12 @@ Resource manager, context engine, task engine, document search and the learning 
 
 The rules in detail: [Security model](docs/security.md) and [SECURITY.md](SECURITY.md).
 
----
-
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Browser["Browser (HUD)"]
-        MIC[Microphone + VAD] --> STT
-        SPK[Playback sentence by sentence]
-    end
-    subgraph Server["server.py (127.0.0.1)"]
-        STT["/api/listen<br/>Whisper local"] --> RUN["/api/run"]
-        RUN --> R{"Intent router<br/>router.py"}
-        R -->|simple command| LOCAL[Code handler<br/>0 tokens]
-        R -->|real question| LEAN["Lean Claude call<br/>runtime.py"]
-        LEAN <--> MCP["Tools<br/>jarvis_mcp.py"]
-        SPEAK["/api/speak<br/>tts_chain.py"]
-    end
-    MCP --> HA[(Home Assistant)]
-    MCP --> NET[(Pi · NAS · network)]
-    MCP --> PIM[(Calendar · mail · Garmin)]
-    MCP --> VAULT[(Obsidian vault)]
-    LOCAL --> SPEAK
-    LEAN --> SPEAK
-    SPEAK --> SPK
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
+  <img src="docs/assets/architecture-light.svg" alt="Architecture: browser, speech to text, intent router, local handler or lean Claude call with tools, voice chain" width="100%">
+</picture>
 
 | Component | Job |
 |---|---|
@@ -254,8 +207,6 @@ flowchart LR
 | `ui/` | HUD (vanilla JS, 3D knowledge graph without dependencies), 19 layouts per device |
 
 **Efficiency:** its own short prompt instead of the Claude Code default, tool groups as needed, automatic model choice (Haiku/Sonnet), answer cache, process pool. Measured, a call needs **over 25× fewer tokens** than a standard call; whatever the router can do costs nothing. All components and the measurement: [Architecture and efficiency](docs/architecture.md).
-
----
 
 ## Quick start
 
@@ -286,8 +237,6 @@ All settings are commented in [`.env.example`](.env.example); personal data belo
 .venv\Scripts\python.exe -m unittest discover -s tests      # all tests: without house, Claude, network and sound
 ```
 
----
-
 ## Secrets
 
 The repo contains no real keys, passwords or addresses. All access is optional. Secrets go into `.env` (template
@@ -303,7 +252,7 @@ The repo contains no real keys, passwords or addresses. All access is optional. 
 | Home network: `PIHOLE_URL`, `PIHOLE_PASSWORD`, `PROMETHEUS_URL`, `KUMA_URL`, `SYNOLOGY_*`, `UNIFI_*`, `JELLYFIN_*`, `PAPERLESS_*`, `JARVIS_PI_HOST`, `JARVIS_PI_USER` | `.env` |
 | Other: `DHL_API_KEY`, `GARMIN_EMAIL`, `GARMIN_PASSWORD`, `JARVIS_SPOTIFY_CLIENT_ID` | `.env`; then sign in to Spotify once with `scripts\spotify_login.py` |
 
-**Changing or rotating a secret:** create the new key or password at the provider (or a new long-lived token in Home Assistant under *Profile → Security*), replace the value in `.env`, restart Jarvis (**⟳ Restart** in the HUD reads `.env` again), then revoke the old key at the provider. The Spotify refresh token is stored in `config/spotify_token.json` after the login; delete that file and run `scripts\spotify_login.py` again to replace it. The HUD token for the browser is created anew at every start and needs no rotation; paired iPhones and iPads can be removed under **📱 Devices**.
+**Changing or rotating a secret:** create the new key or password at the provider (or a new long-lived token in Home Assistant under *Profile → Security*), replace the value in `.env`, restart Jarvis (**⟳ Restart** in the HUD reads `.env` again), then revoke the old key at the provider. The Spotify refresh token is stored in `config/spotify_token.json` after the login; delete that file and run `scripts\spotify_login.py` again to replace it. The HUD token for the browser is created anew at every start and needs no rotation; paired iPhones and iPads can be removed under **Devices**.
 
 For publication, personal values were replaced like this:
 
@@ -322,8 +271,6 @@ A snapshot of the monitoring page and the Pi docs (German, with the same placeho
 ## On the go: iPhone, iPad, phone
 
 The PC stays the brain. iPhone and iPad connect through **Tailscale** over HTTPS, from anywhere and without an open port in the router: `JARVIS_REMOTE=1`, once `tailscale serve --bg 8721`, then add the address to the Home Screen on the device and pair it with a six-digit code. The iPad shows its own room display with tiles (weather, house, energy, tokens), the iPhone the HUD in portrait; tapping the microphone switches live on, holding it is push-to-talk. Suggestions when you leave the flat and before you set off come to the phone with **yes/no buttons** (Home Assistant app), and the answer counts like the card. Step-by-step setup: [Usage → On the go](docs/usage.md#on-the-go-iphone-and-ipad).
-
----
 
 ## Project structure
 
@@ -345,8 +292,6 @@ The PC stays the brain. iPhone and iPad connect through **Tailscale** over HTTPS
 └─ scripts/            measure_tokens · router_report · fetch_voice_models · install-ha-remote.ps1 …
 ```
 
----
-
 ## Documentation
 
 | Page | Content |
@@ -363,8 +308,6 @@ The PC stays the brain. iPhone and iPad connect through **Tailscale** over HTTPS
 | [INVENTORY.md](INVENTORY.md) · [SERVER-REBUILD.md](SERVER-REBUILD.md) · [VOICE-ANALYSIS.md](VOICE-ANALYSIS.md) · [PORTING.md](PORTING.md) | Inventory, the server rebuild, the voice analysis and porting notes |
 | [jarvis-hud-de/pi/](https://github.com/Zedas030/jarvis-hud-de/tree/main/pi) | Monitoring and docs of the Raspberry Pi that gives Jarvis the house, the network and DNS (German snapshot) |
 
----
-
 ## Raspberry Pi: monitoring and docs
 
 The Pi in the home network gives Jarvis Home Assistant, DNS and the monitoring; the HUD links both pages at the top right. Anonymised copies of both pages (German) are in the German edition under [`jarvis-hud-de/pi/`](https://github.com/Zedas030/jarvis-hud-de/tree/main/pi).
@@ -379,7 +322,5 @@ The Pi in the home network gives Jarvis Home Assistant, DNS and the monitoring; 
 <td align="center"><sub>Pi documentation (port 8091): hardware, services, Jarvis section</sub></td>
 </tr>
 </table>
-
----
 
 <sub>Originally inspired by <a href="https://github.com/Itsme23476/jarvis-claude-code">jarvis-claude-code</a>. Before passing it on independently, clarify the licence situation of the original.</sub>
