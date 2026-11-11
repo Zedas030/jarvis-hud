@@ -329,12 +329,15 @@ def _skipped(name, cfg):
 
 
 def kuma_findings(monitors, cfg):
+    import kuma_alerts
     critical = cfg.get("kuma_critical") or []
-    return [dict(key=f"kuma:{m['name']}", ok=m["up"],
-                 severity="critical" if any(c.lower() in m["name"].lower() for c in critical) else "warn",
-                 down=f"Uptime Kuma reports {m['name']} as down for about {{min}} minutes.",
-                 up=f"{m['name']} is reachable again according to Uptime Kuma.")
-            for m in monitors if not _skipped(m["name"], cfg)]
+    out = [dict(key=f"kuma:{m['name']}", ok=m["up"],
+                severity="critical" if any(c.lower() in m["name"].lower() for c in critical) else "warn",
+                down=f"Uptime Kuma reports {m['name']} as down for about {{min}} minutes.",
+                up=f"{m['name']} is reachable again according to Uptime Kuma.")
+           for m in monitors if not _skipped(m["name"], cfg)]
+    # Kuma's webhook already confirmed these (its own retries): no second round of the watcher
+    return out + [f for f in out if not f["ok"] and kuma_alerts.pushed_down(f["key"][5:])]
 
 
 def security_findings(rep, cfg, known, now=None):
@@ -376,7 +379,10 @@ def findings(cfg):
     known = list((commands.load().get("homelab") or {}).keys())
     out = []
     try:
-        out += kuma_findings(kuma(), cfg)
+        monitors = kuma()
+        out += kuma_findings(monitors, cfg)
+        import kuma_alerts
+        kuma_alerts.sync([m for m in monitors if not _skipped(m["name"], cfg)], cfg)
     except Exception:  # noqa: BLE001
         pass
     try:

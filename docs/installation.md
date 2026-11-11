@@ -90,6 +90,9 @@ All settings are commented in [`.env.example`](../.env.example). Personal data b
 # Autostart at sign-in (Task Scheduler, without admin rights); -Remove removes it
 powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1
 
+# Create the crash watchdog in Home Assistant (helper + automation; running it again updates the automation)
+.venv\Scripts\python.exe scripts\heartbeat_ha_setup.py
+
 # Test router + lean call without the server
 .venv\Scripts\python.exe scripts\lean_probe.py "How is the NAS doing?"
 

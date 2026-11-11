@@ -33,6 +33,12 @@ MIN_EXCHANGES = int(os.environ.get("JARVIS_REFLECT_MIN_EXCHANGES", "2"))
 WEEK_HOUR = int(os.environ.get("JARVIS_REFLECT_WEEK_HOUR", "19"))
 MAX_RULES = int(os.environ.get("JARVIS_MAX_RULES", "20"))
 ENABLED = os.environ.get("JARVIS_REFLECT", "1").strip() not in ("0", "false", "no", "off")
+# Lasting facts the user said are saved by the same call, without a card (the user's choice, 2026-11-10):
+# the same checks as memory_save (duplicates, contradictions, work), tagged "inferred" with the day,
+# logged in the learning log and removable with "Forget …" (memory_forget).
+REMEMBER = os.environ.get("JARVIS_REMEMBER", "1").strip() not in ("0", "false", "no", "off")
+REMEMBER_MAX = int(os.environ.get("JARVIS_REMEMBER_MAX", "3"))
+REMEMBER_NOTES = re.compile(r"^(Profile|Preferences|Appointments|Knowledge|Golf|Health|(People|Projects)/[\w .\-]{2,40})$")
 
 LOG_NOTE = "Learning log"
 RULES_NOTE = "Preferences"
@@ -90,11 +96,38 @@ def _prompt(items):
             ("\n\nPossible corrections by the user:\n" + "\n".join(hints) if hints else "") +
             ("\n\nPossible misses (the user asked again right away, the first answer probably did not fit):\n"
              + "\n".join(misses) if misses else "") +
-            "\n\nAnswer with JSON: {\"good\": [...], \"corrected\": [...], \"lessons\": [...]}\n"
+            "\n\nAnswer with JSON: {\"good\": [...], \"corrected\": [...], \"lessons\": [...]"
+            + (", \"remember\": [...]" if REMEMBER else "") + "}\n"
             "- good: what went well (3 at most)\n"
             "- corrected: what the user corrected and what would have been right (3 at most)\n"
             "- lessons: a general lesson for future conversations, as an instruction to yourself (3 at most)\n"
+            + (REMEMBER_HINT if REMEMBER else "") +
             "Each entry one short English sentence (under 140 characters). Invent nothing; nothing notable = empty lists.")
+
+
+REMEMBER_HINT = ("- remember: lasting facts the USER said himself that will be useful later — about himself, people "
+                 "in his life, preferences, appointments, hobbies. As a list of {\"note\": ..., \"text\": ...}; note is "
+                 "Profile, Preferences, Appointments, Knowledge, Golf, Health, People/<Name> or Projects/<Name>; text a "
+                 "short bullet in the third person. NOT: what only Jarvis said, content from mails, websites or the "
+                 "calendar, commands, device states, one-off things (\"tired today\"), TV sound. 3 at most, else empty.\n")
+
+
+def remember(items):
+    """Saves the "remember" facts through memory_save. Returns [(note, text, result)] for the log."""
+    if not REMEMBER:
+        return []
+    import jarvis_mcp
+    out = []
+    for item in (items or [])[:REMEMBER_MAX]:
+        if not isinstance(item, dict):
+            continue
+        note = " ".join(str(item.get("note") or "").split()).strip("/")
+        text = " ".join(str(item.get("text") or "").split())[:160]
+        if not text or not REMEMBER_NOTES.match(note) or privacy.is_work(note, text):
+            continue
+        res = jarvis_mcp._memory("memory_save", {"note": note, "text": text, "source": "inferred"})
+        out.append((note, text, res))
+    return out
 
 
 def _clean(items, limit=3):
@@ -110,11 +143,13 @@ def _note(name):
     return memory.MEMORY_DIR / f"{name}.md"
 
 
-def append_log(result, when=None):
+def append_log(result, when=None, saved=()):
     """Writes one evaluation to the learning log note. Returns the number of bullets."""
     rows = ([f"- Good: {s}" for s in _clean(result.get("good"))] +
             [f"- Corrected: {s}" for s in _clean(result.get("corrected"))] +
-            [f"- Lesson: {s}" for s in _clean(result.get("lessons"))])
+            [f"- Lesson: {s}" for s in _clean(result.get("lessons"))] +
+            [f"- Saved ([[{note.split('/')[-1]}]]): {text}" if res.startswith("Saved")
+             else f"- Not saved ([[{note.split('/')[-1]}]]): {text} — {res[:90]}" for note, text, res in saved])
     if not rows:
         return 0
     path = _note(LOG_NOTE)
@@ -137,7 +172,9 @@ def reflect(force=False):
     if not force and time.time() - last_turn < IDLE_MIN * 60:
         return 0
     items, pos = _new_exchanges()
-    kept = [e for e in items if not privacy.is_work(e[2], e[3])]
+    import voice_wake
+    # TV and YouTube heard as "the user" (foreign-language commentary) are no conversation to learn from
+    kept = [e for e in items if not privacy.is_work(e[2], e[3]) and not voice_wake.foreign(e[2])]
     if len(kept) < (1 if force else MIN_EXCHANGES):
         if pos and not kept:          # only work talk (or nothing): mark as read anyway
             commands.update_state(lambda d: d.__setitem__("reflection_pos", pos))
@@ -146,7 +183,7 @@ def reflect(force=False):
     if result is None:
         return 0                      # no model right now: try again later, positions unchanged
     commands.update_state(lambda d: d.__setitem__("reflection_pos", pos))
-    return append_log(result)
+    return append_log(result, saved=remember(result.get("remember")))
 
 
 # ── weekly: entries → proposed rules ─────────────────────────

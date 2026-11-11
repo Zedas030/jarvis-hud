@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to config/homelab.json. devices: important devices by host (ping) or entity (Home Assistant tracker); critical = report during quiet hours too. limits: fixed limits from which Jarvis reports. kuma_skip: Uptime Kuma monitors that Jarvis already checks itself (no double report); kuma_critical: report at night too. security_announce: which severities of the security centre Jarvis announces on his own. energy: what the energy loop needs (automations: seconds since the last run, 0 = only has to be switched on).",
+  "_comment": "Copy to config/homelab.json. devices: important devices by host (ping) or entity (Home Assistant tracker); critical = report during quiet hours too. limits: fixed limits from which Jarvis reports. kuma_skip: Uptime Kuma monitors that Jarvis already checks itself (no double report); kuma_critical: report at night too. kuma_restart: part of a Kuma monitor name -> Docker container on the Pi that Jarvis may offer to restart (only after a card). security_announce: which severities of the security centre Jarvis announces on his own. energy: what the energy loop needs (automations: seconds since the last run, 0 = only has to be switched on).",
   "devices": [
     {"name": "The router", "host": "192.0.2.1", "critical": true},
     {"name": "The printer", "entity": "device_tracker.printer", "critical": false}
@@ -12,6 +12,7 @@
   },
   "kuma_skip": ["Home Assistant", "NAS"],
   "kuma_critical": ["DNS"],
+  "kuma_restart": {"Paperless": "paperless", "Grafana": "grafana"},
   "security_announce": ["high"],
   "energy": {
     "entities": {"sensor.house_consumption": "House consumption", "sensor.battery_soc": "Battery level"},

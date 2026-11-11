@@ -27,6 +27,13 @@ end of sentence, interrupting, resuming, the model call) is decided by the serve
 Linux server will later get the same interface. The analysis that led to the rebuild is in
 [`VOICE-ANALYSIS.md`](../VOICE-ANALYSIS.md).
 
+**iPad and iPhone (since 2026-11-10):** paired devices use the engine too. The engine only listens on
+127.0.0.1, and `tailscale serve` only forwards the remote port; so the remote HUD passes a WebSocket on
+`wss://<pc>.ts.net/voice-ws` byte for byte through to the engine (`server._voice_tunnel`), only for paired
+devices with a matching origin. After that the engine checks the page token as on the PC and recognises the
+device by its cookie. Nothing changes in the Tailscale configuration. Back to the old path: `engine.remote: false`
+in `config/voice.yaml`.
+
 ### State machine
 
 ```

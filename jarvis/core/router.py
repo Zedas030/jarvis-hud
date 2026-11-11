@@ -981,7 +981,7 @@ def _pi_reports(n):
 
 def _report(n):
     if not re.search(r"\b(usage report|token report|what have you learn(ed|t)|"
-                     r"how many tokens?|how much have i used)\b", n):
+                     r"how many tokens?|how much have i used|token.?budget)\b", n):
         return None
     import learning
     return learning.spoken_report(7)
@@ -1152,12 +1152,38 @@ def _selfcheck(n):
     return selfcheck.handle(n)
 
 
+def _tomorrow(n):
+    import tomorrow
+    return tomorrow.handle(n)
+
+
+def _extras(n):
+    """The additions of the evening of 2026-11-10, each its own module and pattern; the first that answers wins."""
+    import activity
+    import airing
+    import birthdays
+    import ha_why
+    import night_report
+    import places
+    import print_ideas
+    for mod in (print_ideas, places, ha_why, birthdays, activity, night_report, airing):
+        reply = mod.handle(n)
+        if reply:
+            return reply
+    return None
+
+
+def _memory_weekly(n):
+    import memory_weekly
+    return memory_weekly.handle(n)
+
+
 def _habits(n):
     import user_habits
     return user_habits.handle(n)
 
 
-LOCAL_HANDLERS = [_emergency, _proactive, _choice, _room_answer, _personality, _focus, _daytime, _context, _tasks, _desktop, _routine, _timers, _lists, _pronounce,
+LOCAL_HANDLERS = [_emergency, _proactive, _choice, _room_answer, _personality, _focus, _daytime, _tomorrow, _context, _tasks, _desktop, _routine, _timers, _memory_weekly, _extras, _lists, _pronounce,
                   _outage, _pi_reports, _report, _selfcheck, _habits, _episodes, _wellbeing, _maintenance, _situation, _coach, _costs, _announce, _tv, _alerts,
                   _unifi, _media, _pc, _commute, _parcels, _printer, _followup, _home_state, _climate, _home,
                   _music, _time, _date, _sun, _weather, _solar, _nas, _pi]

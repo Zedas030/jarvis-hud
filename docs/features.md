@@ -86,6 +86,19 @@ The architecture separates the **router** (rules), the **tools** (MCP server) an
 - **Asking back with memory:** *"Turn on the living room"* with a lamp and a socket: Jarvis asks once *"Do you mean the lamp or the socket?"*, carries out the answer and remembers it for this wording; after that he never asks again and needs no model (`learning.py` → `choices`, shown under *"What have you learned?"*).
 - **Phone as a card:** suggestions when leaving and before setting off come to the phone with yes/no buttons (Home Assistant app). The answer comes back through a helper in Home Assistant and counts like the card; see [Phone](usage.md#phone-yes-and-no-on-the-go) (`phone_actions.py`).
 - **Focus sessions:** *"Focus 45 minutes"*: notices are collected instead of spoken (alarms ring), the focus playlist starts (`config/home.json` → `focus`), after ten minutes in YouTube, Netflix or Reddit a single hint comes, and at the end the summary with what came up in the meantime. *"End focus"*, *"How much focus time is left?"* (`focus.py`).
+- **HA in real time:** Jarvis keeps a WebSocket connection to Home Assistant (`ha_events.py`) and gets every state change at once. Doors, windows, water, smoke, motion, presence, the printer status and the Jarvis switches wake the notice checks at once instead of at the next 30-second round; every place that used to fetch the full state list over REST reads the live copy. If the connection drops, Jarvis polls as before. Switch off: `JARVIS_HA_WS=0`.
+- **"Why did the light turn on?"** Jarvis reads the HA logbook and follows the cause up to two steps back: *"Bedroom light went off at 7:20. Cause: the automation 'Light follows me', triggered by 'Room', which was set by: the automation 'Where am I', triggered by 'Presence bedroom'."* No context in the logbook: switched on the device itself or in its app (`ha_why.py`).
+- **"Where is …?"** *"I put the spare key in the blue box in the hallway"*, *"Remember, the passport is in the safe"*, *"The winter tyres are now in the basement"* go into the note **Places**; *"Where is the spare key?"* finds it. A new place replaces the old one. Without "remember", "now" or "I put …" nothing is saved, so the TV cannot fill the note (`places.py`).
+- **Birthdays:** the day before at 18:00: *"Tomorrow is Anna's birthday, Anna turns 34. I have noted: likes tulips."* From the people notes and bullets like "Ben's birthday is on 1990-05-04", also ones he saved by himself; the gift idea is the preferences from the person's note, no model call. *"Who has a birthday soon?"*, *"When is Anna's birthday?"* (`birthdays.py`).
+- **"What have you done today?"** Requests and the local share, what he said, saved and proposed by himself and what he changed with or without a card, from his own logs (`activity.py`).
+- **Night report of the ghosts:** in the morning from 7:30, only when a presence or motion sensor triggered at least 5 times while you were in another room, or a light went on at night, with its cause. *"How was the night?"* asks any time (`night_report.py`).
+- **Airing and mould:** Jarvis compares the absolute humidity indoors (humidity and temperature sensors with room names) with the outside air. From 60 % and clearly drier air outside an airing tip comes once per room and day (8–21 h); if a room is mostly above 65 % for three days, a mould warning once a week. *"Should I air the room?"* (`airing.py`).
+- **Print ideas:** *"Remember as a print idea: cable holder for the desk"*, *"What did I want to print?"*, *"The cable holder is printed"*, *"Search for a cable holder on MakerWorld"* opens the search in the browser (`print_ideas.py`, list in the vault).
+- **Kuma alarms at once, restart after approval:** the HA automation that sends Uptime Kuma's alarm to the phone also fires the event `jarvis_alert`; Jarvis then announces an outage at once instead of up to ten minutes later (`kuma_alerts.py`). If the monitor belongs to a container on the Pi (`config/homelab.json` → `kuma_restart`), he asks once *"Shall I restart the container …?"*; a *"yes"* goes through the confirmation card, only then `docker restart` runs. If the service comes back by itself, he withdraws the question.
+- **Noise filter:** a sensor that switches more than 30 times an hour (ghost pulses of presence sensors) stops waking the watchers for an hour; its value still lands in the live copy (`JARVIS_HA_WS_NOISY`).
+- **What's on tomorrow?** Alarm, first appointment and how many follow, all-day entries, expected parcels and the weather in a few sentences, locally (`tomorrow.py`). Also runs as the second-to-last step of the "Good night" routine.
+- **Weekly token budget:** `JARVIS_TOKEN_BUDGET_WEEK` (default 2 million) counts everything that went to a model since Monday. At 80 and 100 % Jarvis says so once a week (`token_budget.py`); *"How many tokens?"* gives the state, the "Tokens" tile shows the share.
+- **Crash watchdog:** every minute Jarvis stamps the time into the HA helper `input_datetime.jarvis_heartbeat`, but only while his own server still answers (`heartbeat.py`). If the PC runs (smart plug above 80 W) for 10 minutes without a stamp, the automation "Jarvis: heartbeat watchdog" sends a push to the phone, once per outage. A switched-off PC triggers nothing. Set up with `scripts/heartbeat_ha_setup.py`; test instances on other ports do not stamp.
 - **Self-check:** if you ask a question again in other words within 25 seconds, that counts as a miss of the first answer, together with the handler or model that gave it. The learning loop sees these places, *"How well did you do this week?"* names them (`selfcheck.py`).
 - **Token tile:** in the room display the "Tokens" tile shows the week, the share of requests handled locally and the trend against the week before; the sheet lists the most expensive repeated questions, i.e. the candidates for the router.
 - **Routine preview:** *"What happens when I say good night?"*, *"What does the evening routine do?"* lists the steps without switching anything.
@@ -102,7 +115,8 @@ The plan per build-out phase is in `ROADMAP.md`, the inventory from 2026-11-02 i
 
 - [x] Wake word ("Jarvis …") as an alternative to the always-on microphone, follow-up questions without the wake word
 - [x] Voice engine on the server: Silero VAD, adaptive end of sentence with partials, interrupting in 150 ms, resuming at the start of the sentence, metrics for Grafana
-- [ ] Voice engine for iPad/iPhone (WebSocket through `tailscale serve`) and a room satellite with openWakeWord
+- [x] Voice engine for iPad/iPhone (through the remote HUD, `/voice-ws`)
+- [ ] Room satellite with openWakeWord
 - [ ] Try out echo cancellation for the Sonos with a reference signal (speexdsp) in everyday use
 - [x] Timers, alarms, reminders and scheduled commands
 - [x] Notices by himself (devices done, appointments, battery, NAS, new devices) with quiet hours
@@ -110,7 +124,7 @@ The plan per build-out phase is in `ROADMAP.md`, the inventory from 2026-11-02 i
 - [x] Fallback mode with a free replacement chain (Groq, Gemini, Ollama) including tools
 - [x] Automated tests for the router
 - [x] Commute times, parcel status, PC control, ducking, pronunciation, learning router, answer cache
-- [x] Autostart and restart after a crash
+- [x] Autostart and restart after a crash, crash watchdog in Home Assistant with a push notice
 - [x] Learning loop, weekly review, homelab watcher, suggestion module
 - [x] Action classes, audit log, emergency stop, memory control, protection against third-party instructions
 - [x] Personality profiles, windows/files/screen, PC and network diagnosis, mail drafts, research, plans, notice centre

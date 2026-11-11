@@ -340,8 +340,10 @@
     var u = d.usage || {};
     if (u.total) {
       var trend = u.trend_pct == null ? '' : ' · ' + (u.trend_pct > 0 ? '+' : '') + u.trend_pct + ' %';
-      out.push(tile(u.trend_pct != null && u.trend_pct > 25 ? 'warn' : '', 'Tokens', num(Math.round(u.tokens / 1000)), 'k',
-        (u.local_pct != null ? u.local_pct + ' % local' : '') + trend, u.local_pct, 'usage'));
+      var budget = u.budget_pct == null ? '' : ' · budget ' + u.budget_pct + ' %';
+      out.push(tile((u.budget_pct != null && u.budget_pct >= 80) || (u.trend_pct != null && u.trend_pct > 25) ? 'warn' : '',
+        'Tokens', num(Math.round(u.tokens / 1000)), 'k',
+        (u.local_pct != null ? u.local_pct + ' % local' : '') + trend + budget, u.local_pct, 'usage'));
     }
     q('#tTiles').innerHTML = out.join('');
   }
@@ -448,6 +450,8 @@
       var rows = [row('Requests (7 days)', num(u.total)), row('Handled locally', u.local_pct != null ? u.local_pct + ' %' : '—', u.local_pct >= 60 ? 'good' : ''),
                   row('To the model', num(u.llm)), row('Tokens this week', Number(u.tokens || 0).toLocaleString('en-GB')),
                   row('Week before', Number(u.prev_tokens || 0).toLocaleString('en-GB')),
+                  row('Weekly budget since Monday', u.budget_pct == null ? 'off' : Number(u.budget_used || 0).toLocaleString('en-GB') + ' of '
+                      + Number(u.budget || 0).toLocaleString('en-GB') + ' (' + u.budget_pct + ' %)', u.budget_pct >= 100 ? 'bad' : u.budget_pct >= 80 ? 'warn' : ''),
                   row('Trend', u.trend_pct == null ? '—' : (u.trend_pct > 0 ? '+' : '') + u.trend_pct + ' %', u.trend_pct > 25 ? 'warn' : u.trend_pct < 0 ? 'good' : ''),
                   row('Learned wordings', num(u.aliases) + (u.drafts ? ' (+' + u.drafts + ' drafts)' : ''))];
       if (u.misses != null) rows.push(row('Asked again right away', num(u.misses), u.misses > 3 ? 'warn' : ''));

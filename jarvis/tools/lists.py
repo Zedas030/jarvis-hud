@@ -27,6 +27,7 @@ HA_TOKEN = os.environ.get("HA_TOKEN", "").strip()
 LISTS = {
     "shopping": {"title": "Shopping list", "entity": os.environ.get("JARVIS_SHOPPING_LIST", "").strip()},
     "todo": {"title": "To-do list", "entity": os.environ.get("JARVIS_TODO_LIST", "").strip()},
+    "print_ideas": {"title": "Print ideas", "entity": ""},      # print_ideas.py, always the vault note
 }
 LIST_DIR = memory.MEMORY_DIR / "Lists"
 
