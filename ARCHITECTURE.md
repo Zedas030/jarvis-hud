@@ -23,7 +23,7 @@ flowchart LR
         API["HTTP/NDJSON · SSE · token · pairing"]
         WS["voice_ws :8724"]
         VE["voice_engine<br/>Silero VAD · endpoint · barge-in · sentence TTS"]
-        RT["router.route<br/>42 local handlers, 0 tokens"]
+        RT["router.route<br/>43 local handlers, 0 tokens"]
         LLM["router.llm_route → runtime.run_lean<br/>claude -p, Haiku/Sonnet, process pool"]
         FB["fallback_llm<br/>Groq → Gemini → Ollama"]
         EV["events.py · SSE, quiet hours"]
@@ -62,7 +62,7 @@ the status of each phase.
 3. Otherwise `router.llm_route` picks tool groups by regex and the model (Haiku/Sonnet).
 4. `commands.lean_system` builds a short system prompt (persona from `personality.py`, rules from
    `policy.py`/`privacy.py`, learned rules from `reflection.py`, core notes); `commands.lean_prefix`
-   adds time, the last exchanges, matching notes, open proposals.
+   adds time, the last exchanges (and, in a long conversation, one short line for each of up to `JARVIS_HISTORY_EARLIER` exchanges before them, built in code by `commands.earlier_block`), matching notes, open proposals.
 5. `runtime.run_lean` runs `claude -p` with only those tool groups (`jarvis_mcp.py` as MCP server).
    If Claude is blocked or fails before speaking, `fallback_llm.run` uses the free chain with the
    same tools.
@@ -83,16 +83,16 @@ via `Path(__file__).resolve().parents[2]`, never via their own folder.
 |---|---|
 | Core (`jarvis/core`) | `server.py` (root), `router.py`, `runtime.py`, `commands.py`, `events.py`, `scheduler.py`, `background.py`, `hostos.py` (what differs between Windows and Linux, PORTING.md), `jarvis_log.py` (JSON log, warnings counted), `metrics.py` (registry behind `/metrics`) |
 | Tools | `jarvis_mcp.py` (MCP server; `call_tool` = dispatch, `handle_call` = policy wrapper) |
-| Safety | `policy.py`, `audit.py`, `emergency.py`, `privacy.py`, `proposals.py` |
+| Safety | `policy.py`, `audit.py`, `emergency.py`, `privacy.py`, `proposals.py`, `content_guard.py` (keys and tokens are cut out of every tool result before the model sees it; phrases addressed to an assistant in third-party content are named and logged), `data_flows.py` (one list of every destination outside the house: who gets what, which setting turns it off; answers "Which data go to the cloud?" locally and generates `docs/data-flows.md`) |
 | Memory | `memory.py` (vault, graph, diary), `memory_tools.py` (provenance, forget, export, backup), `answer_cache.py`, `learning.py` |
-| Voice engine | `voice_engine.py` (one Session per microphone: state machine IDLE→LISTENING→THINKING→SPEAKING→INTERRUPTED/RESUMING, adaptive endpoint, barge-in classification, resume at sentence start, the spoken part into the window), `voice_ws.py` (WebSocket 127.0.0.1:8724, 16-kHz frames in, 24-kHz PCM + JSON events out), `voice_vad.py` (Silero VAD v5 via onnxruntime, energy fallback), `voice_endpoint.py` (completeness rules, learned wait, turn-model hook), `voice_stt.py` (partials and finals on the faster-whisper model), `voice_tts.py` (sentence splitter, per-sentence synthesis kept for resume), `voice_dsp.py` (resample, fades, decoder, echo guard, delay estimate), `voice_wake.py`, `voice_state.py`, `voice_metrics.py` (jsonl + `/metrics`), `voice_config.py` (`config/voice.yaml`); the browser side is `ui/voice-client.js` |
+| Voice engine | `voice_engine.py` (one Session per microphone: state machine IDLE→LISTENING→THINKING→SPEAKING→INTERRUPTED/RESUMING, adaptive endpoint, barge-in classification, resume at sentence start, the spoken part into the window), `voice_ws.py` (WebSocket 127.0.0.1:8724, 16-kHz frames in, 24-kHz PCM + JSON events out), `voice_vad.py` (Silero VAD v5 via onnxruntime, energy fallback), `voice_endpoint.py` (completeness rules, learned wait, turn-model hook), `voice_stt.py` (partials and finals on the faster-whisper model), `voice_tts.py` (sentence splitter, per-sentence synthesis kept for resume), `voice_dsp.py` (resample, fades, decoder, echo guard, delay estimate), `voice_wake.py`, `wake_learn.py` (a "Stop" right after a satellite woke up with nothing to stop = a false wake-up: log, clips as counter-examples for the wake word training, proposal to lower the sensitivity), `voice_state.py`, `voice_metrics.py` (jsonl + `/metrics`), `voice_config.py` (`config/voice.yaml`); the browser side is `ui/voice-client.js` |
 | Voice | `voice.py`, `tts_chain.py`, `local_tts_server.py`, `wakeword.py`, `ambience.py` (music/sport/TV playing, from Home Assistant), `pronounce.py`, `sonos.py` (a device's answers as a Home Assistant announcement on a Sonos; clip server on the LAN), `alexa_voice.py` (a device's answers read aloud by an Echo, sentence after sentence) |
 | Personality | `personality.py` |
 | Proactive mode | `proactive.py` (triggers arrival/morning/instant/evening, briefing within a time budget, worded by Claude with a fixed fallback, no repeats by fingerprint, feedback, history; feature flag in `config/proactive.yaml`), `quiet_rules.py` (pure quiet rules), `proactive_sources.py` (one function per source, skipped when it fails), `proactive_config.py` (YAML loader), `mic_use.py` (programs using the PC microphone, Windows registry). When on, it takes over the welcome (`away_check`), the morning briefing (`morning_echo`) and DWD warnings (`weather_alerts`) |
 | Proactive | `watchers.py`, `scheduler.py`, `homelab_watch.py`, `briefing.py`, `energy_coach.py` (solar surplus advice, learns the plugs), `away_check.py` (what still runs after leaving home → proposal), `homelab_review.py` (Sunday homelab report), `weather_alerts.py` (DWD warnings), `morning_echo.py` (morning briefing on the living-room Echo, in watchers.py), `house_habits.py` (habits from the HA history → routine proposals, lights left on) |
 | Situation | `situation.py` (Lagebericht: Uptime Kuma status page, ORBIT security centre, energy loop in Home Assistant; findings for homelab_watch) |
 | Learning | `reflection.py`, `weekly_review.py`, `suggestions.py`, `background.py` |
-| Music | `spotify.py` (Web API on every device of the account: pause on the wake word, play on after; music tool) |
+| Music | `spotify.py` (Web API on every device of the account: pause on the wake word, play on after; music tool), `sonos_queue.py` (adds Spotify's queue behind a song HA's "music follows me" moved onto the bedroom Sonos) |
 | Windows | `pc.py` (volume, apps, ducking), `desktop.py` (windows, files, clipboard, OCR, scripts) |
 | Outages | `outage_map.py` ("what fails if X fails?" from Blast-Radius on the Pi, `/api/ask`; local router handler `_outage` + LLM tool `outage_impact`, read only) |
 | Pi tools | `pi_reports.py` (status of Restore Probe :8096, update airlock :8100, power hog detective :8101, Zigbee placement advisor :8099; local router handler `_pi_reports` + LLM tool `pi_reports`, read only; only findings go into the morning briefing) |

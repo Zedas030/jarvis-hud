@@ -120,6 +120,30 @@ class Bedroom(Base):
         self.say("Yes")
         self.assertEqual(CALLS, [("light.light", "turn_on", {})])
 
+    def test_light_on_uses_the_bedroom_lamp(self):
+        hue = {"entity_id": "light.bedroom_hue", "state": "off", "attributes": {"friendly_name": "Hue Bedroom"}}
+        states = [{"entity_id": e, "state": "off", "attributes": {"friendly_name": nm}} for e, nm in DEVICES] + [hue]
+        areas = dict(AREAS, **{"light.bedroom_hue": "Bedroom"})
+        extra = [mock.patch.object(briefing, "_ha_states", return_value=states),
+                 mock.patch.object(room_scope, "_areas", return_value={"map": areas, "names": {}})]
+        for p in extra:
+            p.start()
+        try:
+            router._DEV["at"] = 0
+            self.say("Light on")
+            self.assertEqual(CALLS, [("light.bedroom_hue", "turn_on", {})])
+            CALLS.clear()
+            router._DEV["at"] = 0
+            self.say("Light off")
+            self.assertEqual(CALLS, [("light.bedroom_hue", "turn_off", {})])
+            CALLS.clear()
+            with mock.patch.object(learning, "alias", return_value=["light.light"]):   # learned once for the LED
+                self.say("Light on")
+            self.assertEqual(CALLS, [("light.bedroom_hue", "turn_on", {})])
+        finally:
+            for p in reversed(extra):
+                p.stop()
+
     def test_a_learned_wording_still_asks(self):
         with mock.patch.object(learning, "alias", return_value=["light.light"]):
             self.assertIn("no light", self.say("Light on"))
@@ -209,6 +233,43 @@ class Fallbacks(Base):
 
     def test_bathroom_counts_as_bedroom(self):
         self.assertEqual(room_scope.room_of("binary_sensor.bathroom_presence_bathroom"), "Bedroom")
+
+
+class AnswerRoom(Base):
+    """2026-11-19: the answer to a voice satellite goes where someone is; with several rooms busy (or none),
+    to the room of the satellite that heard him."""
+    def test_one_busy_room_wins_over_the_satellite(self):
+        self.busy = {"Bedroom"}
+        self.assertEqual(room_scope.answer_room("Living room"), "Bedroom")
+        self.busy = {"Living room"}
+        self.assertEqual(room_scope.answer_room("Bedroom"), "Living room")
+
+    def test_several_busy_rooms_take_the_satellites_room(self):
+        self.busy = {"Living room", "Bedroom"}
+        self.assertEqual(room_scope.answer_room("Bedroom"), "Bedroom")
+        self.assertEqual(room_scope.answer_room("Living room"), "Living room")
+        self.assertEqual(room_scope.answer_room("Bathroom"), "Bedroom")       # area mapped onto its room
+
+    def test_nobody_seen_takes_the_helpers_room(self):
+        self.busy, self.room = set(), "Living room"           # sitting still: the helper still holds the room
+        self.assertEqual(room_scope.answer_room("Bedroom"), "Living room")
+        self.room = ""                                       # nobody known at all: the satellite's room
+        self.assertEqual(room_scope.answer_room("Bedroom"), "Bedroom")
+
+    def test_ha_down_takes_the_satellites_room(self):
+        self.busy, self.room = None, ""
+        self.assertEqual(room_scope.answer_room("Bedroom"), "Bedroom")
+
+    def test_satellite_without_area(self):
+        self.busy, self.room = {"Living room", "Bedroom"}, "Living room"
+        self.assertEqual(room_scope.answer_room(""), "Living room")             # the presence helper
+        self.busy = {"Bedroom"}
+        self.assertEqual(room_scope.answer_room(""), "Bedroom")
+
+    def test_feature_off_keeps_the_satellites_room(self):
+        self.busy = {"Bedroom"}
+        with mock.patch.object(room_scope, "ENABLED", False):
+            self.assertEqual(room_scope.answer_room("Living room"), "Living room")
 
 
 class Context(Base):

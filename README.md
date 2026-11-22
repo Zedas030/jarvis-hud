@@ -148,7 +148,7 @@ Jarvis speaks up by himself – triggered by events, not by fixed times:
   were away.
 - **Morning:** on the first entry into the bathroom after the night (weather, warnings, appointments, parcels).
 - **Instant:** water, smoke, severe weather, NOAH batteries drifting apart, a device offline.
-- **"Jarvis, good night":** devices still on, open windows, an early appointment tomorrow.
+- **"Jarvis, good night":** devices still on, open windows, an early appointment tomorrow (can be turned off with `evening.enabled: false`).
 
 Every notice is *critical*, *important* or *nice to know*. A briefing is at most 25 seconds long, the iPad shows
 the rest. He repeats what was already said only when something changes; "Jarvis, tell me more" gives details.

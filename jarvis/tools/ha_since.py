@@ -1,0 +1,113 @@
+"""
+"Since when has the light been on?" — when a device's current state began, from the Home Assistant history. Local, 0 tokens.
+
+    LED has been on since 16:52, for 51 minutes.
+
+`last_changed` alone is not enough: a restart of Home Assistant stamps every entity with the restart time,
+and a Zigbee lamp that drops off for a minute comes back as a fresh change. The history is walked back over
+both (same state again, "unavailable"/"unknown" gaps) to the moment the state really changed.
+
+  began(entity_id, state, last_changed=None, now=None)  (aware datetime, lower_bound) or (None, False)
+  phrase(entity_id, state, last_changed=None, now=None) "has been on since 16:52, for 51 minutes" or ""
+"""
+import datetime as dt
+import os
+import urllib.parse
+
+DAYS = int(os.environ.get("JARVIS_SINCE_DAYS", "7"))
+_GAP = {"unavailable", "unknown"}
+_WORD = {"on": "on", "off": "off", "playing": "on", "idle": "off", "paused": "paused", "open": "open",
+         "closed": "closed", "home": "at home", "not_home": "away"}
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+           "November", "December")
+
+
+def _parse(iso):
+    try:
+        t = dt.datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
+
+
+def _history(entity_id, start, end=None):
+    import ha_why
+    end = end or dt.datetime.now(dt.timezone.utc)      # without end_time HA returns only one day from `start`
+    q = ("?filter_entity_id=" + urllib.parse.quote(entity_id) + "&end_time=" + urllib.parse.quote(end.isoformat())
+         + "&minimal_response&no_attributes")
+    data = ha_why._get("/api/history/period/" + urllib.parse.quote(start.isoformat()) + q)
+    return data[0] if data else []
+
+
+def began(entity_id, state, last_changed=None, now=None):
+    """When `state` began. lower_bound=True: it has not changed in the whole history window."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    start = now - dt.timedelta(days=DAYS)
+    try:
+        rows = _history(entity_id, start, now)
+    except Exception:  # noqa: BLE001 — no history: last_changed is the best we have
+        rows = []
+    t = None
+    for row in reversed(rows):
+        s = row.get("state")
+        if s == state:
+            t = _parse(row.get("last_changed")) or t
+        elif s in _GAP:
+            continue
+        else:
+            break
+    else:
+        if t is not None:
+            return max(t, start), True
+    if t is not None:
+        return t, False
+    lc = _parse(last_changed)
+    return (lc, False) if lc else (None, False)
+
+
+def _when(t, now):
+    local, today = t.astimezone(), now.astimezone().date()
+    clock = f"{local.hour}:{local.minute:02d}"
+    if local.date() == today:
+        return clock
+    if local.date() == today - dt.timedelta(days=1):
+        return f"yesterday {clock}"
+    return f"{_MONTHS[local.month - 1]} {local.day} at {clock}"
+
+
+def _duration(secs):
+    m = int(secs // 60)
+    if m < 60:
+        return f"{m} minute" if m == 1 else f"{m} minutes"
+    h, m = divmod(m, 60)
+    if h < 24:
+        hours = "one hour" if h == 1 else f"{h} hours"
+        return hours + (f" and {m} minutes" if m >= 5 else "")
+    d = h // 24
+    return "one day" if d == 1 else f"{d} days"
+
+
+def stamp(entity_id, state, last_changed=None, now=None):
+    """'since 16:52 (51 minutes)' for the home_states tool, or ""."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    t, bound = began(entity_id, state, last_changed, now)
+    if t is None:
+        return ""
+    if bound:
+        return f"for more than {DAYS} days"
+    return f"since {_when(t, now)} ({_duration(max(0.0, (now - t).total_seconds()))})"
+
+
+def phrase(entity_id, state, last_changed=None, now=None):
+    """'has been on since 16:52, for 51 minutes' — the part after the device's name, or "" when unknown."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    word = _WORD.get(state, f"at {state}")
+    t, bound = began(entity_id, state, last_changed, now)
+    if t is None:
+        return ""
+    if bound:
+        return f"has been {word} for more than {DAYS} days"
+    secs = max(0.0, (now - t).total_seconds())
+    if secs < 60:
+        return {"on": "has just come on", "off": "has just gone off"}.get(word, f"has been {word} since just now")
+    return f"has been {word} since {_when(t, now)}, for {_duration(secs)}"

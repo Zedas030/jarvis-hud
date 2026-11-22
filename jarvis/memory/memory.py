@@ -264,6 +264,8 @@ def log_turn(user_text, reply_text):
     reply = _strip_tags(reply_text)
     if not (user_text or "").strip() or not reply:
         return
+    if reply.strip(" .!").upper() == "IGNORE":   # TV/background a satellite heard (remote_ask.IGNORE)
+        return
     import privacy
     if privacy.is_work(user_text, reply):          # work stays out of the vault
         user_text, reply = "(work topic, not logged)", "(not logged)"

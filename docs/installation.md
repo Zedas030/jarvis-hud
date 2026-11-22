@@ -54,7 +54,7 @@ All settings are commented in [`.env.example`](../.env.example). Personal data b
 | Area | Variables | Purpose |
 |---|---|---|
 | Profile | `JARVIS_USER_NAME`, `JARVIS_PLACE`, `JARVIS_WEATHER_LAT/LON`, `JARVIS_TIMEZONE`, `JARVIS_BROWSER` | Form of address, place, browser |
-| Brain | `JARVIS_LEAN`, `JARVIS_LOCAL_ROUTER`, `JARVIS_MODEL_SIMPLE/SMART`, `JARVIS_EFFORT`, `JARVIS_MAX_OUTPUT_TOKENS`, `JARVIS_HISTORY_TURNS` | Router, model choice, context size |
+| Brain | `JARVIS_LEAN`, `JARVIS_LOCAL_ROUTER`, `JARVIS_MODEL_SIMPLE/SMART`, `JARVIS_EFFORT`, `JARVIS_MAX_OUTPUT_TOKENS`, `JARVIS_HISTORY_TURNS`, `JARVIS_HISTORY_EARLIER` | Router, model choice, context size |
 | Voice | `TTS_CHAIN`, `TTS_ANNOUNCE_SWITCH`, `FISH_AUDIO_*`, `ELEVENLABS_*` (incl. `ELEVENLABS_LANG`, default `en`), `AZURE_*`, `GOOGLE_TTS_*`, `EDGE_*`, `LOCAL_TTS_URL` | Provider order and access |
 | Listening | `JARVIS_STT`, `WHISPER_LOCAL_*` (incl. `WHISPER_LOCAL_LANG`, default `en`), `ELEVENLABS_STT_LANG` (default `eng`) | Speech recognition |
 | Wake word | `JARVIS_WAKE` (`off`/`text`/`oww`), `JARVIS_WAKE_*`, `JARVIS_FOLLOWUP_S` | "Jarvis …" instead of an always-on microphone. Without "Jarvis" nothing is processed or logged; `JARVIS_FOLLOWUP_S` > 0 briefly allows follow-up questions without "Jarvis" (default: off) |
@@ -77,6 +77,13 @@ All settings are commented in [`.env.example`](../.env.example). Personal data b
 ## Development and diagnosis
 
 ```powershell
+# Doctor: Python, packages, .env, configuration, Claude CLI, voices, running server, Home Assistant
+# (reads only, changes nothing; exit code 1 on a failure, --json for machines)
+.venv\Scripts\python.exe scripts\doctor.py
+
+# Data flows: which services outside the house get data in this installation? (--write renews docs/data-flows.md)
+.venv\Scripts\python.exe scripts\data_flows.py
+
 # Tests: router, timers, lists, routines (Home Assistant is simulated, nothing is switched)
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 

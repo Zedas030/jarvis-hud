@@ -123,7 +123,8 @@ TOOLS += [
     {
         "name": "home_states",
         "description": ("Read the user's smart home (Home Assistant): devices with name, entity_id and state. "
-                        "Optional `search` filters by name or entity_id (e.g. 'living room', 'light.'). "
+                        "Optional `search` filters by name or entity_id (e.g. 'living room', 'light.'); with few hits each "
+                        "switchable device also says since when it has its state ('since 16:52 (51 minutes)'). "
                         "Read-only, no confirmation needed."),
         "inputSchema": {"type": "object", "properties": {"search": {"type": "string"}}},
     },
@@ -149,24 +150,49 @@ TOOLS += [
 TOOLS += [
     {
         "name": "mail_inbox",
-        "description": ("Read the user's mail inbox via IMAP (read-only): newest mails of the last 24 hours with "
-                        "sender, subject, date and a short preview. `unread_only` (default true), `limit` (default 5, max 15), "
-                        "optional `search` in subject/sender. Never sends, deletes or marks anything."),
+        "description": ("Read the user's mail inbox via IMAP (read-only): newest mails with sender, subject, date "
+                        "and a short preview. Default period the last 24 hours; `days` looks further back (max 90) "
+                        "whenever the user means older mail (\"since yesterday\", \"the last few days\", \"while I was "
+                        "away\", \"the 240 mails\"). `unread_only` (default true, false when `search` is given — set "
+                        "false to see mails that are already read), `limit` (default 5; up to 15 with preview, "
+                        "16–300 = compact list date · sender · subject to look a pile through), optional `search` "
+                        "in subject/sender. `last_marked`=true lists the mails mail_mark_read marked as read last "
+                        "time. For one sender/topic over the whole year use mail_search. Never sends, deletes or "
+                        "marks anything."),
         "inputSchema": {
             "type": "object",
             "properties": {"unread_only": {"type": "boolean"}, "limit": {"type": "integer"},
-                           "search": {"type": "string"}},
+                           "search": {"type": "string"}, "days": {"type": "number"},
+                           "last_marked": {"type": "boolean"}},
+        },
+    },
+    {
+        "name": "mail_search",
+        "description": ("Search ALL mail of the last months (read-only, headers only): did a sender ever write, when "
+                        "was the last mail from X, mails about a topic. `query` = sender name/address or subject word "
+                        "(e.g. 'stadtwerke'), `days` how far back (default and max 365), `in_text`=true also searches the "
+                        "body, `limit` (default 10, max 25). Looks in the inbox and the user's own folders (Archive …), "
+                        "not Sent/Trash/Spam. Returns count, date range and the newest hits (date, sender, subject)."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}, "days": {"type": "integer"},
+                           "in_text": {"type": "boolean"}, "limit": {"type": "integer"}},
+            "required": ["query"],
         },
     },
     {
         "name": "mail_mark_read",
         "description": ("Mark unread inbox mails as read (only the read flag, nothing is moved or deleted). "
                         "`search`: substring of sender or subject (as mail_inbox showed it), or `all`=true for every "
-                        "unread mail. `unread`=true does the opposite: marks matching read mails as unread again. "
-                        "Harmless and reversible, no confirmation needed."),
+                        "unread mail. With `all` and more than 15 mails nothing is marked at first: the tool returns "
+                        "the list, you tell the user which ones look important, and only after his go call again "
+                        "with `reviewed`=true. `unread`=true does the opposite: marks matching read mails as unread "
+                        "again; `unread`=true + `last_batch`=true restores exactly the mails marked last time. "
+                        "Harmless and reversible."),
         "inputSchema": {
             "type": "object",
-            "properties": {"search": {"type": "string"}, "all": {"type": "boolean"}, "unread": {"type": "boolean"}},
+            "properties": {"search": {"type": "string"}, "all": {"type": "boolean"}, "unread": {"type": "boolean"},
+                           "reviewed": {"type": "boolean"}, "last_batch": {"type": "boolean"}},
         },
     },
 ]
@@ -201,8 +227,14 @@ TOOLS += [
                         "(`room` = Living Room, Bedroom, ... or a Spotify device name such as PC: the "
                         "music moves to that room's speaker and plays on there — 'move the music from the bedroom to "
                         "the living room', 'put the music on in the living room'; without `room`: the room the presence "
-                        "sensors see the user in, 'bring the music to me'). Starts Spotify first if it is not "
-                        "running. Harmless, no confirmation needed."),
+                        "sensors see the user in, 'bring the music to me'), or liked (the user's liked songs, "
+                        "'my favourites', 'my playlist', as a whole list; optional `room`), or artist (all songs of the artist "
+                        "in `query`, 'play all songs by Linkin Park' — plays right away, never tell him to do it "
+                        "himself; optional `room`). Starts Spotify first if it is not "
+                        "running. Music in a room always goes through this tool, never as an Alexa command to an "
+                        "Echo (home_control play_media custom refuses that): it plays on the room's soundbar and "
+                        "only falls back to the Echo when the soundbar stays unreachable. "
+                        "Harmless, no confirmation needed."),
         "inputSchema": {
             "type": "object",
             "properties": {"action": {"type": "string"}, "query": {"type": "string"}, "room": {"type": "string"}},
@@ -310,7 +342,7 @@ TOOLS += [
         "description": (
             "Create or replace a routine: when the user says one of `triggers`, the steps run without the LLM. "
             "Steps, in order, each an object with exactly one of: "
-            "{\"say\": text Jarvis speaks}, "
+            "{\"say\": text Jarvis speaks, or a list of texts — one of them, never the same twice in a row}, "
             "{\"do\": a short English command the local router understands, answer not spoken — e.g. "
             "'living room light off', 'fan socket on', 'alarm tomorrow at 7', 'timer 10 minutes'}, "
             "{\"tell\": an English question whose answer is spoken — e.g. 'When does my alarm ring?', "
@@ -569,9 +601,13 @@ TOOLS += [
                         "night's backups really restorable), updates (update airlock: container updates waiting, "
                         "held back for breaking changes, failed), power (power hog detective: open findings on "
                         "the power plugs, e.g. standby too high, plug sends no values), zigbee (placement advisor: "
-                        "where a new Zigbee router would help, channel overlap with WLAN), or all."),
+                        "where a new Zigbee router would help, channel overlap with WLAN), battery (battery doctor: health "
+                        "of the home battery: usable kWh, SOH, cycles, warranty), automations (automation checker: "
+                        "broken, looping or conflicting Home Assistant automations), drift (homelab drift: unexpected "
+                        "changes on Pi and FRITZ!Box, scan health), or all."),
         "inputSchema": {"type": "object", "properties": {"topic": {"type": "string",
                                                                    "enum": ["backups", "updates", "power", "zigbee",
+                                                                            "battery", "automations", "drift",
                                                                             "all"]}}},
     },
     {
@@ -881,7 +917,7 @@ GROUPS = {
                      "memory_review", "memory_timeline"},
     "audit": {"audit_today"},
     "phone": {"phone_notify"},
-    "mail": {"mail_inbox", "mail_mark_read", "mail_draft", "mail_events_scan", "mail_events_add",
+    "mail": {"mail_inbox", "mail_search", "mail_mark_read", "mail_draft", "mail_events_scan", "mail_events_add",
              "shipments_status", "mail_events_undo"},
     "dayprep": {"day_prep", "calendar_events", "context_snapshot"},
     "tasks": {"task_run", "task_status", "task_cancel"},
@@ -1098,6 +1134,79 @@ def _music_room(room):
     return f"The music is now playing in the {where}." + (" The playlist starts from the beginning there." if via_ha else "")
 
 
+def _room_device(room):
+    """The Spotify device for music in `room` (else the room the user is in): the room's soundbar, asked again a
+    few times when Spotify misses it, the Echo only when it stays away (2026-11-19).
+    -> (device dict or None, room name or "", room's HA player, stand-in note or "", error text or "")."""
+    import speakers
+    import spotify
+    if not room:
+        import whereabouts
+        room = whereabouts.room() or ""
+    if not room:
+        return None, "", "", "", ""
+    name, device, player = speakers.spotify_device(room)
+    fallback = speakers.spotify_fallback(room)
+    devs = spotify.devices()
+    dev = spotify.find_device(device or room, devs)
+    for _ in range(MUSIC_ROOM_TRIES - 1):
+        # the soundbar drops out of Spotify's list now and then: ask again before the Echo (as _music_room)
+        if dev or not fallback:
+            break
+        time.sleep(MUSIC_ROOM_PAUSE_S)
+        devs = spotify.devices()
+        dev = spotify.find_device(device or room, devs)
+    stand_in = ""
+    if not dev and fallback:
+        dev = spotify.find_device(fallback, devs)
+        stand_in = (f"“{device}” cannot be reached by Spotify right now, playing instead on "
+                    f"“{dev.get('name', fallback)}”. ") if dev else ""
+    if not dev:
+        return None, name or room, player, "", f"The speaker in the {name or room} cannot be reached by Spotify right now."
+    return dev, name or dev.get("name", ""), player, stand_in, ""
+
+
+def _music_liked(room):
+    """The liked songs as a whole list, in `room` (else the room the user is in, else where Spotify plays now).
+    Before 2026-11-16 "play my liked songs in the living room" only moved what played — a Sonos stream
+    as one single track, so the music stopped after the first song."""
+    import spotify
+    if not spotify.configured():
+        return "For that I need the Spotify login (docs/installation.md → Configuration → Spotify)."
+    dev, where, player, stand_in, err = _room_device(room)
+    if err:
+        return err
+    src = _speaker_stream(player)
+    if not spotify.play_liked(dev["id"] if dev else None):
+        return "Spotify did not start the liked songs."
+    if src and src[0] != player:
+        _pause_speaker(src)                           # a Sonos elsewhere streaming its own track would play on
+    if not where:
+        return "Your liked songs are playing."
+    return stand_in + f"Your liked songs are now playing in the {where}."
+
+
+def _music_artist(artist, room):
+    """All songs of an artist, in `room` (else where the user is, else where Spotify plays). Before 2026-11-19
+    Jarvis could only open Spotify's search and said he had to start it himself."""
+    import spotify
+    artist = " ".join(str(artist or "").split())
+    if not artist:
+        return "Which artist should I play?"
+    if not spotify.configured():
+        return "For that I need the Spotify login (docs/installation.md → Configuration → Spotify)."
+    dev, where, player, stand_in, err = _room_device(room)
+    if err:
+        return err
+    src = _speaker_stream(player)
+    found = spotify.play_artist(artist, dev["id"] if dev else None)
+    if not found:
+        return f"I did not find “{artist}” on Spotify, or it would not start."
+    if src and src[0] != player:
+        _pause_speaker(src)
+    return stand_in + f"{found} is now playing" + (f" in the {where}." if where else ".")
+
+
 def _speaker_stream(target_player=""):
     """(HA player, spotify:track:…, position in ms) of a room speaker that streams Spotify itself — the Sonos with
     the wake-up music or a song asked of Alexa. Spotify's API does not see that playback, so moving it means
@@ -1165,6 +1274,10 @@ def _music(args):
         return f"Spotify shows the search for “{q}”."
     import spotify
     room = " ".join(str(args.get("room") or "").split())
+    if action in ("liked", "favorites", "favourites", "liked_songs"):
+        return _music_liked(room)
+    if action == "artist":
+        return _music_artist(args.get("query"), room)
     if action in ("transfer", "move", "room") or (room and action in ("play", "play_pause")):
         return _music_room(room)
     if action in ("play", "pause", "play_pause", "next", "previous"):
@@ -1189,17 +1302,72 @@ MAIL_USER = os.environ.get("MAIL_USER", "").strip()
 MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "").strip()
 
 
+MAIL_MARKED = os.environ.get("JARVIS_MAIL_MARKED", os.path.join(HERE, "logs", "mail_marked.json"))
+# Marking more unread mails than this at once first returns the list instead (the user wants to hear
+# the important ones before a whole pile disappears as "read" — 2026-11-19, 240 mails marked unseen).
+MAIL_REVIEW_MIN = max(1, int(os.environ.get("JARVIS_MAIL_REVIEW_MIN", "15")))
+_MAIL_HEADERS = "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])"
+
+
+def _mail_dec(v):
+    import email.header
+    try:
+        return str(email.header.make_header(email.header.decode_header(v or ""))).strip()
+    except Exception:  # noqa: BLE001 — a broken header must not stop the list
+        return (v or "").strip()
+
+
+def _mail_heads(box, ids, uid=False):
+    """[(id, from, subject, date-or-None)] for `ids` in one round trip, headers only, nothing marked."""
+    import email
+    import email.utils
+    if not ids:
+        return []
+    joined = b",".join(i if isinstance(i, bytes) else str(i).encode() for i in ids).decode()
+    rows = (box.uid("fetch", joined, _MAIL_HEADERS) if uid else box.fetch(joined, _MAIL_HEADERS))[1]
+    out = []
+    for row in rows or []:
+        if not isinstance(row, tuple):
+            continue
+        meta, raw = row[0], row[1]
+        m = re.search(rb"UID (\d+)", meta) if uid else None
+        key = m.group(1) if m else meta.split()[0]
+        msg = email.message_from_bytes(raw)
+        try:
+            sent = email.utils.parsedate_to_datetime(msg.get("Date")) if msg.get("Date") else None
+        except Exception:  # noqa: BLE001
+            sent = None
+        out.append((key, _mail_dec(msg.get("From")), _mail_dec(msg.get("Subject")) or "(no subject)", sent))
+    return out
+
+
+def _mail_line(tag, frm, subj, sent):
+    return f"{tag}{sent.strftime('%Y-%m-%d %H:%M') if sent else '?'} · {frm[:50]} · {subj[:90]}"
+
+
+def _mail_marked_load():
+    try:
+        with open(MAIL_MARKED, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
 def _mail(args):
     import email
-    import email.header
     import email.utils
     import mailboxes
     if not mailboxes.configured():
         return ("Mailbox not connected yet: MAIL_USER and MAIL_PASSWORD are missing in .env (more accounts as "
                 "MAIL2_…), and IMAP access must be enabled at the mail provider. The user enters that himself.")
-
-    def dec(v):
-        return str(email.header.make_header(email.header.decode_header(v or ""))).strip()
+    if args.get("last_marked"):
+        batch = _mail_marked_load()
+        mails = batch.get("mails") or []
+        if not mails:
+            return "I have not noted any mails I marked as read yet."
+        lines = [f"{m.get('date') or '?'} · {m.get('from', '')[:60]} · {m.get('subject', '')[:110]}" for m in mails[:300]]
+        return (f"{len(mails)} mails I marked as read on {batch.get('at', '?')} (mail_mark_read "
+                f"unread=true last_batch=true makes them unread again):\n" + "\n".join(lines))[:30000]
 
     def preview(msg):
         for part in msg.walk():
@@ -1209,76 +1377,169 @@ def _mail(args):
                 return " ".join(text.split())[:120]
         return ""
 
-    limit = max(1, min(int(args.get("limit") or 5), 15))
-    unread_only = args.get("unread_only", True)
-    q = (args.get("search") or "").lower()
+    # up to 15 mails with a preview; more (up to 300) as a header list to look a pile through
+    limit = max(1, min(int(args.get("limit") or 5), 300))
+    full = limit <= 15
+    days = max(0.0, min(float(args.get("days") or 0), mailboxes.READ_DAYS))
+    hours = days * 24 if days else mailboxes.LOOKBACK_H
+    q = (args.get("search") or "").strip().lower()
+    # "did anything come from X today?" means read ones too; before, the search only saw the newest unread mails
+    unread_only = args.get("unread_only", not q)
     many = len(mailboxes.accounts()) > 1
+    crit = ("UNSEEN",) if unread_only else ()
+    if q.isascii() and q:   # the server narrows to sender/subject first, so `limit` counts hits
+        quoted = '"' + q.replace("\\", "").replace('"', "") + '"'
+        crit += ("OR", "FROM", quoted, "SUBJECT", quoted)
 
     def read(acc, box):
-        # box is read-only: nothing gets marked; never further back than mailboxes.LOOKBACK_H
-        ids = mailboxes.recent(box, criteria=("UNSEEN",) if unread_only else ())
+        # box is read-only: nothing gets marked; never further back than the user asked (at most READ_DAYS)
+        ids = mailboxes.recent(box, hours=hours, criteria=crit, asked=bool(days))
+        tag = f"[{acc['name']}] " if many else ""
         rows = []
+        if not full:
+            for _, frm, subj, sent in _mail_heads(box, ids[-limit:]):
+                if q and q not in frm.lower() and q not in subj.lower():
+                    continue
+                rows.append((sent.timestamp() if sent else 0, _mail_line(tag, frm, subj, sent)))
+            return acc["name"], len(ids), rows
         for i in ids[-limit:][::-1]:
             _, parts = box.fetch(i, "(BODY.PEEK[])")
             msg = email.message_from_bytes(parts[0][1])
-            frm, subj = dec(msg.get("From")), dec(msg.get("Subject"))
+            frm, subj = _mail_dec(msg.get("From")), _mail_dec(msg.get("Subject"))
             if q and q not in frm.lower() and q not in subj.lower():
                 continue
             sent = email.utils.parsedate_to_datetime(msg.get("Date")) if msg.get("Date") else None
-            tag = f"[{acc['name']}] " if many else ""
             rows.append((sent.timestamp() if sent else 0,
                          f"{tag}{sent.strftime('%Y-%m-%d %H:%M') if sent else '?'} · {frm}\n  {subj}\n  {preview(msg)}"))
         return acc["name"], len(ids), rows
 
-    results, errors = mailboxes.each(read, timeout=20)
+    results, errors = mailboxes.each(read, timeout=30 if days else 20)
     if not results:
         return "Mailbox not reachable: " + "; ".join(errors)
     kind = "unread " if unread_only else ""
+    span = (f"{days:g} days" if days != 1 else "24 hours") if days else f"{mailboxes.LOOKBACK_H} hours"
     head = ", ".join(f"{n}: {c}" for n, c, _ in results) if many else str(results[0][1])
-    head = (f"{head} {kind}mails of the last {mailboxes.LOOKBACK_H} hours in the inbox."
-            + (f" Not reachable: {'; '.join(errors)}." if errors else "") + "\n")
+    head = (f"{head} {kind}mails of the last {span} in the inbox."
+            + (f" Not reachable: {'; '.join(errors)}." if errors else "")
+            + ("" if days else f" Further back (up to {mailboxes.READ_DAYS} days) with `days`.") + "\n")
     rows = sorted((r for _, _, rs in results for r in rs), key=lambda r: -r[0])[:limit]
-    return (head + "\n".join(text for _, text in rows))[:6000] if rows else head + "No matching mails."
+    cap = 6000 if full else 30000
+    return (head + "\n".join(text for _, text in rows))[:cap] if rows else head + "No matching mails."
+
+
+def _mail_search(args):
+    import mailboxes
+    if not mailboxes.configured():
+        return _mail({})
+    q = " ".join(str(args.get("query") or args.get("search") or "").split())
+    if not q:
+        return "Search for what? Give `query` = sender or a word of the subject."
+    days = max(1, min(int(args.get("days") or mailboxes.SEARCH_DAYS), mailboxes.SEARCH_DAYS))
+    limit = max(1, min(int(args.get("limit") or 10), 25))
+    in_text = bool(args.get("in_text"))
+    many = len(mailboxes.accounts()) > 1
+
+    def look(acc, box):
+        return [dict(h, account=acc["name"]) for h in mailboxes.search(box, q, days, in_text=in_text)]
+
+    results, errors = mailboxes.each(look, timeout=30)
+    if not results:
+        return "Mailbox not reachable: " + "; ".join(errors)
+    hits = [h for rs in results for h in rs]
+    where = "sender, subject or text" if in_text else "sender or subject"
+    missing = f" Not reachable: {'; '.join(errors)}." if errors else ""
+    if not hits:
+        more = "" if in_text else " With in_text=true I can search the text as well."
+        return f"No mail with “{q}” in {where} in the last {days} days.{missing}{more}"
+    hits.sort(key=lambda h: h["date"].timestamp() if h["date"] else 0, reverse=True)
+    dated = [h["date"] for h in hits if h["date"]]
+    span = (f", from {min(dated).strftime('%Y-%m-%d')} to {max(dated).strftime('%Y-%m-%d')}" if dated else "")
+    per = {}
+    for h in hits:
+        k = (f"{h['account']}/" if many else "") + h["folder"]
+        per[k] = per.get(k, 0) + 1
+    head = (f"{len(hits)} mails with “{q}” in {where} (last {days} days{span}; "
+            + ", ".join(f"{k}: {n}" for k, n in per.items()) + f").{missing}\nNewest:\n")
+    lines = []
+    for h in hits[:limit]:
+        tag = f"[{h['account']}/{h['folder']}] " if many else (f"[{h['folder']}] " if h["folder"] != "INBOX" else "")
+        when = h["date"].strftime("%Y-%m-%d %H:%M") if h["date"] else "?"
+        lines.append(f"{tag}{when} · {h['from'][:80]}\n  {h['subject'][:140]}")
+    return (head + "\n".join(lines))[:6000]
 
 
 def _mail_mark(args):
-    import email
-    import email.header
+    import datetime as dt
     import mailboxes
     if not mailboxes.configured():
         return _mail({})
     q = (args.get("search") or "").strip().lower()
-    if not q and not args.get("all"):
-        return "Which mails? Give `search` (sender/subject) or `all`=true."
     unread = bool(args.get("unread"))
+    last = bool(args.get("last_batch"))
+    if not q and not args.get("all") and not last:
+        return "Which mails? Give `search` (sender/subject), `all`=true or `last_batch`=true."
+    many = len(mailboxes.accounts()) > 1
 
-    def dec(v):
-        return str(email.header.make_header(email.header.decode_header(v or ""))).strip()
+    if last:   # undo: exactly the mails of the last "marked as read"
+        batch = _mail_marked_load()
+        want = {}
+        for m in batch.get("mails") or []:
+            want.setdefault(m.get("account"), []).append(str(m.get("uid")).encode())
+        if not want:
+            return "I have not noted any mails marked last time."
 
-    def mark(acc, box):
-        uids = box.uid("search", None, "SEEN" if unread else "UNSEEN")[1][0].split()
-        if unread:
-            uids = uids[-200:]          # only look at the newest read mails
-        hit = []
-        for uid in uids:
-            raw = box.uid("fetch", uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT)])")[1][0][1]
-            msg = email.message_from_bytes(raw)
-            frm, subj = dec(msg.get("From")), dec(msg.get("Subject"))
-            if not q or q in frm.lower() or q in subj.lower():
-                hit.append((uid, subj or "(no subject)"))
-        if unread and not args.get("all"):
+    def find(acc, box):
+        if last:
+            uids = want.get(acc["key"]) or []
+        else:
+            uids = box.uid("search", None, "SEEN" if unread else "UNSEEN")[1][0].split()
+            if unread:
+                uids = uids[-200:]          # only look at the newest read mails
+        hit = [h for h in _mail_heads(box, uids, uid=True)
+               if last or not q or q in h[1].lower() or q in h[2].lower()]
+        if unread and not last and not args.get("all"):
             hit = hit[-5:]              # "unread again" means the latest few, not the whole archive
-        if hit:
-            box.uid("STORE", b",".join(u for u, _ in hit).decode(), "-FLAGS" if unread else "+FLAGS", "(\\Seen)")
-        return hit
+        return acc, hit
 
-    results, errors = mailboxes.each(mark, readonly=False, timeout=20)
-    hit = [h for r in results for h in r]
+    found, errors = mailboxes.each(find, timeout=30)
     note = f" Not reachable: {'; '.join(errors)}." if errors else ""
-    if not hit:
+    total = sum(len(h) for _, h in found)
+    if not total:
         return "No matching " + ("read" if unread else "unread") + " mails found." + note
+    if not unread and args.get("all") and total > MAIL_REVIEW_MIN and not args.get("reviewed"):
+        # a pile: the user hears what looks important first — nothing is marked yet
+        rows = sorted(((s.timestamp() if s else 0, _mail_line(f"[{acc['name']}] " if many else "", f, subj, s))
+                       for acc, hits in found for _, f, subj, s in hits), key=lambda r: -r[0])
+        return (f"NOTHING marked: {total} unread mails match.{note} First tell the user briefly which of them "
+                "look important (invoices, reminders, bank, authorities, contracts, appointments, parcels, mails from "
+                "people rather than newsletters) — advertising and newsletters only as a number. Only when he then "
+                "says they should be marked, call mail_mark_read again with the same arguments and reviewed=true.\n"
+                + "\n".join(t for _, t in rows[:300]))[:30000]
+    by_key = {acc["key"]: hits for acc, hits in found}
+
+    def store(acc, box):
+        hits = by_key.get(acc["key"]) or []
+        if hits:
+            box.uid("STORE", b",".join(u for u, *_ in hits).decode(), "-FLAGS" if unread else "+FLAGS", "(\\Seen)")
+        return acc, hits
+
+    done, errors2 = mailboxes.each(store, readonly=False, timeout=30)
+    note = f" Not reachable: {'; '.join(errors + errors2)}." if errors or errors2 else ""
+    hit = [(acc, h) for acc, hits in done for h in hits]
+    if not hit:
+        return "Marking did not work." + note
+    if not unread:   # remember the batch, so "which ones did you mark?" and "make them unread again" work
+        mails = [{"account": acc["key"], "uid": u.decode(), "from": f, "subject": subj,
+                  "date": s.strftime("%Y-%m-%d %H:%M") if s else ""} for acc, (u, f, subj, s) in hit]
+        try:
+            os.makedirs(os.path.dirname(MAIL_MARKED), exist_ok=True)
+            with open(MAIL_MARKED, "w", encoding="utf-8") as fh:
+                json.dump({"at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "mails": mails}, fh, ensure_ascii=False)
+        except OSError as e:
+            log.warning("mail_marked not saved: %s", e)
     what = "as unread" if unread else "as read"
-    return (f"{len(hit)} mails marked {what}: " + "; ".join(s for _, s in hit[:10]))[:1500] + note
+    return (f"{len(hit)} mails marked {what}: " + "; ".join(h[2] for _, h in hit[:10]))[:1500] + note
+
 
 def _weather(args):
     import datetime as dt
@@ -1331,6 +1592,7 @@ HA_TOKEN = os.environ.get("HA_TOKEN", "").strip()
 # Climate control is limited below to room entities configured by the user.
 HA_DOMAINS = {"light", "switch", "fan", "media_player", "scene", "climate"}
 HA_SHOWN = HA_DOMAINS | {"sensor", "binary_sensor", "climate", "cover", "weather", "person"}
+SINCE_ROWS = 6       # a search with at most this many hits also says since when (ha_since, one history call each)
 
 
 def _ha(path, body=None):
@@ -1394,6 +1656,33 @@ def _verify(eid, domain, service, data=None, wait=None):
             "Do not report it as done.")
 
 
+_ALEXA_MUSIC = re.compile(r"music|spotify|song|track|playlist|album|radio|podcast|audio ?book|\bplay", re.I)
+
+
+def _alexa_music_refused(eid, service, data):
+    """Music never goes as a spoken Alexa command to an Echo: "play my liked songs in the living room"
+    landed on the Echo Dot instead of the soundbar (2026-11-19). The music tool picks the room's speaker
+    (the soundbar, the Echo only when the soundbar stays unreachable). The Fire TV's own commands stay."""
+    if not (eid.startswith("media_player.") and service == "play_media"):
+        return ""
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except ValueError:
+            data = {}
+    data = data if isinstance(data, dict) else {}
+    if str(data.get("media_content_type") or "").lower() != "custom":
+        return ""
+    import speakers
+    if eid == speakers._cfg()[1]:
+        return ""
+    if not _ALEXA_MUSIC.search(str(data.get("media_content_id") or "")):
+        return ""
+    return ("Refused: do not send music to an Echo as an Alexa command. Use the tool music "
+            "(action liked for the liked songs, transfer or play with room): it plays on the room's soundbar "
+            "and only falls back to the Echo.")
+
+
 def _home(name, args):
     if not HA_TOKEN:
         return ("Home Assistant not connected yet: HA_TOKEN is missing in .env (long-lived access token "
@@ -1419,8 +1708,19 @@ def _home(name, args):
                         detail += f", room {attrs['current_temperature']} °C"
                     if attrs.get("temperature") is not None:
                         detail += f", target {attrs['temperature']} °C"
-                rows.append(f"{label} ({eid}): {detail}".rstrip())
-            return "\n".join(sorted(rows))[:6000] or "Nothing found."
+                rows.append((f"{label} ({eid}): {detail}".rstrip(), s))
+            if q and len(rows) <= SINCE_ROWS:
+                # a few devices asked for: say since when, so "since when has the light been on?" has an answer
+                import ha_since
+                for i, (row, s) in enumerate(rows):
+                    if s["entity_id"].split(".")[0] in HA_DOMAINS:
+                        try:
+                            told = ha_since.stamp(s["entity_id"], s["state"], s.get("last_changed"))
+                        except Exception:  # noqa: BLE001
+                            told = ""
+                        if told:
+                            rows[i] = (f"{row}, {told}", s)
+            return "\n".join(sorted(r for r, _ in rows))[:6000] or "Nothing found."
         eid = (args.get("entity_id") or "").strip()
         domain, service = eid.split(".")[0], (args.get("service") or "").strip()
         if domain == "climate":
@@ -1467,6 +1767,9 @@ def _home(name, args):
             return f"Refused: I may not switch {domain}, only {', '.join(sorted(HA_DOMAINS))}."
         if not service.replace("_", "").isalnum():
             return "Refused: invalid service."
+        refused = _alexa_music_refused(eid, service, args.get("data"))
+        if refused:
+            return refused
         _ha(f"/api/services/{domain}/{service}", dict(args.get("data") or {}, entity_id=eid))
         return _verify(eid, domain, service)
     except urllib.error.HTTPError as e:
@@ -1791,6 +2094,8 @@ def call_tool(name, args):
             text = f"Music error: {e}"
     elif name == "mail_inbox":
         text = _mail(args)
+    elif name == "mail_search":
+        text = _mail_search(args)
     elif name == "mail_mark_read":
         text = _mail_mark(args)
     elif name in ("announce", "tv_control"):
@@ -2098,6 +2403,10 @@ def handle_call(name, args):
     text = call_tool(name, args)
     if text is None:
         return None
+    # Keys and tokens leave the result here: before the audit line and before the cut
+    # (half a key would no longer look like one).
+    import content_guard
+    text = content_guard.clean(name, text, untrusted=name in policy.UNTRUSTED)
     audit.tool(name, args, text, cls)
     if name in policy.UNTRUSTED:
         TAINTED.update(on=True, by=name)

@@ -43,7 +43,10 @@ port and state file (see `docs/installation.md`, "Development and diagnosis"); `
   via `mail_events_undo`). A second one, chosen by the user on 2026-11-10: the learning loop
   (`reflection.remember`) saves up to `JARVIS_REMEMBER_MAX` lasting facts the user said himself through
   `memory_save` (duplicate/contradiction/work checks, only the notes in `REMEMBER_NOTES`, never Commands,
-  logged in the learning log, removable with memory_forget). Do not widen either without asking.
+  logged in the learning log, removable with memory_forget). A third one, chosen by the user on 2026-11-19:
+  `sonos_queue.py` adds Spotify's queue behind the song the HA automation "Jarvis: music follows me" just moved
+  onto the bedroom Sonos (event `jarvis_music_sonos`; only that speaker's queue, never start/stop/volume,
+  logged in the HA logbook, `JARVIS_SONOS_QUEUE=0` turns it off). Do not widen any of them without asking.
 - Jarvis never edits his own code at runtime.
 - Never set `ANTHROPIC_API_KEY`; personal data lives only in `.env`, `config/*.json` (not the
   examples), `vault/`, `logs/`, `backups/`, `state.json` — all ignored by git.

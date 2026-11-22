@@ -10,8 +10,8 @@ Legend: ✅ done · 🔄 in progress · ⏸ waiting for approval · ⬜ open
 |---|---|---|
 | 0 Inventory | ✅ | Report `INVENTORY.md`, approved 2026-11-02. The seven decisions (section 11) are still open |
 | P0 Foundation | ✅ except the Linux run | 2026-11-02: tests green (637), dependencies split, `jarvis_log.py` (JSON log), `metrics.py` (`/metrics` for all modules), non-UTF-8 requests → 400. Open: test run on Linux (no WSL on the PC), rotate keys (user) |
-| 1 Voice pipeline | ✅ core · ⬜ rest | Engine on the server since 2026-11-02 (commit `b85eb0d`). Since 2026-11-10: iPad/iPhone on the engine (tunnel `/voice-ws`). Open: room satellite, Sonos AEC trial, RNNoise, tuning with a real microphone |
-| 2 Agent core | 🔄 | Present: router, Haiku/Sonnet, fallback mode, action classes, audit, personality, vault, episodes. Since 2026-11-10: SQLite FTS5 index over the memory (`memory_index.py`), saving facts by himself after a conversation, store on the NAS. Missing: plugin registry, YAML configuration, short-term summary, speaker recognition, separation of private and work |
+| 1 Voice pipeline | ✅ core · ⬜ rest | Engine on the server since 2026-11-02 (commit `b85eb0d`). Since 2026-11-10: iPad/iPhone on the engine (tunnel `/voice-ws`). Since 2026-11-17: Home Assistant Voice PE prepared (only the ear: recognition on the GPU, the answer sentence by sentence on the room's speaker; Whisper/Piper on the Pi as a reserve). Open: connecting the Voice PE, Sonos AEC trial, RNNoise, tuning with a real microphone |
+| 2 Agent core | 🔄 | Present: router, Haiku/Sonnet, fallback mode, action classes, audit, personality, vault, episodes. Since 2026-11-10: SQLite FTS5 index over the memory (`memory_index.py`), saving facts by himself after a conversation, store on the NAS. Since 2026-11-21: short-term summary (earlier exchanges of the same conversation as one line each, `JARVIS_HISTORY_EARLIER`), content guard, `scripts/doctor.py`. Missing: plugin registry, YAML configuration, speaker recognition, separation of private and work |
 | 3 Server & operations | ⬜ | Plan and hardware in `SERVER-REBUILD.md`; `hostos.py` started. Missing: Linux test run, PC agent, systemd, secrets, backups to the NAS, self-monitoring. Since 2026-11-10: crash watchdog in HA (`heartbeat.py`, push when the PC runs without a heartbeat) |
 | 4 HA & energy | ⬜ | Present: rooms/aliases, climate groups, own routines, energy coach, electricity costs, budget. Missing: HA automations by voice, PV forecast, Noah SOC, PromQL from speech with a chart |
 | 5 Proactivity | 🔄 | 2026-11-05: proactive mode (docs/proactive.md): triggers arrival/morning/instant/good night, levels, output by presence, quiet rules, feedback by voice, history. Since 2026-11-10: HA WebSocket (`ha_events.py`) instead of the 30-s poll. Missing: Alertmanager |
@@ -27,7 +27,7 @@ Legend: ✅ done · 🔄 in progress · ⏸ waiting for approval · ⬜ open
 | Tests | 🔄 | 664 tests green; `coverage` in `requirements-dev.txt`, no measurement yet; never run on Linux |
 | Observability | 🔄 | `/metrics` for requests, duration, tokens, cards, jobs, fallback mode, tool calls, log errors and the voice engine; `logs/jarvis.log` as JSON. Prometheus on the Pi does not reach the PC; no Grafana dashboard "Jarvis" |
 | Cost control | ✅ | Tokens per route in the log, electricity budget; since 2026-11-10 a weekly token budget announced at 80/100 % (`token_budget.py`) |
-| Privacy | 🔄 | Audio local, raw audio only in debug mode; an overview "which data goes to which cloud" is missing as a document |
+| Privacy | 🔄 | Audio local, raw audio only in debug mode; since 2026-11-21 the overview "which data goes to which cloud" as `docs/data-flows.md`, `scripts/data_flows.py` and a voice command (`data_flows.py`) |
 | Configuration | 🔄 | `voice.yaml` as the model; the rest in `.env` (333 variables) and 7 JSON files. New: `JARVIS_LOG_LEVEL`, `JARVIS_LOG_DEBUG`, `JARVIS_LOG_FILE` |
 | Documentation | 🔄 | README, ARCHITECTURE, SECURITY, PORTING, SERVER-REBUILD, VOICE-ANALYSIS; a README per module and a "new ability" guide are missing |
 | Language | ✅ | English edition (this repository); the German edition is [jarvis-hud-de](https://github.com/Zedas030/jarvis-hud-de) |
@@ -40,6 +40,7 @@ Legend: ✅ done · 🔄 in progress · ⏸ waiting for approval · ⬜ open
 
 ## History
 
+- 2026-11-17 `/api/ask` with a key from `pair.html?key` (at first also for a Siri shortcut, removed again the same day: the HUD as an app on the phone is enough), battery doctor, automation checker and homelab drift in `pi_reports.py`, Home Assistant Voice PE prepared (`ha/custom_components/jarvis`, `pi/voice/compose.yml`, `scripts/ha_voice_setup.py`); the Voice PE's speech recognition on the PC's GPU (`/api/hear`, `stt.jarvis`, 0.2 s instead of 7–17 s on the Pi), the answer sentence by sentence on the Sonos while Claude is writing.
 - 2026-11-10 evening: "Why is … on?" from the HA logbook, "Where is …?", birthdays the day before, "What did you do today?", night report of the presence sensors, airing and mould, print ideas with MakerWorld.
 - 2026-11-10 afternoon: weekly review of what was saved, check of the NAS store, noise filter, "What's on tomorrow?" in good night, Kuma alarms with a restart proposal.
 - 2026-11-10 HA events in real time, weekly token budget, memory with an FTS5 index, saving facts by himself and the NAS store, iPad/iPhone on the voice engine.

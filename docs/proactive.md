@@ -22,7 +22,7 @@ The file is read again whenever it changes, no restart needed.
 | Coming home | `person.*` is `home` again after at least 20 min away | briefing as soon as a presence sensor knows the room (after 3 min at the latest, on the default speaker) |
 | Morning | first entry into the bathroom after the night (5–11 h), once a day | weather, warnings, appointments, parcels, sun, what happened at night. Counts as the day's briefing |
 | Instant | every round (30 s) | critical and important news from HA: water/smoke, NOAH difference, socket offline, DWD warnings |
-| Good night | "Jarvis, good night" | appended to your routine "Good night": devices still on, open windows, an early appointment tomorrow |
+| Good night | "Jarvis, good night" | appended to your routine "Good night": devices still on, open windows, an early appointment tomorrow. Off in the user's setup since 2026-11-20 (`evening.enabled: false`): no evening litany after "Good night" any more |
 
 A briefing lasts at most 25 seconds (about 60 words); what no longer fits only appears on the iPad.
 Claude (Haiku, without tools) words it; if the model does not answer within 25 s, Jarvis speaks a fixed text

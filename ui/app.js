@@ -702,7 +702,7 @@ async function transmit(message, opts) {
   answerBubble.classList.remove('thinking');
   $('#sLatency').textContent = Math.round(performance.now() - t0) + 'ms';
   setVoiceState('IDLE', '');
-  if (answerText.trim() && opts.speak !== false) {
+  if (answerText.trim() && opts.speak !== false && streamSpeak) {   // streamSpeak: off after a "quiet" event
     feedSpeech(speakable(answerText), true);   // whatever is left after the last full sentence
     await speechDrained();
   }
@@ -749,6 +749,9 @@ function handleEvent(ev) {
       var tone = lastTone(answerText);
       if (tone) $('#toneNow').textContent = tone;
       $('#transcript').scrollTop = $('#transcript').scrollHeight;
+      break;
+    case 'quiet':                                  // done and audible (music started): shown, not spoken
+      streamSpeak = false;
       break;
     case 'route':
       $('#routeNow').textContent = ev.model + (ev.groups && ev.groups.length ? ' · ' + ev.groups.join(', ') : '')
@@ -2896,7 +2899,8 @@ var Devices = {
     ul.innerHTML = d.devices.length ? '' : '<li class="empty">No device paired yet.</li>';
     d.devices.forEach(function (dev) {
       var li = document.createElement('li');
-      li.innerHTML = '<b>' + esc(dev.name) + '</b><em>' + esc(dev.seen ? 'last seen ' + dev.seen : 'paired ' + dev.created)
+      li.innerHTML = '<b>' + esc(dev.name) + (dev.kind === 'ask' ? ' 🔑' : '') + '</b><em>'
+        + esc(dev.seen ? 'last seen ' + dev.seen : 'paired ' + dev.created)
         + '</em><button title="Remove device">✕</button>';
       li.querySelector('button').onclick = async function () {
         if (!confirm('Remove ' + dev.name + '? It has to be paired again afterwards.')) return;

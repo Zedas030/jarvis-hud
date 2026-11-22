@@ -44,7 +44,7 @@ FORBIDDEN = re.compile(r"buy|order|purchase|call|phone|message|shop|pay|subscri|
 def _quiet():
     try:
         import events
-        return events.quiet_now()
+        return events.sleeping()          # after "good night", not by the clock (2026-11-17)
     except Exception:  # noqa: BLE001
         return False
 

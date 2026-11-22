@@ -44,5 +44,87 @@ class Mailboxes(unittest.TestCase):
         boxes["imap.gmx.net"].select.assert_called_with("INBOX", readonly=True)
 
 
+class SearchBox:
+    """A typical provider's box: INBOX and Archive hold mails, Sent/Trash/Spam must never be searched."""
+    LIST = [b'(\\Archive \\HasNoChildren) "/" Archive', b'(\\Sent \\NoInferiors) "/" Sent',
+            b'(\\HasNoChildren) "/" INBOX', b'(\\Trash \\HasNoChildren) "/" Trash',
+            b'(\\NoInferiors) "/" Outbox', b'(\\Junk \\NoInferiors) "/" Spam',
+            b'(\\HasNoChildren) "/" "My stuff"']
+    MAILS = {"INBOX": {b"1": ("Stadtwerke <info@stadtwerke.example>", "Your invoice", "Mon, 03 Nov 2026 10:00:00 +0100")},
+             "Archive": {b"7": ("Stadtwerke GmbH <noreply@stadtwerke.example>", "Instalment", "Tue, 10 Mar 2026 08:30:00 +0100")}}
+
+    def __init__(self):
+        self.selected, self.searched, self.literal = None, [], None
+
+    def list(self):
+        return "OK", self.LIST
+
+    def select(self, name, readonly=False):
+        assert readonly, "search must stay read-only"
+        self.selected = name.strip('"')
+        return "OK", [b"1"]
+
+    def search(self, charset, *crit):
+        self.searched.append((self.selected, crit))
+        return "OK", [b" ".join(self.MAILS.get(self.selected, {}))]
+
+    def fetch(self, ids, what):
+        assert "HEADER.FIELDS" in what and "PEEK" in what, "only headers, nothing marked"
+        out = []
+        for i in ids.split(b","):
+            frm, subj, date = self.MAILS[self.selected][i]
+            out.append((i + b" (BODY[HEADER.FIELDS (FROM SUBJECT DATE)] {99}",
+                        f"From: {frm}\r\nSubject: {subj}\r\nDate: {date}\r\n\r\n".encode()))
+            out.append(b")")
+        return "OK", out
+
+
+class MailSearch(unittest.TestCase):
+    def test_own_folders_only_inbox_first(self):
+        self.assertEqual(mailboxes.folders(SearchBox()), ["INBOX", "Archive", "My stuff"])
+
+    def test_finds_old_mails_in_inbox_and_archive_headers_only(self):
+        box = SearchBox()
+        hits = mailboxes.search(box, "stadtwerke")
+        self.assertEqual(sorted((h["folder"], h["subject"]) for h in hits),
+                         [("Archive", "Instalment"), ("INBOX", "Your invoice")])
+        crit = box.searched[0][1]
+        self.assertEqual(crit[0], "SINCE")
+        self.assertEqual(crit[2:], ("OR", "FROM", '"stadtwerke"', "SUBJECT", '"stadtwerke"'))
+        self.assertEqual(box.selected, "INBOX", "INBOX is selected again afterwards")
+
+    def test_window_is_capped(self):
+        import time
+        box = SearchBox()
+        mailboxes.search(box, "stadtwerke", days=5000)
+        since = time.mktime(time.strptime(box.searched[0][1][1], "%d-%b-%Y"))
+        self.assertGreater(since, time.time() - (mailboxes.SEARCH_DAYS + 2) * 86400)
+
+    def test_umlauts_go_as_literal(self):
+        box = SearchBox()
+        mailboxes.search(box, "Müller")
+        inbox = [c for f, c in box.searched if f == "INBOX"]
+        self.assertEqual([c[2] for c in inbox], ["FROM", "SUBJECT"], "sender and subject, each as UTF-8 literal")
+        self.assertEqual(box.literal, "Müller".encode())
+
+    def test_tool_answers_with_count_and_range(self):
+        import jarvis_mcp
+        one = {"MAIL_IMAP_HOST": "imap.example", "MAIL_USER": "a@example.org", "MAIL_PASSWORD": "x"}
+        with mock.patch.dict(os.environ, one, clear=False), \
+                mock.patch.object(mailboxes, "accounts", return_value=[mailboxes.accounts()[0]]), \
+                mock.patch.object(mailboxes, "connect", return_value=SearchBox()):
+            out = jarvis_mcp._mail_search({"query": "stadtwerke"})
+        self.assertIn("2 mails", out)
+        self.assertIn("2026-03-10", out)
+        self.assertIn("[Archive]", out)
+        self.assertIn("Your invoice", out)
+
+    def test_router_sends_the_question_to_mail(self):
+        import router
+        for q in ("Did anything ever come from Stadtwerke?", "did Stadtwerke ever write?",
+                  "Have I ever received post from Telekom?", "Has anything arrived from Stadtwerke at some point?"):
+            self.assertIn("mail", router.llm_route(q)["groups"], q)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -44,6 +44,11 @@ stt:
   min_chars: 2             # transcripts with fewer letters/digits are noise
   vocabulary:              # always primed into Whisper (plus WHISPER_LOCAL_PROMPT and device names from config/home.json)
     - Jarvis
+    - mails
+    - email
+    - inbox
+    - mark as read
+    - volume
     - Home Assistant
     - Grafana
     - Prometheus
@@ -78,6 +83,7 @@ barge:
   clip_silence_ms: 500     # silence ending the interruption clip
   clip_max_ms: 8000        # an interruption longer than this is checked as it stands
   resume_after_ms: 1500    # interrupted, then nothing said: go on from the start of the sentence
+  resume_skip_ratio: 0.6   # nobody spoke (echo, noise, TV) and this share of the sentence was heard: go on with the next one
   backchannel: ["mhm", "mh", "hm", "hmm", "yes", "yeah", "yep", "right", "okay", "ok", "aha", "i see",
                 "got it", "understood", "good", "true", "exactly", "sure", "oh", "ah", "uh", "um"]
   stop_words: ["stop", "halt", "quiet", "be quiet", "silence", "shush", "hush", "never mind",
